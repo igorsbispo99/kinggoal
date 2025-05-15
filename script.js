@@ -39,8 +39,8 @@ function carregarTreinamento() {
 
 function carregarReais() {
   const jogos = [
-    { casa: "São Paulo", fora: "Athletico-PR", analise: "Ambas Marcam: tendência nos últimos confrontos diretos." },
-    { casa: "Fortaleza", fora: "América-MG", analise: "Lay Goleada: visitante com 0.5 de média nos últimos 4 jogos." }
+    { casa: "Bragantino", fora: "Atlético-GO", analise: "Ambas Marcam: padrão nos últimos confrontos." },
+    { casa: "Bahia", fora: "Vasco", analise: "Lay Goleada: visitante com baixa produção ofensiva recente." }
   ];
   let html = "";
   jogos.forEach(j => {
