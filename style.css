@@ -1,7 +1,41 @@
-body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
-h1 { color: #6a1b9a; }
-#login, #app { background: white; padding: 20px; margin-top: 20px; border-radius: 8px; }
-input { margin: 5px 0; padding: 8px; width: 100%; }
-button { padding: 10px; background: #6a1b9a; color: white; border: none; cursor: pointer; }
-button:hover { background: #4a148c; }
-#jogos { margin-top: 15px; }
+body {
+    font-family: 'Open Sans', sans-serif;
+    background: #f5f5f5;
+    padding: 20px;
+    color: #333;
+}
+#logo h1 {
+    text-align: center;
+    font-size: 28px;
+    color: #6a1b9a;
+}
+#login, #app {
+    background: white;
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0px 0px 10px #ccc;
+}
+input {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+button {
+    background: #6a1b9a;
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+button:hover {
+    background: #4a148c;
+}
+#jogos {
+    margin-top: 20px;
+}

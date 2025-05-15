@@ -6,15 +6,15 @@ function entrar() {
         document.getElementById('app').style.display = 'block';
         carregarJogos();
     } else {
-        alert("Preencha e-mail e senha para entrar.");
+        alert("Digite e-mail e senha para entrar.");
     }
 }
 
 function carregarJogos() {
     const jogos = [
-        { casa: "Time A", fora: "Time B", analise: "Lay Goleada - recomendado" },
-        { casa: "Time C", fora: "Time D", analise: "+2.5 Gols - possível valor" },
-        { casa: "Time E", fora: "Time F", analise: "Ambas Marcam - risco moderado" }
+        { casa: "Flamengo", fora: "Palmeiras", analise: "Lay Goleada - Flamengo tem média de 1.2 gols marcados e 0.8 sofridos nos últimos 5 jogos." },
+        { casa: "Botafogo", fora: "Grêmio", analise: "+2.5 Gols - Média combinada de 3.4 gols nos últimos confrontos diretos." },
+        { casa: "Corinthians", fora: "São Paulo", analise: "Ambas Marcam - Ambas marcaram em 6 dos últimos 7 clássicos." }
     ];
     let html = "";
     jogos.forEach(jogo => {
