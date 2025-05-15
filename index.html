@@ -2,26 +2,31 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>KingGoal - IA Estratégica</title>
+  <title>KingGoal - Modo Noturno</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="logo">
-    <h1><span style="color:#d4af37;">KG</span> - KingGoal</h1>
+    <h1><span class="dourado">KG</span> - KingGoal</h1>
   </div>
-  <div id="login">
-    <input type="email" placeholder="E-mail" id="email">
-    <input type="password" placeholder="Senha" id="senha">
-    <button onclick="entrar()">Entrar</button>
+  <div id="menu-principal">
+    <button onclick="mostrarModoTreinamento()">Entrar no Modo Treinamento</button>
+    <button onclick="mostrarJogosReais()">Ver Jogos Reais</button>
   </div>
-  <div id="app" style="display:none;">
-    <h2>Jogos do Dia</h2>
-    <div id="jogos"></div>
-    <h3>Modo Treinamento</h3>
+
+  <div id="modo-treinamento" style="display:none;">
+    <h2>Modo Treinamento</h2>
     <label for="banca">Banca simulada (R$):</label>
     <input type="number" id="banca" value="100" oninput="sugerirStake()" />
     <div id="sugestao"></div>
+    <div id="jogos-treinamento"></div>
   </div>
+
+  <div id="jogos-reais" style="display:none;">
+    <h2>Jogos Reais (Simulados)</h2>
+    <div id="jogos"></div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 </html>
