@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>KingGoal - Jogos Reais</title>
+  <title>KingGoal - Valor de Aposta</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,21 +14,8 @@
   </div>
 
   <div id="menu" style="display:none;">
-    <h2>Escolha o modo</h2>
-    <button onclick="mostrarTreinamento()">Modo Treinamento</button>
-    <button onclick="mostrarReais()">Jogos Reais</button>
-  </div>
-
-  <div id="modo-treinamento" style="display:none;">
-    <h3>Modo Treinamento</h3>
-    <input type="number" id="banca" value="100" oninput="sugerirStake()" />
-    <div id="sugestao"></div>
-    <div id="simulados"></div>
-  </div>
-
-  <div id="modo-reais" style="display:none;">
-    <h3>Jogos Reais de Hoje</h3>
-    <div id="reais"></div>
+    <h2>Jogos Reais (simulados)</h2>
+    <div id="jogos"></div>
   </div>
 
   <script src="script.js"></script>

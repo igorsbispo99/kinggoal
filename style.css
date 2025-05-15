@@ -28,3 +28,6 @@ button {
   padding: 10px;
   border-radius: 8px;
 }
+.valor-positivo { color: #00e676; }
+.valor-negativo { color: #ff1744; }
+.valor-neutro { color: #cccccc; }
