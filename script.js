@@ -1,61 +1,50 @@
-function mostrarModoTreinamento() {
-  document.getElementById('modo-treinamento').style.display = 'block';
-  document.getElementById('jogos-reais').style.display = 'none';
-  carregarJogosTreinamento();
+function entrar() {
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  if (email && senha) {
+    document.getElementById("login").style.display = "none";
+    document.getElementById("menu").style.display = "block";
+  }
+}
+
+function mostrarTreinamento() {
+  document.getElementById("modo-reais").style.display = "none";
+  document.getElementById("modo-treinamento").style.display = "block";
+  carregarTreinamento();
   sugerirStake();
 }
 
-function mostrarJogosReais() {
-  document.getElementById('modo-treinamento').style.display = 'none';
-  document.getElementById('jogos-reais').style.display = 'block';
-  carregarJogos();
+function mostrarReais() {
+  document.getElementById("modo-treinamento").style.display = "none";
+  document.getElementById("modo-reais").style.display = "block";
+  carregarReais();
 }
 
 function sugerirStake() {
-  const banca = parseFloat(document.getElementById('banca').value);
+  const banca = parseFloat(document.getElementById("banca").value);
   const stake = (banca * 0.1).toFixed(2);
-  document.getElementById("sugestao").innerText =
-    `Stake recomendada: R$ ${stake}`;
+  document.getElementById("sugestao").innerText = `Stake sugerida: R$ ${stake}`;
 }
 
-function carregarJogosTreinamento() {
+function carregarTreinamento() {
   const jogos = [
-    { casa: "Atlético-MG", fora: "Cuiabá", analise: "Lay Goleada: mandante sofreu menos de 2 gols em todos os últimos jogos." },
-    { casa: "Cruzeiro", fora: "Internacional", analise: "+2.5 Gols: Média combinada de 3.2 gols por jogo." }
+    { casa: "Santos", fora: "Chapecoense", analise: "Lay Goleada: média de 0.8 gols do visitante." }
   ];
   let html = "";
-  jogos.forEach((jogo, i) => {
-    html += `<div class="analise">
-      <strong>${jogo.casa} vs ${jogo.fora}</strong><br>
-      <em>${jogo.analise}</em>
-    </div>`;
+  jogos.forEach(j => {
+    html += `<div class="analise"><strong>${j.casa} x ${j.fora}</strong><br><em>${j.analise}</em></div>`;
   });
-  document.getElementById('jogos-treinamento').innerHTML = html;
+  document.getElementById("simulados").innerHTML = html;
 }
 
-function carregarJogos() {
+function carregarReais() {
   const jogos = [
-    { casa: "Fluminense", fora: "Bahia", analise: "Ambas Marcam: ambas marcaram em 5 dos últimos 6 confrontos diretos." },
-    { casa: "Vasco", fora: "Coritiba", analise: "Lay Goleada: visitante tem média de 0.6 gols nos últimos jogos." }
+    { casa: "São Paulo", fora: "Athletico-PR", analise: "Ambas Marcam: tendência nos últimos confrontos diretos." },
+    { casa: "Fortaleza", fora: "América-MG", analise: "Lay Goleada: visitante com 0.5 de média nos últimos 4 jogos." }
   ];
   let html = "";
-  jogos.forEach((jogo, i) => {
-    html += `<div class="analise">
-      <strong>${jogo.casa} vs ${jogo.fora}</strong><br>
-      <em>${jogo.analise}</em>
-      <div class="botoes">
-        <button onclick="responder(${i}, true)">Vou apostar</button>
-        <button onclick="responder(${i}, false)">Não vou apostar</button>
-      </div>
-      <div id="resposta-${i}"></div>
-    </div>`;
+  jogos.forEach(j => {
+    html += `<div class="analise"><strong>${j.casa} x ${j.fora}</strong><br><em>${j.analise}</em></div>`;
   });
-  document.getElementById('jogos').innerHTML = html;
-}
-
-function responder(i, decisao) {
-  const resposta = decisao
-    ? "Decisão registrada. Essa entrada tem valor esperado positivo."
-    : "Ok, a IA continuará analisando os padrões.";
-  document.getElementById(`resposta-${i}`).innerText = resposta;
+  document.getElementById("reais").innerHTML = html;
 }

@@ -2,29 +2,33 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>KingGoal - Modo Noturno</title>
+  <title>KingGoal - Dados Reais</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="logo">
+  <div id="login">
     <h1><span class="dourado">KG</span> - KingGoal</h1>
+    <input type="email" id="email" placeholder="E-mail" />
+    <input type="password" id="senha" placeholder="Senha" />
+    <button onclick="entrar()">Entrar</button>
   </div>
-  <div id="menu-principal">
-    <button onclick="mostrarModoTreinamento()">Entrar no Modo Treinamento</button>
-    <button onclick="mostrarJogosReais()">Ver Jogos Reais</button>
+
+  <div id="menu" style="display:none;">
+    <h2>Escolha o modo</h2>
+    <button onclick="mostrarTreinamento()">Modo Treinamento</button>
+    <button onclick="mostrarReais()">Jogos Reais</button>
   </div>
 
   <div id="modo-treinamento" style="display:none;">
-    <h2>Modo Treinamento</h2>
-    <label for="banca">Banca simulada (R$):</label>
+    <h3>Modo Treinamento</h3>
     <input type="number" id="banca" value="100" oninput="sugerirStake()" />
     <div id="sugestao"></div>
-    <div id="jogos-treinamento"></div>
+    <div id="simulados"></div>
   </div>
 
-  <div id="jogos-reais" style="display:none;">
-    <h2>Jogos Reais (Simulados)</h2>
-    <div id="jogos"></div>
+  <div id="modo-reais" style="display:none;">
+    <h3>Jogos Reais de Hoje</h3>
+    <div id="reais"></div>
   </div>
 
   <script src="script.js"></script>

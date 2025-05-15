@@ -1,57 +1,30 @@
 body {
-  font-family: 'Open Sans', sans-serif;
   background: #121212;
-  color: #ffffff;
+  color: #fff;
+  font-family: 'Open Sans', sans-serif;
   padding: 20px;
 }
 .dourado { color: #d4af37; }
-#logo h1 {
-  text-align: center;
-  font-size: 28px;
-  color: #9b90d1;
-}
-#menu-principal, #modo-treinamento, #jogos-reais {
-  background: #1e1e1e;
-  max-width: 700px;
-  margin: 20px auto;
-  padding: 25px;
-  border-radius: 10px;
-  box-shadow: 0px 0px 10px #000;
+input, button {
+  display: block;
+  margin: 10px auto;
+  padding: 10px;
+  width: 80%;
+  border-radius: 6px;
+  border: none;
 }
 input {
-  display: block;
-  width: 100%;
-  margin-bottom: 12px;
-  padding: 10px;
-  border-radius: 5px;
-  border: 1px solid #555;
   background: #2b2b2b;
   color: #fff;
 }
 button {
   background: #9b90d1;
-  color: white;
-  padding: 10px;
-  border: none;
-  border-radius: 5px;
+  color: #fff;
   cursor: pointer;
-  margin: 10px 0;
-  width: 100%;
-}
-button:hover {
-  background: #7e71c7;
 }
 .analise {
-  background: #2c2c2c;
-  padding: 10px;
+  background: #1e1e1e;
   margin: 10px 0;
+  padding: 10px;
   border-radius: 8px;
-}
-.botoes {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-}
-.botoes button {
-  flex: 1;
 }
