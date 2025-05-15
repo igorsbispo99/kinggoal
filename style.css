@@ -1,0 +1,7 @@
+body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 20px; }
+h1 { color: #6a1b9a; }
+#login, #app { background: white; padding: 20px; margin-top: 20px; border-radius: 8px; }
+input { margin: 5px 0; padding: 8px; width: 100%; }
+button { padding: 10px; background: #6a1b9a; color: white; border: none; cursor: pointer; }
+button:hover { background: #4a148c; }
+#jogos { margin-top: 15px; }
