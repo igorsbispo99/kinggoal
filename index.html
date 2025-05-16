@@ -2,19 +2,32 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>KingGoal - Valor de Aposta</title>
+  <title>KingGoal - Jogos Reais Integrados</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="login">
-    <h1><span class="dourado">KG</span> - KingGoal</h1>
+    <h1><img src="logo-kg.png" alt="Logo KingGoal" style="height:60px;"><br><span class="dourado">KingGoal</span></h1>
     <input type="email" id="email" placeholder="E-mail" />
     <input type="password" id="senha" placeholder="Senha" />
     <button onclick="entrar()">Entrar</button>
   </div>
 
   <div id="menu" style="display:none;">
-    <h2>Jogos Reais (simulados)</h2>
+    <h2>Escolha o modo</h2>
+    <button onclick="mostrarTreinamento()">Modo Treinamento</button>
+    <button onclick="mostrarJogos()">Jogos Reais</button>
+  </div>
+
+  <div id="modo-treinamento" style="display:none;">
+    <h3>Modo Treinamento</h3>
+    <input type="number" id="banca" value="100" oninput="sugerirStake()" />
+    <div id="sugestao"></div>
+    <div id="treinamento"></div>
+  </div>
+
+  <div id="modo-jogos" style="display:none;">
+    <h3>Jogos Reais</h3>
     <div id="jogos"></div>
   </div>
 
