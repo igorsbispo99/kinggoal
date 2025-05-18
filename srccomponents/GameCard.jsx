@@ -34,4 +34,11 @@ function GameCard({ match }) {
       {/* Detalhes adicionais */}
       <div style={{ marginTop: '1rem', fontSize: '0.9rem', color: '#ccc' }}>
         <p><strong>Horário:</strong> {horario}</p>
-        <p><
+        <p><strong>Liga:</strong> {league.name} ({league.country})</p>
+        <p><strong>Status:</strong> {fixture.status.long}</p>
+      </div>
+    </div>
+  );
+}
+
+export default GameCard;
