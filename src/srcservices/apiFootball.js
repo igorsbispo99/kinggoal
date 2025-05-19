@@ -13,7 +13,7 @@ export const getMatchesByDate = async (date) => {
   try {
     const response = await api.get('/fixtures', {
       params: {
-        date,
+  date: '2024-05-17', // << Troque por um dia que sabemos que teve jogos
         timezone: 'America/Sao_Paulo',
         // ❌ Removido filtro status para trazer todos os jogos da data (inclusive FT)
       },
