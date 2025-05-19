@@ -8,15 +8,13 @@ const api = axios.create({
     'x-apisports-key': apiKey,
   },
 });
-
-export const getTodayMatches = async () => {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+export const getMatchesByDate = async (date) => {
   try {
     const response = await api.get('/fixtures', {
       params: {
-        date: today,
+        date,
         timezone: 'America/Sao_Paulo',
-        status: 'NS,TBD', // Somente jogos futuros
+        status: 'NS,TBD,1H,2H,HT,ET,P,FT',
       },
     });
     return response.data.response;
