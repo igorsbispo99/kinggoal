@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiKey = '02c0a6ce2f0a4823a857ec0d593617a1'; // Sua chave PRO
+const apiKey = '02c0a6ce2f0a4823a857ec0d593617a1'; // Chave PRO fornecida
 
 const api = axios.create({
   baseURL: 'https://v3.football.api-sports.io/',
@@ -8,13 +8,14 @@ const api = axios.create({
     'x-apisports-key': apiKey,
   },
 });
+
 export const getMatchesByDate = async (date) => {
   try {
     const response = await api.get('/fixtures', {
       params: {
         date,
         timezone: 'America/Sao_Paulo',
-        status: 'NS,TBD,1H,2H,HT,ET,P,FT',
+        // ❌ Removido filtro status para trazer todos os jogos da data (inclusive FT)
       },
     });
     return response.data.response;
