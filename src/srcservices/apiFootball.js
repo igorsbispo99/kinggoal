@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const apiKey = '02c0a6ce2f0a4823a857ec0d593617a1'; // Chave PRO fornecida
+const apiKey = '8d9cba82ae12f5bfa9f2e4d132c71f5e'; // Chave PRO fornecida
 
 const api = axios.create({
   baseURL: 'https://v3.football.api-sports.io/',
