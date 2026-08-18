@@ -1,0 +1,15 @@
+{
+  "name": "estudio-ia",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Estúdio de TV com IA — redação automatizada para canal de notícias vertical",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "manha": "node src/esteira/manha.js",
+    "tarde": "node src/esteira/tarde.js",
+    "indicadores": "node src/esteira/indicadores.js",
+    "teste": "node --test test/"
+  },
+  "dependencies": {}
+}

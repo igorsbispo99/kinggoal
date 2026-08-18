@@ -1,0 +1,65 @@
+{
+  "canal": {
+    "nome": "A definir",
+    "tagline": "O jornal que cabe no seu dia",
+    "posicionamento": "Notícia do dia contada para quem não assiste jornal na TV. Linguagem jovem, humor inteligente, zero enrolação.",
+    "publico": "18 a 30 anos, Brasil, consome notícia por rede social e não confia em telejornal tradicional"
+  },
+
+  "apresentador": {
+    "nome": "A definir",
+    "idadeAparente": 28,
+    "jeito": "Rápido, irônico sem ser cínico. Trata o público de igual para igual. Nunca dá lição de moral.",
+    "bordaoAbertura": "A definir",
+    "bordaoFechamento": "A definir",
+    "imagemBase": "ativos/apresentador.png"
+  },
+
+  "formato": {
+    "duracaoAlvoSegundos": 82,
+    "duracaoMinimaSegundos": 65,
+    "duracaoMaximaSegundos": 95,
+    "noticiasPorVideo": 3,
+    "proporcao": "9:16",
+    "resolucao": "1080x1920",
+    "fps": 30,
+    "ganchoSegundos": 3
+  },
+
+  "ritmo": {
+    "videosPorDia": 1,
+    "horaPortao1": "07:00",
+    "horaPortao2": "14:00",
+    "fusoHorario": "America/Sao_Paulo"
+  },
+
+  "modelos": {
+    "criativo": "claude-opus-5",
+    "mecanico": "claude-haiku-4-5-20251001",
+    "maxTokensPadrao": 4000
+  },
+
+  "custos": {
+    "tetoMensalUSD": 30,
+    "alertaEmUSD": 22,
+    "precos": {
+      "claude-opus-5":               { "entrada": 5.0, "saida": 25.0, "cacheLeitura": 0.5 },
+      "claude-haiku-4-5-20251001":   { "entrada": 1.0, "saida": 5.0,  "cacheLeitura": 0.1 }
+    }
+  },
+
+  "monetizacao": {
+    "metaSeguidores": 10000,
+    "metaViews30d": 100000,
+    "duracaoMinimaMonetizavelSegundos": 61,
+    "rotuloIAObrigatorio": true
+  },
+
+  "seguranca": {
+    "repositorioPublico": true,
+    "alertarMigracaoPrivadoQuando": {
+      "receitaMensalBRL": 500,
+      "ou_seguidores": 10000
+    }
+  }
+}

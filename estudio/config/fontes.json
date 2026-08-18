@@ -1,0 +1,20 @@
+{
+  "comentario": "Feeds RSS públicos. Editar aqui muda o que a redação lê, sem tocar em código. Peso influencia a ordem de leitura quando há muita notícia.",
+  "feeds": [
+    { "nome": "G1",             "url": "https://g1.globo.com/rss/g1/",                              "editoria": "geral",     "peso": 3 },
+    { "nome": "G1 Tecnologia",  "url": "https://g1.globo.com/rss/g1/tecnologia/",                   "editoria": "tech",      "peso": 2 },
+    { "nome": "G1 Economia",    "url": "https://g1.globo.com/rss/g1/economia/",                     "editoria": "economia",  "peso": 2 },
+    { "nome": "G1 Pop & Arte",  "url": "https://g1.globo.com/rss/g1/pop-arte/",                     "editoria": "cultura",   "peso": 2 },
+    { "nome": "UOL Notícias",   "url": "https://rss.uol.com.br/feed/noticias.xml",                  "editoria": "geral",     "peso": 3 },
+    { "nome": "Agência Brasil", "url": "https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml", "editoria": "geral", "peso": 2 },
+    { "nome": "CNN Brasil",     "url": "https://www.cnnbrasil.com.br/feed/",                        "editoria": "geral",     "peso": 2 },
+    { "nome": "Tecnoblog",      "url": "https://tecnoblog.net/feed/",                               "editoria": "tech",      "peso": 1 },
+    { "nome": "Olhar Digital",  "url": "https://olhardigital.com.br/feed/",                         "editoria": "tech",      "peso": 1 }
+  ],
+  "gdelt": {
+    "ativo": true,
+    "idioma": "por",
+    "pais": "BR",
+    "janelaHoras": 24
+  }
+}
