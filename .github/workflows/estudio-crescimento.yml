@@ -1,0 +1,36 @@
+name: Estúdio · Estratégia e indicadores
+
+# Segunda-feira, 08:00 em Brasília.
+on:
+  schedule:
+    - cron: '0 11 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  crescimento:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Analisar números e definir a estratégia da semana
+        working-directory: estudio
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node src/esteira/crescimento.js
+
+      - name: Guardar o estado no repositório
+        run: |
+          git config user.name  "Estúdio IA"
+          git config user.email "actions@github.com"
+          git add estudio/estado
+          git diff --staged --quiet || git commit -m "Estratégia da semana de $(date -u +%F)"
+          git push

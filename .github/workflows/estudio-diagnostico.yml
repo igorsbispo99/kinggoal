@@ -1,0 +1,46 @@
+name: Estúdio · Diagnóstico
+
+# Teste de fumaça da cadeia de mídia. Não chama modelo nenhum, então rodar não
+# custa nada. É o jeito de conferir que o estúdio funciona sem sair do
+# navegador: aba Actions › Estúdio · Diagnóstico › Run workflow.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar FFmpeg e o motor de voz
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install --quiet edge-tts
+
+      - name: Rodar o diagnóstico
+        working-directory: estudio
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PEXELS_API_KEY:    ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY:   ${{ secrets.PIXABAY_API_KEY }}
+          VOZ_APRESENTADOR:  ${{ vars.VOZ_APRESENTADOR || 'antonio' }}
+        run: node src/esteira/diagnostico.js
+
+      - name: Guardar o vídeo de teste
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: video-de-teste
+          path: estudio/saida/diagnostico/
+          retention-days: 7
+          if-no-files-found: warn

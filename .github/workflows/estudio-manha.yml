@@ -1,0 +1,42 @@
+name: Estúdio · Portão 1 (pauta)
+
+# 10:00 UTC = 07:00 em Brasília. O horário do canal fica em
+# estudio/config/estudio.json; este cron precisa ser ajustado junto se mudar.
+on:
+  schedule:
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: estudio-esteira
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  pauta:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Levantar pauta e montar a edição
+        working-directory: estudio
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: npm run manha
+
+      - name: Guardar o estado no repositório
+        run: |
+          git config user.name  "Estúdio IA"
+          git config user.email "actions@github.com"
+          git add estudio/estado
+          git diff --staged --quiet || git commit -m "Pauta do dia $(date -u +%F)"
+          git push

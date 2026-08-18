@@ -1,0 +1,71 @@
+name: Estúdio · Portão 2 (vídeo)
+
+# Roda três vezes à tarde e à noite. Se a pauta ainda não foi aprovada, a
+# esteira para sem fazer nada e tenta de novo na execução seguinte — assim a
+# aprovação atrasada não custa o vídeo do dia.
+on:
+  schedule:
+    - cron: '0 17,20,23 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: estudio-esteira
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  video:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar FFmpeg e o motor de voz
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+          pip install --quiet edge-tts
+          ffmpeg -version | head -1
+          edge-tts --version
+
+      - name: Produzir o vídeo do dia
+        working-directory: estudio
+        env:
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN:       ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY:  ${{ github.repository }}
+          PEXELS_API_KEY:     ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY:    ${{ secrets.PIXABAY_API_KEY }}
+          FAL_KEY:            ${{ secrets.FAL_KEY }}
+          MODO_APRESENTADOR:  ${{ vars.MODO_APRESENTADOR || 'ilustrado' }}
+          VOZ_APRESENTADOR:   ${{ vars.VOZ_APRESENTADOR || 'antonio' }}
+        run: npm run tarde
+
+      - name: Guardar o estado no repositório
+        run: |
+          git config user.name  "Estúdio IA"
+          git config user.email "actions@github.com"
+          git add estudio/estado
+          git diff --staged --quiet || git commit -m "Vídeo do dia $(date -u +%F)"
+          git push
+
+      # O vídeo vai para a release; o rascunho fica aqui por uma semana caso
+      # algo tenha saído errado e valha a pena olhar os arquivos intermediários.
+      - name: Guardar os arquivos intermediários
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: producao-${{ github.run_id }}
+          path: estudio/saida/
+          retention-days: 7
+          if-no-files-found: ignore
