@@ -6,6 +6,8 @@ import { levantarPautas } from '../times/01-pauta.js';
 import { montarEdicao } from '../times/02-editorial.js';
 import { aprendizadosAtivos } from '../times/09-indicadores.js';
 import { abrirPortao } from '../github/issues.js';
+import { Supervisor } from '../diretor/supervisor.js';
+import { conferirPautas, conferirEdicao } from '../diretor/contratos.js';
 import { log } from '../nucleo/log.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -65,7 +67,8 @@ Sem aprovação até o horário do segundo portão, o vídeo do dia não é prod
 async function principal() {
   const cfg = lerConfig();
   const data = dataDeHoje();
-  log.info(`=== esteira da manhã · ${data} ===`);
+  const chefe = new Supervisor({ data });
+  log.info(`=== esteira da manhã · ${data} · sob direção do DiTV.IA ===`);
 
   const jaExiste = lerEstado(`pacote-${data}`);
   if (jaExiste?.edicao) {
@@ -81,17 +84,25 @@ async function principal() {
   ]);
 
   const crus = [...doRss, ...doGdelt];
-  if (crus.length < 10) {
-    throw new Error(`só ${crus.length} manchetes coletadas — material insuficiente para uma edição. Verifique config/fontes.json.`);
+  const minimo = chefe.regras.operacao.manchetesMinimasParaProduzir;
+  if (crus.length < minimo) {
+    throw new Error(`só ${crus.length} manchetes coletadas, mínimo de ${minimo} — material insuficiente para uma edição. Verifique config/fontes.json.`);
   }
 
   const licoes = aprendizadosAtivos();
-  const pautas = await levantarPautas(crus, { historico: assuntosRecentes() });
-  const edicao = await montarEdicao(pautas, {
-    noticiasPorVideo: cfg.formato.noticiasPorVideo,
-    canal: cfg.canal,
-    aprendizados: licoes,
-  });
+  const rPautas = await chefe.executar('01-pauta',
+    () => levantarPautas(crus, { historico: assuntosRecentes() }),
+    { contrato: conferirPautas });
+  const pautas = rPautas.valor;
+
+  const rEdicao = await chefe.executar('02-editorial',
+    ({ economico }) => montarEdicao(pautas, {
+      noticiasPorVideo: cfg.formato.noticiasPorVideo,
+      canal: cfg.canal,
+      aprendizados: economico ? licoes.slice(0, 3) : licoes,
+    }),
+    { contrato: (e) => conferirEdicao(e, { noticiasPorVideo: cfg.formato.noticiasPorVideo }) });
+  const edicao = rEdicao.valor;
 
   const issue = await abrirPortao({
     titulo: `Portão 1 · Pauta de ${data}`,
@@ -107,6 +118,7 @@ async function principal() {
     pautas,
     edicao,
     portao1: { issue: issue.number, url: issue.html_url },
+    supervisaoManha: chefe.resumo(),
     custoAcumuladoUSD: Number(gastoDoMes().totalUSD.toFixed(4)),
   });
 

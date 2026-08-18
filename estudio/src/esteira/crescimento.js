@@ -2,6 +2,7 @@ import { lerConfig, lerEstado, gravarEstado, listarEstados, dataDeHoje } from '.
 import { analisarIndicadores, aprendizadosAtivos } from '../times/09-indicadores.js';
 import { definirEstrategia } from '../times/10-estrategia.js';
 import { abrirPortao } from '../github/issues.js';
+import { escreverRelatorio, formatarRelatorio } from '../diretor/relatorio.js';
 import { log } from '../nucleo/log.js';
 
 /**
@@ -83,6 +84,15 @@ ${estrategia.alertaSeguranca ? `---\n\n> [!IMPORTANT]\n> ## ${estrategia.alertaS
 ${acoesDoDono.length
   ? `**${acoesDoDono.length} ação(ões) dependem de você esta semana.** As demais o sistema executa sozinho.`
   : 'Nenhuma ação depende de você esta semana — o sistema dá conta.'}`;
+
+  // O relatório do diretor sai junto: estratégia diz para onde ir, relatório
+  // diz se o estúdio está de pé para ir.
+  const relatorio = await escreverRelatorio({ dias: 7 });
+  await abrirPortao({
+    titulo: `${{ saudavel: '🟢', atencao: '🟡', critico: '🔴' }[relatorio.veredito] || '⚪'} DiTV.IA · relatório da semana`,
+    corpo: formatarRelatorio(relatorio),
+    etiquetas: ['relatorio', 'estudio'],
+  });
 
   const issue = await abrirPortao({
     titulo: `Estratégia · semana de ${dataDeHoje()}`,

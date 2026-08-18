@@ -126,6 +126,7 @@ footer.rodape{margin-top:2.5rem;padding-top:1.1rem;border-top:1px solid var(--li
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" aria-selected="true"  data-alvo="hoje">Hoje</button>
+    <button class="tab" role="tab" aria-selected="false" data-alvo="ditv">DiTV.IA</button>
     <button class="tab" role="tab" aria-selected="false" data-alvo="estrategia">Estratégia</button>
     <button class="tab" role="tab" aria-selected="false" data-alvo="marca">Marca &amp; Instagram</button>
     <button class="tab" role="tab" aria-selected="false" data-alvo="numeros">Indicadores</button>
@@ -133,6 +134,7 @@ footer.rodape{margin-top:2.5rem;padding-top:1.1rem;border-top:1px solid var(--li
   </nav>
 
   <section class="painel stack" id="p-hoje"></section>
+  <section class="painel stack" id="p-ditv" hidden></section>
   <section class="painel stack" id="p-estrategia" hidden></section>
   <section class="painel stack" id="p-marca" hidden></section>
   <section class="painel stack" id="p-numeros" hidden></section>
@@ -281,6 +283,86 @@ async function abaHoje() {
       <p style="font-size:.92rem">${esc(pacote.laudo.resumo)}</p>
     `, pacote.laudo.veredito === 'barrado' ? 'alerta' : '') : '',
   ].filter(Boolean).join('');
+}
+
+
+// --- aba: DiTV.IA -----------------------------------------------------------
+const SELO_DIRECAO = { liberar:['ok','liberado'], liberar_com_ressalva:['esperando','com ressalva'],
+                       segurar:['ruim','segurado'], barrar:['ruim','barrado'] };
+
+async function abaDitv() {
+  const pacotes = await listarPacotes();
+  const [rel, times, incid] = await Promise.all([
+    lerEstado('diretor-relatorio'), lerEstado('diretor-times'), lerEstado('diretor-incidentes'),
+  ]);
+
+  const partes = [];
+
+  // Estado da operação
+  if (rel) {
+    const selo = { saudavel:['ok','saudável'], atencao:['esperando','atenção'], critico:['ruim','crítico'] }[rel.veredito] || ['neutro','—'];
+    partes.push(cartao('', `
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:flex-start">
+        <div><p class="eyebrow">Estado do estúdio</p><h2 style="margin-top:.3rem">${esc(rel.manchete)}</h2></div>
+        <span class="chip ${selo[0]}">${esc(selo[1])}</span>
+      </div>
+      <div class="kpis" style="margin-top:.5rem">
+        <div class="kpi"><span class="kpi-k">Entrega</span><span class="kpi-v mono">${rel.producao.taxaDeEntrega}%</span><span class="kpi-n">${rel.producao.publicados} de ${rel.producao.previstos} vídeos</span></div>
+        <div class="kpi"><span class="kpi-k">Incidentes</span><span class="kpi-v mono" style="color:${rel.saude.incidentes ? 'var(--tally)' : 'var(--teal)'}">${rel.saude.incidentes}</span><span class="kpi-n">últimos ${rel.periodo.dias} dias</span></div>
+        <div class="kpi"><span class="kpi-k">Duração média</span><span class="kpi-v mono">${rel.qualidade.duracaoMedia ?? '—'}s</span>${rel.qualidade.abaixoDoMinimo ? `<span class="kpi-n" style="color:var(--tally)">${rel.qualidade.abaixoDoMinimo} sem monetizar</span>` : '<span class="kpi-n">acima do mínimo</span>'}</div>
+      </div>
+    `, rel.veredito === 'critico' ? 'alerta' : rel.veredito === 'saudavel' ? 'bom' : 'destaque'));
+
+    if (rel.acoesDoDono?.length) {
+      partes.push(cartao('O que depende de você', `<ul class="lista">${rel.acoesDoDono.map((a) =>
+        `<li><span class="chip esperando">${esc(a.urgencia)}</span><strong style="display:block;margin-top:.3rem">${esc(a.acao)}</strong><span style="color:var(--ink-3);font-size:.86rem">${esc(a.porque)}</span></li>`).join('')}</ul>`, 'destaque'));
+    }
+    if (rel.ajustesQueVouFazer?.length) {
+      partes.push(cartao('O que o diretor vai ajustar sozinho', `<ul class="lista">${rel.ajustesQueVouFazer.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`, 'bom'));
+    }
+  } else {
+    partes.push(vazio('O relatório do diretor sai no ciclo semanal. Dispare o workflow "Estúdio · Estratégia e indicadores" para gerar o primeiro.'));
+  }
+
+  // Quem está ligado
+  const desligados = Object.entries(times?.desligados || {});
+  const instaveis = Object.entries(times?.falhas || {});
+  partes.push(cartao('Times sob comando', `
+    <p style="font-size:.9rem;color:var(--ink-3)">O diretor desliga sozinho o time opcional que falha seguidamente, e religa quando a quarentena vence.</p>
+    ${desligados.length
+      ? `<span class="rotulo">Desligados</span><ul class="lista">${desligados.map(([t, i]) =>
+          `<li><span class="chip ruim">${esc(t)}</span> ${esc(i.motivo)} — volta em ${esc(i.ate)}</li>`).join('')}</ul>`
+      : '<p style="font-size:.92rem;color:var(--teal)">Todos os times ligados.</p>'}
+    ${instaveis.length
+      ? `<span class="rotulo">Instáveis</span><ul class="lista">${instaveis.map(([t, n]) =>
+          `<li><span class="chip esperando">${esc(t)}</span> ${n} falha(s) seguida(s)</li>`).join('')}</ul>` : ''}
+  `, desligados.length ? 'alerta' : 'bom'));
+
+  // Decisões de direção recentes
+  const decisoes = [];
+  for (const nome of pacotes.slice(0, 6)) {
+    const pk = await lerEstado(nome);
+    if (pk?.direcao) decisoes.push({ data: pk.data, ...pk.direcao });
+  }
+  if (decisoes.length) {
+    partes.push(cartao('Últimas decisões de direção', `<div class="scroller"><table>
+      <thead><tr><th>Dia</th><th>Decisão</th><th>Confiança</th><th>Por quê</th></tr></thead><tbody>
+      ${decisoes.map((d) => {
+        const sel = SELO_DIRECAO[d.decisao] || ['neutro', d.decisao];
+        return `<tr><td class="n">${esc(d.data)}</td><td><span class="chip ${sel[0]}">${esc(sel[1])}</span></td><td class="n">${d.confianca}</td><td>${esc(d.resumo)}</td></tr>`;
+      }).join('')}</tbody></table></div>`));
+  }
+
+  // Plantão
+  const registros = (incid?.registros || []).slice(-8).reverse();
+  if (registros.length) {
+    partes.push(cartao('Plantão — incidentes recentes', `<div class="scroller"><table>
+      <thead><tr><th>Dia</th><th>Time</th><th>Causa</th><th>O que houve</th></tr></thead><tbody>
+      ${registros.map((r) => `<tr><td class="n">${esc(r.data)}</td><td>${esc(r.time)}</td><td><span class="chip neutro">${esc(r.causa || '—')}</span></td><td>${esc((r.detalhe || '').slice(0, 160))}</td></tr>`).join('')}
+      </tbody></table></div>`));
+  }
+
+  el('p-ditv').innerHTML = partes.join('');
 }
 
 // --- aba: estratégia --------------------------------------------------------
@@ -471,7 +553,7 @@ async function abaCusto() {
 }
 
 // --- navegação --------------------------------------------------------------
-const CARREGADORES = { hoje: abaHoje, estrategia: abaEstrategia, marca: abaMarca, numeros: abaNumeros, custo: abaCusto };
+const CARREGADORES = { hoje: abaHoje, ditv: abaDitv, estrategia: abaEstrategia, marca: abaMarca, numeros: abaNumeros, custo: abaCusto };
 const jaCarregou = new Set();
 
 async function mostrar(alvo) {

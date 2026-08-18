@@ -4,6 +4,8 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from '../nucleo/log.js';
 import { contarPalavras } from './03-roteiro.js';
+import { construirGC } from './13-gc.js';
+import { grafoMixagem } from './12-audio.js';
 
 const rodar = promisify(execFile);
 const FFMPEG = process.env.FFMPEG_BIN || 'ffmpeg';
@@ -45,7 +47,7 @@ export function escaparDrawtext(txt) {
  * Monta o filter_complex do vídeo inteiro.
  * Separado da execução para poder ser inspecionado e testado sem rodar nada.
  */
-export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentador, legendaArquivo, rotuloIA }) {
+export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentador, legendaArquivo, rotuloIA, gc = null, audio = null }) {
   const { resolucao, fps } = formato;
   const [L, A] = resolucao.split('x').map(Number);
   const partes = [];
@@ -92,7 +94,16 @@ export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentado
     atual = 'comA';
   }
 
-  // 4. Legenda queimada. Vertical vive de legenda: a maioria assiste sem som.
+  // 4. Camadas de GC: selo do canal, placa de abertura, lower-thirds e
+  //    destaque de número. Entram antes da legenda para a legenda ficar por
+  //    cima de tudo — ela é o elemento que não pode ser encoberto.
+  if (gc) {
+    const { camadas, saida } = gc.aplicar(atual);
+    partes.push(...camadas);
+    atual = saida;
+  }
+
+  // 5. Legenda queimada. Vertical vive de legenda: a maioria assiste sem som.
   if (legendaArquivo) {
     const estilo = [
       'FontName=DejaVu Sans',
@@ -110,7 +121,7 @@ export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentado
     atual = 'comLeg';
   }
 
-  // 5. Rótulo de IA. A plataforma exige e a ausência dele desmonetiza o canal.
+  // 6. Rótulo de IA. A plataforma exige e a ausência dele desmonetiza o canal.
   if (rotuloIA) {
     partes.push(
       `[${atual}]drawtext=text='${escaparDrawtext(rotuloIA)}':` +
@@ -123,7 +134,7 @@ export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentado
   return { grafo: partes.join(';'), saida: atual };
 }
 
-export async function montarVideo({ roteiro, locucao, arte, apresentador, formato, pasta, ativos, rotuloIA }) {
+export async function montarVideo({ roteiro, locucao, arte, apresentador, formato, pasta, ativos, rotuloIA, canal, fio, audio = null }) {
   if (!existsSync(pasta)) mkdirSync(pasta, { recursive: true });
 
   const fatias = repartirDuracao(roteiro.segmentos, locucao.duracaoSegundos);
@@ -156,11 +167,27 @@ export async function montarVideo({ roteiro, locucao, arte, apresentador, format
     indiceEntrada += 2;
   }
 
+  // O GC precisa das fatias já calculadas para cronometrar cada placa.
+  const gc = construirGC({ fatias, roteiro, formato, canal, fio });
+
   const { grafo, saida } = construirGrafo({
     fatias, entradaDoSegmento, formato,
     apresentador: blocoApresentador,
     legendaArquivo: locucao.legenda,
-    rotuloIA,
+    rotuloIA, gc,
+  });
+
+  // A locução entra depois de todas as entradas de vídeo; a trilha, se houver,
+  // logo em seguida.
+  const indiceVoz = indiceEntrada;
+  let indiceTrilha;
+  if (audio?.trilha) { indiceTrilha = indiceVoz + 1; }
+
+  const mix = grafoMixagem({
+    indiceVoz,
+    indiceTrilha,
+    filtroLoudnorm: audio?.filtro || 'anull',
+    duracao: locucao.duracaoSegundos,
   });
 
   const destino = join(pasta, 'video.mp4');
@@ -168,9 +195,10 @@ export async function montarVideo({ roteiro, locucao, arte, apresentador, format
     '-y', '-hide_banner',
     ...entradas,
     '-i', locucao.audio,
-    '-filter_complex', grafo,
+    ...(audio?.trilha ? ['-i', audio.trilha] : []),
+    '-filter_complex', `${grafo};${mix.grafo}`,
     '-map', `[${saida}]`,
-    '-map', `${indiceEntrada}:a`,
+    '-map', `[${mix.saida}]`,
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '21',
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '128k',
