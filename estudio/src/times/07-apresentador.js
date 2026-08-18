@@ -88,12 +88,20 @@ export function expressaoBocaAberta(trechos) {
  * fotografada ou escolhida no casting. É o caminho para ter uma pessoa real
  * no vídeo em vez do desenho que vem no repositório.
  */
-export function acharRetrato() {
-  for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
-    const p = join(caminhos.RAIZ, 'ativos', `apresentador.${ext}`);
-    if (existsSync(p)) return p;
+export function acharRetrato(apresentador = null) {
+  // Retrato do apresentador escalado tem prioridade; o nome genérico é o
+  // fallback de quem ainda tem um apresentador só.
+  const candidatos = [];
+  if (apresentador?.retrato) candidatos.push(join(caminhos.RAIZ, apresentador.retrato));
+  if (apresentador?.id) {
+    for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
+      candidatos.push(join(caminhos.RAIZ, 'ativos', `apresentador-${apresentador.id}.${ext}`));
+    }
   }
-  return null;
+  for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
+    candidatos.push(join(caminhos.RAIZ, 'ativos', `apresentador.${ext}`));
+  }
+  return candidatos.find((p) => existsSync(p)) || null;
 }
 
 /**
@@ -151,11 +159,12 @@ async function lipsyncHospedado({ audioUrl, videoUrl }) {
   return url;
 }
 
-async function apresentadorRealista(locucao, { pasta }) {
-  const retrato = acharRetrato();
+async function apresentadorRealista(locucao, { pasta, apresentador }) {
+  const retrato = acharRetrato(apresentador);
   if (!retrato) {
     throw new Error(
-      'Modo realista pedido, mas não há retrato. Suba uma imagem em ativos/apresentador.png (ou .jpg).'
+      `Modo realista pedido, mas não há retrato${apresentador ? ` para ${apresentador.nome}` : ''}. ` +
+      `Suba a imagem em ativos/apresentador-${apresentador?.id || 'nome'}.png.`
     );
   }
 
@@ -173,23 +182,23 @@ async function apresentadorRealista(locucao, { pasta }) {
     const arquivo = await baixar(resultado, join(pasta, 'apresentador-falando.mp4'));
 
     log.time('07-apresentador', 'lipsync pronto');
-    return { modo: 'realista', retrato, video: arquivo };
+    return { modo: 'realista', retrato, video: arquivo, apresentador: apresentador?.id || null };
   } finally {
     await area.limpar();
   }
 }
 
-export async function prepararApresentador(locucao, { pasta, modo = 'ilustrado' } = {}) {
+export async function prepararApresentador(locucao, { pasta, modo = 'ilustrado', apresentador = null } = {}) {
   if (!existsSync(pasta)) mkdirSync(pasta, { recursive: true });
 
   // Um retrato na pasta de ativos é a intenção declarada do dono: se ele
   // existe e há chave de lipsync, o realista é o padrão sem precisar de flag.
-  const temRetrato = Boolean(acharRetrato());
+  const temRetrato = Boolean(acharRetrato(apresentador));
   const querRealista = modo === 'realista' || (temRetrato && process.env.FAL_KEY);
 
   if (querRealista) {
     try {
-      return await apresentadorRealista(locucao, { pasta });
+      return await apresentadorRealista(locucao, { pasta, apresentador });
     } catch (e) {
       // O vídeo do dia não pode morrer porque o lipsync falhou: cai para o
       // ilustrado, que sempre funciona, e o incidente vai para o relatório.

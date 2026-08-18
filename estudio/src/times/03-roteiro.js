@@ -68,7 +68,7 @@ export function duracaoDoRoteiro(roteiro) {
   return roteiro.segmentos.reduce((t, s) => t + estimarSegundos(s.fala), 0);
 }
 
-export async function escreverRoteiro(edicao, { formato, apresentador, canal, aprendizados = [] } = {}) {
+export async function escreverRoteiro(edicao, { formato, apresentadores = [], canal, aprendizados = [] } = {}) {
   const alvo = formato.duracaoAlvoSegundos;
   const palavrasAlvo = Math.round(alvo * PALAVRAS_POR_SEGUNDO);
 
@@ -86,8 +86,12 @@ export async function escreverRoteiro(edicao, { formato, apresentador, canal, ap
     time: '03-roteiro',
     papel: PAPEL,
     tarefa:
-`APRESENTADOR: ${apresentador.nome} — ${apresentador.jeito}
+`${apresentadores.length > 1
+  ? `BANCADA (dois apresentadores dividem o vídeo, alternando a cada notícia):\n${apresentadores.map((a) => `- ${a.nome}: ${a.jeito}`).join('\n')}\nEscreva de forma que a troca de voz caia nas viradas de notícia e que cada bloco soe como a pessoa que o diz.`
+  : `APRESENTADOR: ${apresentadores[0].nome} — ${apresentadores[0].jeito}`}
+
 CANAL: ${canal.nome} — ${canal.posicionamento}
+PILARES: ${(canal.pilares || []).join(', ')}
 
 FIO DA EDIÇÃO: ${edicao.fio}
 (por que funciona: ${edicao.porqueEsseFio})

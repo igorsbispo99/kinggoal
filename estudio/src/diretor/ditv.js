@@ -99,7 +99,7 @@ export async function revisarPacote({ edicao, roteiro, laudo, achadosDosContrato
     papel: PAPEL_REVISOR,
     tarefa:
 `CANAL: ${cfg.canal.nome} — ${cfg.canal.posicionamento}
-APRESENTADOR: ${cfg.apresentador.nome} — ${cfg.apresentador.jeito}
+BANCADA: ${cfg.elenco.apresentadores.map((a) => `${a.nome} (${a.jeito})`).join(' · ')}
 
 REGRAS INEGOCIÁVEIS DO ESTÚDIO:
 ${inegociaveis}

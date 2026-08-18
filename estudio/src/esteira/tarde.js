@@ -4,7 +4,8 @@ import { lerConfig, lerEstado, gravarEstado, dataDeHoje, caminhos } from '../nuc
 import { gastoDoMes } from '../nucleo/llm.js';
 import { escreverRoteiro } from '../times/03-roteiro.js';
 import { checar, aplicarCorrecoes } from '../times/04-checagem.js';
-import { gravarLocucao, VOZES } from '../times/05-voz.js';
+import { gravarLocucao } from '../times/05-voz.js';
+import { escalarApresentadores, distribuirSegmentos, vozDe } from '../times/07-elenco.js';
 import { montarArte } from '../times/06-arte.js';
 import { prepararApresentador } from '../times/07-apresentador.js';
 import { montarVideo } from '../times/08-montagem.js';
@@ -90,10 +91,13 @@ async function principal() {
   mkdirSync(pasta, { recursive: true });
   const historico = carregarHistorico();
 
+  // --- Escalação: quem apresenta hoje, antes de escrever ------------------
+  const escalacao = escalarApresentadores({ data });
+
   // --- Roteiro, sob double check ------------------------------------------
   const rRoteiro = await chefe.executar('03-roteiro',
     ({ economico }) => escreverRoteiro(pacote.edicao, {
-      formato: cfg.formato, apresentador: cfg.apresentador, canal: cfg.canal,
+      formato: cfg.formato, apresentadores: escalacao.apresentadores, canal: cfg.canal,
       aprendizados: economico ? licoes.slice(0, 3) : licoes,
     }),
     { contrato: (r) => conferirRoteiro(r, { formato: cfg.formato, edicao: pacote.edicao }) });
@@ -149,8 +153,11 @@ async function principal() {
   }
 
   // --- Mídia ---------------------------------------------------------------
+  const divisao = distribuirSegmentos(roteiro, escalacao.apresentadores);
+  const principal_ = escalacao.apresentadores[0];
+
   const rLocucao = await chefe.executar('05-voz',
-    () => gravarLocucao(roteiro, { pasta, voz: VOZES[process.env.VOZ_APRESENTADOR] || VOZES.antonio }),
+    () => gravarLocucao(roteiro, { pasta, voz: vozDe(principal_) }),
     { contrato: (l) => conferirLocucao(l, { formato: cfg.formato }) });
   const locucao = rLocucao.valor;
 
@@ -164,14 +171,18 @@ async function principal() {
   const arte = rArte.valor;
 
   const rApresentador = await chefe.executar('07-apresentador',
-    () => prepararApresentador(locucao, { pasta, modo: process.env.MODO_APRESENTADOR || 'ilustrado' }));
+    () => prepararApresentador(locucao, {
+      pasta,
+      modo: process.env.MODO_APRESENTADOR || 'ilustrado',
+      apresentador: principal_,
+    }));
   const apresentador = rApresentador.valor;
 
   const rVideo = await chefe.executar('08-montagem',
     () => montarVideo({
       roteiro, locucao, arte, apresentador, audio,
       formato: cfg.formato, pasta,
-      canal: cfg.canal, fio: pacote.edicao.fio,
+      canal: cfg.canal, fio: pacote.edicao.fio, marca: cfg.marca,
       ativos: {
         bocaFechada: join(caminhos.RAIZ, 'ativos', 'apresentador-fechada.png'),
         bocaAberta:  join(caminhos.RAIZ, 'ativos', 'apresentador-aberta.png'),
@@ -185,7 +196,7 @@ async function principal() {
   const rMarca = await chefe.executar('11-marca',
     () => adaptarParaMarca({
       pacote: { edicao: pacote.edicao, roteiro },
-      canal: cfg.canal, apresentador: cfg.apresentador,
+      canal: cfg.canal, apresentador: principal_,
       numeros: lerEstado('numeros', {}), aprendizados: licoes,
     }),
     { plandoB: async () => null });
@@ -222,6 +233,11 @@ async function principal() {
     roteiro, laudo, marca, direcao,
     continuidade: achadosContinuidade,
     audio: audio ? { medidoLufs: audio.medido.I, correcaoDb: audio.correcaoDb, comTrilha: Boolean(audio.trilha) } : null,
+    escalacao: {
+      modo: escalacao.modo,
+      apresentadores: escalacao.apresentadores.map((a) => ({ id: a.id, nome: a.nome, voz: a.voz })),
+      blocos: divisao.blocos,
+    },
     locucao: { duracaoSegundos: locucao.duracaoSegundos, marcas: locucao.marcas.length },
     arte: { comImagem: arte.pecas.filter((p) => p.arquivoLocal).length, creditos: arte.creditos },
     video: { url: urlVideo, duracaoSegundos: video.duracaoSegundos },

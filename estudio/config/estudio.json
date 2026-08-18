@@ -1,20 +1,16 @@
 {
   "canal": {
-    "nome": "A definir",
-    "tagline": "O jornal que cabe no seu dia",
-    "posicionamento": "Notícia do dia contada para quem não assiste jornal na TV. Linguagem jovem, humor inteligente, zero enrolação.",
-    "publico": "18 a 30 anos, Brasil, consome notícia por rede social e não confia em telejornal tradicional"
+    "nome": "Z News",
+    "tagline": "A sua notícia do nosso jeito",
+    "posicionamento": "Notícia séria, mas sem cara de tédio. O jornal do dia contado para quem não assiste telejornal na TV: linguagem jovem, humor inteligente, zero enrolação.",
+    "publico": "18 a 30 anos, Brasil, consome notícia por rede social e não confia em telejornal tradicional",
+    "pilares": [
+      "Notícia",
+      "Humor",
+      "Rapidez",
+      "A sua cara"
+    ]
   },
-
-  "apresentador": {
-    "nome": "A definir",
-    "idadeAparente": 28,
-    "jeito": "Rápido, irônico sem ser cínico. Trata o público de igual para igual. Nunca dá lição de moral.",
-    "bordaoAbertura": "A definir",
-    "bordaoFechamento": "A definir",
-    "imagemBase": "ativos/apresentador.png"
-  },
-
   "formato": {
     "duracaoAlvoSegundos": 82,
     "duracaoMinimaSegundos": 65,
@@ -25,41 +21,88 @@
     "fps": 30,
     "ganchoSegundos": 3
   },
-
   "ritmo": {
     "videosPorDia": 1,
     "horaPortao1": "07:00",
     "horaPortao2": "14:00",
     "fusoHorario": "America/Sao_Paulo"
   },
-
   "modelos": {
     "criativo": "claude-opus-5",
     "mecanico": "claude-haiku-4-5-20251001",
     "maxTokensPadrao": 4000
   },
-
   "custos": {
     "tetoMensalUSD": 30,
     "alertaEmUSD": 22,
     "precos": {
-      "claude-opus-5":               { "entrada": 5.0, "saida": 25.0, "cacheLeitura": 0.5 },
-      "claude-haiku-4-5-20251001":   { "entrada": 1.0, "saida": 5.0,  "cacheLeitura": 0.1 }
+      "claude-opus-5": {
+        "entrada": 5.0,
+        "saida": 25.0,
+        "cacheLeitura": 0.5
+      },
+      "claude-haiku-4-5-20251001": {
+        "entrada": 1.0,
+        "saida": 5.0,
+        "cacheLeitura": 0.1
+      }
     }
   },
-
   "monetizacao": {
     "metaSeguidores": 10000,
     "metaViews30d": 100000,
     "duracaoMinimaMonetizavelSegundos": 61,
     "rotuloIAObrigatorio": true
   },
-
   "seguranca": {
     "repositorioPublico": true,
     "alertarMigracaoPrivadoQuando": {
       "receitaMensalBRL": 500,
       "ou_seguidores": 10000
     }
+  },
+  "marca": {
+    "comentario": "Identidade visual do Z News. O time de GC lê estas cores; mudar aqui muda o vídeo inteiro.",
+    "laranja": "0xF0801C",
+    "preto": "0x0E0E10",
+    "branco": "0xFFFFFF",
+    "cinza": "0x9AA0A6",
+    "corDeDestaque": "0xF0801C",
+    "corDoTextoSobreDestaque": "0x0E0E10",
+    "assinatura": "Z NEWS"
+  },
+  "elenco": {
+    "modo": "alternado",
+    "comentarioModo": "alternado = revezam por dia, 1 lipsync por vídeo. duo = os dois no mesmo vídeo, dobra o custo de lipsync. fixo = sempre o mesmo, definido em 'fixoEm'.",
+    "fixoEm": "zeca",
+    "apresentadores": [
+      {
+        "id": "nina",
+        "nome": "Nina",
+        "idadeAparente": 29,
+        "voz": "francisca",
+        "retrato": "ativos/apresentador-nina.png",
+        "jeito": "Rápida e afiada. Abre o vídeo pelo absurdo do fato e não perde tempo com contexto. Irônica sem ser cínica, e nunca dá lição de moral.",
+        "puxaMelhor": [
+          "economia",
+          "política",
+          "comportamento"
+        ]
+      },
+      {
+        "id": "zeca",
+        "nome": "Zeca",
+        "idadeAparente": 30,
+        "voz": "antonio",
+        "retrato": "ativos/apresentador-zeca.png",
+        "jeito": "Mais solto e brincalhão. Trata o público de igual para igual, como quem conta a notícia para um amigo no bar. Segura bem a pauta esportiva e a bizarra.",
+        "puxaMelhor": [
+          "esporte",
+          "cultura",
+          "bizarro",
+          "tech"
+        ]
+      }
+    ]
   }
 }

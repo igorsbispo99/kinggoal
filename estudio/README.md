@@ -1,4 +1,6 @@
-# Estúdio de TV com IA
+# Z News — estúdio de TV com IA
+
+> A sua notícia do nosso jeito
 
 Uma redação automatizada que produz um telejornal vertical por dia. Treze times
 de IA trabalham em sequência sob a direção do **DiTV.IA**; você aprova em dois
@@ -66,68 +68,52 @@ Editar `config/estudio.json` pelo próprio GitHub (botão de lápis no arquivo):
 - `apresentador.nome`, `apresentador.jeito` — quem apresenta e como fala
 - `formato.duracaoAlvoSegundos` — deixe acima de 61, ou o vídeo não monetiza
 
-### 5. Escolher o apresentador
+### 5. Subir os retratos da bancada
 
-O que vem no repositório é um **desenho feito em código**: homem afro-brasileiro
-em selo de telejornal. Existe para o estúdio produzir desde o primeiro dia — e,
-por melhor que fique, é ilustração e não vira fotografia.
+O Z News tem **dupla de apresentadores**, definida em `config/estudio.json`:
 
-Três caminhos para ter uma pessoa de verdade:
+| | Voz | Puxa melhor |
+|---|---|---|
+| **Nina** | pt-BR Francisca | economia, política, comportamento |
+| **Zeca** | pt-BR Antonio | esporte, cultura, bizarro, tech |
 
-#### A. Imagem que você gerou (recomendado)
-
-Gere o apresentador onde preferir e suba **um arquivo só**:
+Para eles aparecerem em vídeo, suba um retrato de cada pelo navegador:
 
 1. No GitHub, abra a pasta `estudio/ativos/`
-2. **Add file › Upload files** (funciona no navegador do tablet)
-3. Nomeie como `apresentador.png` ou `apresentador.jpg`
+2. **Add file › Upload files** (funciona no tablet)
+3. Nomeie exatamente:
+   - `apresentador-nina.png`
+   - `apresentador-zeca.png`
 
-O estúdio detecta o arquivo sozinho e passa ao modo realista. Não precisa de
-duas versões de boca: quem move a boca é o lipsync.
+Um arquivo por pessoa. Não precisa de versão de boca aberta — quem move a boca
+é o lipsync.
 
-**O que a imagem precisa ter** para o lipsync funcionar bem:
+**O que o retrato precisa ter:** rosto de frente, **boca fechada** e expressão
+neutra, dos ombros para cima, luz uniforme, fundo simples. Retrato sorrindo com
+os dentes à mostra funciona pior, porque é dele que o lipsync parte.
 
-- rosto **de frente**, olhando para a câmera
-- **boca fechada** e expressão neutra — é dela que o lipsync parte
-- enquadramento dos ombros para cima, rosto ocupando boa parte do quadro
-- luz uniforme no rosto, sem sombra forte cortando
-- fundo simples, **vertical** de preferência
-- nada de óculos escuros, mão no rosto ou microfone tapando a boca
+#### Como os dois se revezam
 
-Prompt que costuma dar esse resultado:
+`elenco.modo` em `config/estudio.json`:
 
-> Retrato fotográfico de um homem negro brasileiro de 28 anos, apresentador de
-> telejornal moderno. Rosto de frente, olhando direto para a câmera, boca
-> fechada, expressão neutra e confiante. Enquadramento dos ombros para cima.
-> Camisa social escura. Luz de estúdio suave e uniforme no rosto. Fundo liso
-> em azul-escuro desfocado. Formato vertical 9:16, alta resolução, fotorrealista.
+| Modo | O que faz | Custo de lipsync |
+|---|---|---|
+| **`alternado`** (padrão) | Revezam por dia, um por vídeo | ~US$ 9/mês |
+| `duo` | Os dois no mesmo vídeo, trocando a cada notícia | ~US$ 18/mês |
+| `fixo` | Sempre o mesmo, definido em `fixoEm` | ~US$ 9/mês |
 
-Guarde o prompt: é com ele que você gera variações do mesmo personagem depois.
+O revezamento é por número de aparições, não por dia do calendário: dia sem
+produção ou vídeo reprovado desequilibrariam o rodízio e um dos dois sumiria do
+canal por semanas.
 
-#### B. Casting de banco de imagem
+#### Sem retrato, ou sem chave de lipsync
 
-Aba **Actions** › **Estúdio · Casting do apresentador** › **Run workflow**.
+Nada quebra. O estúdio usa o apresentador ilustrado que vem no repositório, e o
+DiTV.IA registra no relatório que o modo realista não entrou. O lipsync exige
+`FAL_KEY` e custa ~US$ 0,30 por vídeo.
 
-Busca retratos de pessoas reais em bancos com uso comercial liberado e abre uma
-issue com os candidatos; você comenta `escolher 3` e roda de novo. Exige
-`PEXELS_API_KEY` ou `PIXABAY_API_KEY` (gratuitas).
-
-#### C. Sua própria arte ilustrada
-
-Substitua os dois arquivos em `ativos/`: `apresentador-fechada.png` e
-`apresentador-aberta.png`, quadrados, fundo transparente, 512×512. O estúdio
-alterna entre eles conforme o volume da fala, sem custo nenhum.
-
----
-
-**O modo realista custa.** O lipsync roda em serviço hospedado e exige `FAL_KEY`
-— cerca de US$ 0,30 por vídeo, ou ~US$ 9/mês a um vídeo por dia. Sem essa chave
-nada quebra: se o lipsync falhar ou faltar a chave, a produção do dia continua
-com o apresentador ilustrado e o incidente aparece no relatório do DiTV.IA.
-
-**Sobre direitos:** imagem que você gerou é sua para usar comercialmente na
-maioria dos serviços, mas confirme os termos do que você usar. Todo vídeo sai
-com o rótulo de conteúdo gerado por IA, que a plataforma exige.
+Prefere sua própria arte ilustrada? Substitua `ativos/apresentador-fechada.png`
+e `ativos/apresentador-aberta.png`, quadrados, fundo transparente, 512×512.
 
 ### 6. Ligar a esteira
 

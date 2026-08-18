@@ -141,7 +141,7 @@ export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentado
   return { grafo: partes.join(';'), saida: atual };
 }
 
-export async function montarVideo({ roteiro, locucao, arte, apresentador, formato, pasta, ativos, rotuloIA, canal, fio, audio = null }) {
+export async function montarVideo({ roteiro, locucao, arte, apresentador, formato, pasta, ativos, rotuloIA, canal, fio, marca = null, audio = null }) {
   if (!existsSync(pasta)) mkdirSync(pasta, { recursive: true });
 
   const fatias = repartirDuracao(roteiro.segmentos, locucao.duracaoSegundos);
@@ -184,7 +184,7 @@ export async function montarVideo({ roteiro, locucao, arte, apresentador, format
   }
 
   // O GC precisa das fatias já calculadas para cronometrar cada placa.
-  const gc = construirGC({ fatias, roteiro, formato, canal, fio });
+  const gc = construirGC({ fatias, roteiro, formato, canal, fio, marca });
 
   const { grafo, saida } = construirGrafo({
     fatias, entradaDoSegmento, formato,

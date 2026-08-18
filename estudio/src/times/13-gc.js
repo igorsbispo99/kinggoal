@@ -1,4 +1,5 @@
 import { escaparDrawtext } from './08-montagem.js';
+import { lerConfig } from '../nucleo/estado.js';
 import { log } from '../nucleo/log.js';
 
 /**
@@ -47,7 +48,10 @@ function xDeslizante({ inicio, fim, xFinal, xForaDaTela, entrada = 0.35 }) {
  * Monta as camadas de GC do vídeo inteiro.
  * Devolve fragmentos de filtro para a montagem encadear, na ordem.
  */
-export function construirGC({ fatias, roteiro, formato, canal, fio }) {
+export function construirGC({ fatias, roteiro, formato, canal, fio, marca = null }) {
+  // As cores vêm da identidade do canal, não estão presas no código: trocar a
+  // marca em config/estudio.json repinta o vídeo inteiro.
+  const M = marca || lerConfig().marca;
   const [L, A] = formato.resolucao.split('x').map(Number);
   const camadas = [];
   let n = 0;
@@ -67,15 +71,17 @@ export function construirGC({ fatias, roteiro, formato, canal, fio }) {
       // --- selo do canal: o "cenário" que se repete todo dia ---------------
       if (canal?.nome && canal.nome !== 'A definir') {
         const y = Math.round(A * 0.045);
+        const largura = Math.round(L * 0.30);
+        const x0 = Math.round(L * 0.05);
+        atual = empilhar(atual, `drawbox=x=${x0}:y=${y}:w=${largura}:h=56:color=${M.preto}@0.72:t=fill`);
+        // Bloco laranja com a letra da marca, do jeito que aparece na bancada.
+        atual = empilhar(atual, `drawbox=x=${x0}:y=${y}:w=54:h=56:color=${M.laranja}@0.98:t=fill`);
         atual = empilhar(atual,
-          `drawbox=x=${Math.round(L * 0.05)}:y=${y}:w=${Math.round(L * 0.34)}:h=54:` +
-          `color=black@0.55:t=fill`);
+          `drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(M.assinatura.slice(0, 1))}':` +
+          `fontcolor=${M.corDoTextoSobreDestaque}:fontsize=40:x=${x0 + 16}:y=${y + 8}`);
         atual = empilhar(atual,
-          `drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(canal.nome.toUpperCase())}':` +
-          `fontcolor=white:fontsize=30:x=${Math.round(L * 0.05) + 18}:y=${y + 13}`);
-        // Fita de cor da marca, o detalhe que identifica o programa de longe.
-        atual = empilhar(atual,
-          `drawbox=x=${Math.round(L * 0.05)}:y=${y}:w=8:h=54:color=0xD9942B@0.95:t=fill`);
+          `drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(M.assinatura.slice(1).trim())}':` +
+          `fontcolor=${M.branco}:fontsize=30:x=${x0 + 68}:y=${y + 14}`);
       }
 
       // --- placa de abertura com o fio da edição ---------------------------
@@ -83,10 +89,12 @@ export function construirGC({ fatias, roteiro, formato, canal, fio }) {
         const ate = 2.6;
         const yFaixa = Math.round(A * 0.40);
         atual = empilhar(atual,
-          `drawbox=x=0:y=${yFaixa}:w=${L}:h=190:color=black@0.72:t=fill:enable='lt(t,${ate})'`);
+          `drawbox=x=0:y=${yFaixa}:w=${L}:h=190:color=${M.preto}@0.78:t=fill:enable='lt(t,${ate})'`);
+        atual = empilhar(atual,
+          `drawbox=x=0:y=${yFaixa}:w=${L}:h=9:color=${M.laranja}@0.98:t=fill:enable='lt(t,${ate})'`);
         atual = empilhar(atual,
           `drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(fio.slice(0, 76))}':` +
-          `fontcolor=white:fontsize=46:line_spacing=12:` +
+          `fontcolor=${M.branco}:fontsize=46:line_spacing=12:` +
           `x=(w-text_w)/2:y=${yFaixa + 46}:enable='lt(t,${ate})'`);
       }
 
@@ -107,8 +115,8 @@ export function construirGC({ fatias, roteiro, formato, canal, fio }) {
         const xFinal = Math.round(L * 0.055);
         const x = xDeslizante({ inicio, fim, xFinal, xForaDaTela: -largura - 20 });
 
-        camadas.push(`[${atual}]drawbox=x='${x}':y=${yLT}:w=${largura}:h=${alturaLT}:color=0xD9942B@0.94:t=fill:enable='between(t,${inicio.toFixed(2)},${fim.toFixed(2)})'[${(atual = proximo())}]`);
-        camadas.push(`[${atual}]drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(rotulo.toUpperCase())}':fontcolor=0x1A1206:fontsize=38:x='${x}+23':y=${yLT + 20}:enable='between(t,${inicio.toFixed(2)},${fim.toFixed(2)})'[${(atual = proximo())}]`);
+        camadas.push(`[${atual}]drawbox=x='${x}':y=${yLT}:w=${largura}:h=${alturaLT}:color=${M.laranja}@0.96:t=fill:enable='between(t,${inicio.toFixed(2)},${fim.toFixed(2)})'[${(atual = proximo())}]`);
+        camadas.push(`[${atual}]drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(rotulo.toUpperCase())}':fontcolor=${M.corDoTextoSobreDestaque}:fontsize=38:x='${x}+23':y=${yLT + 20}:enable='between(t,${inicio.toFixed(2)},${fim.toFixed(2)})'[${(atual = proximo())}]`);
       });
 
       // --- placa de dado: número forte vira arte ---------------------------
@@ -126,7 +134,7 @@ export function construirGC({ fatias, roteiro, formato, canal, fio }) {
 
         atual = empilhar(atual,
           `drawtext=font='${FONTE_NEGRITO}':text='${escaparDrawtext(numero)}':` +
-          `fontcolor=white:fontsize=104:borderw=6:bordercolor=0x1A1206@0.9:` +
+          `fontcolor=${M.branco}:fontsize=104:borderw=7:bordercolor=${M.preto}@0.92:` +
           `x=(w-text_w)/2:y=${y}:enable='${janela}'`);
       });
 

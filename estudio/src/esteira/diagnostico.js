@@ -3,7 +3,8 @@ import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { lerConfig, caminhos } from '../nucleo/estado.js';
-import { gravarLocucao, VOZES } from '../times/05-voz.js';
+import { gravarLocucao } from '../times/05-voz.js';
+import { escalarApresentadores, vozDe, retratoDe, elenco } from '../times/07-elenco.js';
 import { montarArte } from '../times/06-arte.js';
 import { prepararApresentador } from '../times/07-apresentador.js';
 import { montarVideo } from '../times/08-montagem.js';
@@ -95,18 +96,32 @@ async function principal() {
     bocaFechada: join(caminhos.RAIZ, 'ativos', 'apresentador-fechada.png'),
     bocaAberta:  join(caminhos.RAIZ, 'ativos', 'apresentador-aberta.png'),
   };
-  await verificar('Imagens do apresentador', async () => {
+  await verificar('Apresentador ilustrado', async () => {
     for (const [k, p] of Object.entries(ativos)) {
       if (!existsSync(p)) throw new Error(`faltando ${k}: ${p}`);
     }
     return 'boca fechada e boca aberta encontradas';
   });
 
+  // Retrato faltando não é falha: o estúdio funciona com o ilustrado. Mas o
+  // dono precisa saber que o modo realista não vai entrar.
+  for (const a of elenco()) {
+    const retrato = retratoDe(a);
+    registrar(
+      `Retrato de ${a.nome}`,
+      true,
+      retrato
+        ? `${retrato.split('/').pop()} · voz ${a.voz}`
+        : `ainda não enviado — suba em ${a.retrato} para ${a.nome} aparecer em vídeo`
+    );
+  }
+
   // --- cadeia de mídia ----------------------------------------------------
   let locucao, arte, apresentador;
 
   const vozOk = await verificar('Gerar locução', async () => {
-    locucao = await gravarLocucao(ROTEIRO_TESTE, { pasta, voz: VOZES[process.env.VOZ_APRESENTADOR] || VOZES.antonio });
+    const escalado = escalarApresentadores({ registrarAgora: false }).apresentadores[0];
+    locucao = await gravarLocucao(ROTEIRO_TESTE, { pasta, voz: vozDe(escalado) });
     return `${locucao.duracaoSegundos}s de áudio, ${locucao.marcas.length} marcas de tempo`;
   });
 
