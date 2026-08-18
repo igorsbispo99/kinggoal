@@ -1,7 +1,8 @@
 # Estúdio de TV com IA
 
-Uma redação automatizada que produz um telejornal vertical por dia. Onze times
-de IA trabalham em sequência; você aprova em dois pontos e posta.
+Uma redação automatizada que produz um telejornal vertical por dia. Treze times
+de IA trabalham em sequência sob a direção do **DiTV.IA**; você aprova em dois
+pontos e posta.
 
 **Tudo roda dentro do GitHub.** Nada é executado na sua máquina — o estúdio foi
 montado assim de propósito, porque a operação é feita pelo navegador do tablet.
@@ -76,6 +77,10 @@ código. Para trocar, substitua os dois arquivos em `ativos/`:
 Quadrados, fundo transparente, 512×512. O sistema alterna entre os dois
 conforme o volume da fala.
 
+Para ter trilha de fundo, basta colocar um `ativos/trilha.mp3` livre de
+direitos. Ela entra abaixada e recua sozinha quando o apresentador fala. Sem o
+arquivo, o vídeo sai só com a locução.
+
 ### 6. Ligar a esteira
 
 Aba **Actions** › **Estúdio · Portão 1 (pauta)** › **Run workflow**.
@@ -122,10 +127,46 @@ Sem esses números o estúdio produz, mas não aprende.
 
 ---
 
-## Os onze times
+## DiTV.IA — o diretor
+
+O cérebro da operação. Cobre onze cargos do organograma de uma emissora: os que
+existem para que os outros consigam trabalhar.
+
+| Faz | Como |
+|---|---|
+| **Double check** | Confere cada entrega antes de seguir. Conserta o que dá, repete o que não passou, para o que fere regra |
+| **Liga e desliga robôs** | Time opcional que falha 3 vezes entra em quarentena e volta sozinho |
+| **Julga o conjunto** | Tom, fio, piada fora de hora, fórmula repetida — o que código não vê |
+| **Plantão** | Classifica a falha e separa o que resolve sozinho do que depende de você |
+| **Guarda as regras** | `config/regras.json` — 6 inegociáveis e 6 de qualidade |
+| **Relata** | Toda segunda: entrega, incidentes, custo por vídeo, times instáveis |
+
+**Duas conferências, dois mecanismos.** O que se verifica com código é verificado
+com código (`src/diretor/contratos.js`); o julgamento editorial vem depois, e só
+sobre o que passou. Conferir com o mesmo mecanismo que produziu herdaria os
+mesmos pontos cegos.
+
+O diretor **só barra citando uma regra inegociável**. Se quiser barrar sem
+regra, é rebaixado para "segurar" e a decisão volta para você.
+
+### As regras que ele faz valer
+
+Editáveis em `config/regras.json`, sem tocar em código:
+
+- vídeo abaixo da duração monetizável não vai ao ar
+- todo vídeo carrega o rótulo de IA
+- apontamento grave da checagem barra
+- pauta sensível nunca recebe tratamento cômico
+- a operação nunca passa do teto de custo
+- nunca comprar seguidor ou engajamento
+
+---
+
+## Os treze times
 
 | # | Time | Modelo | O que faz |
 |---|---|---|---|
+| 00 | **DiTV.IA** | topo | Dirige, confere, liga e desliga, atende o plantão, relata |
 | 01 | Pauta | barato | Agrupa manchetes e pontua por retenção, não por importância |
 | 02 | Editorial | topo | Escolhe a edição e acha o fio que costura as notícias |
 | 03 | Roteiro | topo | Escreve para ouvido, com gancho nos 3 primeiros segundos |
@@ -136,7 +177,16 @@ Sem esses números o estúdio produz, mas não aprende.
 | 08 | Montagem | — | 9:16, legenda queimada, selo de IA |
 | 09 | Indicadores | topo | Transforma número em regra para os times de conteúdo |
 | 10 | Estratégia | topo | Diagnostica a fase e define o plano de crescimento |
-| 11 | Marca e Instagram | topo | Guarda a identidade e adapta o pacote para Reels, Carrossel e Stories |
+| 11 | Marca e Instagram | topo | Guarda a identidade e adapta para Reels, Carrossel e Stories |
+| 12 | Áudio | — | Normaliza o loudness em dois passos e mixa a trilha |
+| 13 | GC | — | Selo do canal, placa de abertura, lower-thirds e destaque de número |
+
+Mais o **continuísta**, que vive no diretor porque olha o histórico e não o
+vídeo de hoje: avisa quando um assunto volta sem fato novo, quando o fio é
+reciclado e quando três edições seguidas abrem com a mesma estrutura.
+
+O mapeamento completo dos 56 cargos de uma emissora está em
+[`docs/ORGANOGRAMA.md`](docs/ORGANOGRAMA.md).
 
 ---
 
@@ -176,7 +226,10 @@ mês — o que vier primeiro. Os gatilhos ficam em `config/estudio.json`, em
 | Portão 2 não abriu | Pauta ainda não aprovada — a esteira tenta de novo às 17h e 20h |
 | Vídeo mudo ou sem legenda | edge-tts recusou por volume; o serviço é gratuito e não oficial |
 | Vídeo todo em fundo sólido | Nenhum banco de imagens respondeu |
-| Issue com ⛔ no título | A checagem barrou por problema grave — leia e corrija a fonte |
+| Issue com ⛔ no título | A checagem ou o diretor barraram — leia e corrija a fonte |
+| Issue com ✋ no título | O DiTV.IA segurou o vídeo e quer sua decisão — comente **aprovado** ou **reprovado** |
+| Issue com 🔧 no título | Plantão do diretor: algo quebrou e ele diz se depende de você |
+| Um time sumiu da produção | O diretor desligou por falhas seguidas; veja a aba DiTV.IA do painel |
 
 O diagnóstico do passo 3 pode ser disparado a qualquer momento e é a forma mais
 rápida de descobrir qual peça quebrou.
