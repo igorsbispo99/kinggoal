@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estúdio · Painel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{
+  --paper:#EDEAE4; --surface:#FFF; --surface-2:#F6F4EF;
+  --ink:#17181C; --ink-2:#4C4F57; --ink-3:#7C808A;
+  --line:#D9D4CA; --line-soft:#E6E2D9;
+  --gold:#9A6608; --gold-lit:#D9942B; --gold-soft:#F6ECD9;
+  --teal:#0F6A57; --teal-soft:#E2EFEB;
+  --slate:#6E7480; --slate-soft:#E9E7E2;
+  --tally:#C4402F; --tally-soft:#F7E5E2;
+  --f-d:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-b:"Source Serif 4",Georgia,serif;
+  --f-m:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#121317; --surface:#1A1C21; --surface-2:#23262C;
+  --ink:#EDEBE6; --ink-2:#B2B5BC; --ink-3:#848892;
+  --line:#32363E; --line-soft:#272A31;
+  --gold:#E0A544; --gold-lit:#E0A544; --gold-soft:#322717;
+  --teal:#4FC7A8; --teal-soft:#17312B;
+  --slate:#8C919C; --slate-soft:#24272D;
+  --tally:#E4604D; --tally-soft:#33201D;
+}}
+:root[data-theme="dark"]{
+  --paper:#121317; --surface:#1A1C21; --surface-2:#23262C;
+  --ink:#EDEBE6; --ink-2:#B2B5BC; --ink-3:#848892;
+  --line:#32363E; --line-soft:#272A31;
+  --gold:#E0A544; --gold-lit:#E0A544; --gold-soft:#322717;
+  --teal:#4FC7A8; --teal-soft:#17312B;
+  --slate:#8C919C; --slate-soft:#24272D;
+  --tally:#E4604D; --tally-soft:#33201D;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--f-b);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,.eyebrow,.chip,.tab,th,.kpi-v,.big{font-family:var(--f-d)}
+h1{font-size:clamp(1.7rem,5vw,2.5rem);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:0}
+h2{font-size:1.15rem;font-weight:700;letter-spacing:-.018em;margin:0}
+h3{font-size:.97rem;font-weight:700;margin:0}
+p{margin:0;max-width:66ch}
+.mono{font-family:var(--f-m);font-variant-numeric:tabular-nums}
+.eyebrow{font-size:.66rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--ink-3);margin:0}
+a{color:var(--gold)}
+.wrap{max-width:1000px;margin:0 auto;padding:0 clamp(.9rem,3.5vw,2rem) 5rem}
+
+header.top{padding:clamp(1.6rem,5vw,2.8rem) 0 1.1rem;display:flex;flex-direction:column;gap:.7rem}
+.tally{display:inline-flex;align-items:center;gap:.5rem;font-family:var(--f-d);font-size:.66rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--tally)}
+.tally i{width:8px;height:8px;border-radius:50%;background:var(--tally);animation:bl 2.6s ease-in-out infinite}
+@keyframes bl{0%,68%,100%{opacity:1}78%,90%{opacity:.28}}
+@media(prefers-reduced-motion:reduce){.tally i{animation:none}}
+
+nav.tabs{position:sticky;top:0;z-index:20;background:var(--paper);border-bottom:2px solid var(--ink);display:flex;gap:.15rem;overflow-x:auto;margin-bottom:1.5rem;-webkit-overflow-scrolling:touch}
+.tab{flex:none;appearance:none;background:none;border:0;border-bottom:3px solid transparent;margin-bottom:-2px;padding:.75rem .85rem;font-size:.78rem;font-weight:700;letter-spacing:.03em;color:var(--ink-3);cursor:pointer;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--gold-lit)}
+.tab:focus-visible{outline:2px solid var(--gold-lit);outline-offset:-3px}
+
+.painel[hidden]{display:none}
+.stack{display:flex;flex-direction:column;gap:1rem}
+.card{background:var(--surface);border:1px solid var(--line);padding:1.1rem 1.2rem 1.25rem;display:flex;flex-direction:column;gap:.7rem}
+.card.destaque{border-left:5px solid var(--gold-lit)}
+.card.alerta{border-left:5px solid var(--tally)}
+.card.bom{border-left:5px solid var(--teal)}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.kpi{background:var(--surface);padding:.9rem 1rem 1rem;display:flex;flex-direction:column;gap:.3rem}
+.kpi-k{font-family:var(--f-d);font-size:.6rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.kpi-v{font-size:1.45rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.kpi-n{font-size:.76rem;color:var(--ink-3);line-height:1.35}
+
+.chip{display:inline-flex;align-items:center;gap:.35rem;align-self:flex-start;font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:.26rem .55rem;border-radius:2px}
+.chip.ok{background:var(--teal-soft);color:var(--teal)}
+.chip.esperando{background:var(--gold-soft);color:var(--gold)}
+.chip.ruim{background:var(--tally-soft);color:var(--tally)}
+.chip.neutro{background:var(--slate-soft);color:var(--slate)}
+
+.trilha{display:flex;flex-direction:column;gap:1px;background:var(--line);border:1px solid var(--line)}
+.etapa{background:var(--surface);padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem}
+.etapa .bola{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;font-family:var(--f-d);font-size:.62rem;font-weight:800;color:var(--surface);background:var(--slate)}
+.etapa.feito .bola{background:var(--teal)}
+.etapa.agora .bola{background:var(--gold-lit)}
+.etapa .nome{font-family:var(--f-d);font-size:.85rem;font-weight:600;flex:1}
+.etapa .obs{font-size:.76rem;color:var(--ink-3);text-align:right}
+
+.btn{display:inline-flex;align-items:center;gap:.45rem;align-self:flex-start;font-family:var(--f-d);font-size:.8rem;font-weight:700;text-decoration:none;padding:.62rem 1rem;border:2px solid var(--ink);color:var(--ink);background:var(--surface)}
+.btn.primario{background:var(--gold-lit);border-color:var(--gold-lit);color:#1A1206}
+.btn:focus-visible{outline:2px solid var(--gold-lit);outline-offset:2px}
+
+ul.lista{margin:0;padding-left:1.1rem;display:flex;flex-direction:column;gap:.45rem}
+ul.lista li{font-size:.93rem;color:var(--ink-2)}
+ul.lista li::marker{color:var(--ink-3)}
+.rotulo{font-family:var(--f-d);font-size:.62rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+
+.scroller{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{width:100%;border-collapse:collapse;min-width:460px}
+th{text-align:left;font-size:.6rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);padding:.7rem .85rem;border-bottom:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+td{padding:.7rem .85rem;border-bottom:1px solid var(--line-soft);font-size:.88rem;color:var(--ink-2);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td:first-child{color:var(--ink);font-weight:600}
+td.n{font-family:var(--f-m);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.barra{height:6px;background:var(--line-soft);overflow:hidden}
+.barra i{display:block;height:100%;background:var(--gold-lit)}
+.barra i.perto{background:var(--tally)}
+
+pre.copiavel{margin:0;background:var(--surface-2);border:1px solid var(--line-soft);padding:.8rem .9rem;font-family:var(--f-m);font-size:.78rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--ink-2)}
+
+.vazio{color:var(--ink-3);font-size:.9rem;font-style:italic}
+footer.rodape{margin-top:2.5rem;padding-top:1.1rem;border-top:1px solid var(--line);font-size:.78rem;color:var(--ink-3);display:flex;flex-direction:column;gap:.4rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="tally"><i></i> <span id="statusFonte">carregando…</span></span>
+    <h1 id="tituloCanal">Estúdio</h1>
+    <p class="eyebrow" id="subtitulo">Painel de operação</p>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true"  data-alvo="hoje">Hoje</button>
+    <button class="tab" role="tab" aria-selected="false" data-alvo="estrategia">Estratégia</button>
+    <button class="tab" role="tab" aria-selected="false" data-alvo="marca">Marca &amp; Instagram</button>
+    <button class="tab" role="tab" aria-selected="false" data-alvo="numeros">Indicadores</button>
+    <button class="tab" role="tab" aria-selected="false" data-alvo="custo">Custo</button>
+  </nav>
+
+  <section class="painel stack" id="p-hoje"></section>
+  <section class="painel stack" id="p-estrategia" hidden></section>
+  <section class="painel stack" id="p-marca" hidden></section>
+  <section class="painel stack" id="p-numeros" hidden></section>
+  <section class="painel stack" id="p-custo" hidden></section>
+
+  <footer class="rodape">
+    <p>O painel lê os arquivos de estado direto do repositório. Toda decisão do estúdio fica registrada no histórico do git.</p>
+    <p id="rodapeRepo"></p>
+  </footer>
+</div>
+
+<script type="module">
+// --- de onde vêm os dados --------------------------------------------------
+// Em github.io o dono é o subdomínio e o repositório é o primeiro trecho do
+// caminho. Fora dali, cai no valor fixo — assim o arquivo abre local também.
+function descobrirRepo() {
+  const h = location.hostname;
+  if (h.endsWith('.github.io')) {
+    const dono = h.split('.')[0];
+    const repo = location.pathname.split('/').filter(Boolean)[0];
+    if (dono && repo) return `${dono}/${repo}`;
+  }
+  return 'igorsbispo99/kinggoal';
+}
+
+const REPO = descobrirRepo();
+const API = `https://api.github.com/repos/${REPO}`;
+
+const cacheEstado = new Map();
+
+async function lerEstado(nome) {
+  if (cacheEstado.has(nome)) return cacheEstado.get(nome);
+  const p = (async () => {
+    const r = await fetch(`${API}/contents/estudio/estado/${nome}.json`, {
+      headers: { Accept: 'application/vnd.github.raw+json' },
+    });
+    if (!r.ok) return null;
+    return r.json();
+  })().catch(() => null);
+  cacheEstado.set(nome, p);
+  return p;
+}
+
+async function listarPacotes() {
+  const r = await fetch(`${API}/contents/estudio/estado`).catch(() => null);
+  if (!r || !r.ok) return [];
+  const itens = await r.json();
+  return itens
+    .filter((i) => i.name.startsWith('pacote-') && i.name.endsWith('.json'))
+    .map((i) => i.name.replace(/\.json$/, ''))
+    .sort()
+    .reverse();
+}
+
+// --- utilidades de escrita na tela -----------------------------------------
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const num = (n) => Number(n || 0).toLocaleString('pt-BR');
+// Chaves internas viram texto de gente: 'liberado_com_ajustes' -> 'liberado com ajustes'
+const humano = (s) => String(s ?? '').replace(/[_-]+/g, ' ');
+const el = (id) => document.getElementById(id);
+
+function cartao(titulo, conteudo, classe = '') {
+  return `<div class="card ${classe}">${titulo ? `<h2>${esc(titulo)}</h2>` : ''}${conteudo}</div>`;
+}
+
+function vazio(msg) {
+  return `<div class="card"><p class="vazio">${esc(msg)}</p></div>`;
+}
+
+// --- aba: hoje --------------------------------------------------------------
+const ETAPAS = [
+  ['aguardando-portao-1', 'Pauta levantada',      'portão 1 aberto'],
+  ['portao-1-aprovado',   'Pauta aprovada',       'por você'],
+  ['publicado',           'Vídeo produzido',      'portão 2 aberto'],
+  ['postado',             'Postado',              'por você'],
+];
+
+function trilha(pacote) {
+  const ordem = ['aguardando-portao-1', 'portao-1-aprovado', 'publicado', 'postado'];
+  const atual = ordem.indexOf(pacote?.etapa === 'publicado' ? 'publicado' : pacote?.etapa) ;
+  const idx = pacote?.etapa === 'publicado' ? 2 : Math.max(atual, 0);
+
+  return `<div class="trilha">${ETAPAS.map(([id, nome, obs], i) => {
+    const estado = i < idx ? 'feito' : i === idx ? 'agora' : '';
+    return `<div class="etapa ${estado}">
+      <span class="bola">${i < idx ? '✓' : i + 1}</span>
+      <span class="nome">${esc(nome)}</span>
+      <span class="obs">${i <= idx ? esc(obs) : ''}</span>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+async function abaHoje() {
+  const pacotes = await listarPacotes();
+  if (!pacotes.length) {
+    el('p-hoje').innerHTML = vazio('Nenhum pacote produzido ainda. Assim que a esteira da manhã rodar pela primeira vez, o dia aparece aqui.');
+    return;
+  }
+
+  const pacote = await lerEstado(pacotes[0]);
+  if (!pacote) { el('p-hoje').innerHTML = vazio('Não consegui ler o pacote mais recente.'); return; }
+
+  const ed = pacote.edicao || {};
+  const rot = pacote.roteiro;
+  const barrado = pacote.etapa === 'barrado-checagem';
+  const reprovado = pacote.etapa === 'reprovado-portao-1';
+
+  let estado = `<span class="chip esperando">aguardando você</span>`;
+  if (pacote.etapa === 'publicado') estado = `<span class="chip ok">vídeo pronto</span>`;
+  if (barrado)  estado = `<span class="chip ruim">barrado na checagem</span>`;
+  if (reprovado) estado = `<span class="chip neutro">pauta reprovada</span>`;
+
+  const acao = pacote.video?.url
+    ? `<a class="btn primario" href="${esc(pacote.video.url)}">⬇ Baixar o vídeo</a>
+       <a class="btn" href="${esc(pacote.portao2?.url || '#')}">Abrir o portão 2</a>`
+    : `<a class="btn primario" href="${esc(pacote.portao1?.url || '#')}">Abrir o portão 1</a>`;
+
+  const noticias = (ed.escolhidas || [])
+    .map((n, i) => `<li><strong>${esc(n.assunto)}</strong><br><span style="color:var(--ink-3)">${esc(n.angulo)}</span></li>`)
+    .join('');
+
+  el('p-hoje').innerHTML = [
+    cartao('', `
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap">
+        <div><p class="eyebrow">Pacote de ${esc(pacote.data)}</p>
+        <h2 style="margin-top:.3rem">${esc(ed.fio || 'Sem fio definido')}</h2></div>
+        ${estado}
+      </div>
+      <p style="font-size:.9rem;color:var(--ink-2)">${esc(ed.porqueEsseFio || '')}</p>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.3rem">${acao}</div>
+    `, 'destaque'),
+
+    cartao('Onde está o dia', trilha(pacote)),
+
+    noticias ? cartao(`As ${(ed.escolhidas || []).length} notícias`, `<ul class="lista">${noticias}</ul>`) : '',
+
+    rot ? cartao('Para colar no TikTok', `
+      <span class="rotulo">Título e hashtags</span>
+      <pre class="copiavel">${esc(rot.tituloPost)}\n\n${esc((rot.hashtags || []).map((h) => '#' + h).join(' '))}</pre>
+      <span class="rotulo">Gancho dos 3 primeiros segundos</span>
+      <p style="font-size:.93rem">“${esc(rot.gancho)}”</p>
+    `) : '',
+
+    pacote.laudo ? cartao('Checagem', `
+      <span class="chip ${pacote.laudo.veredito === 'liberado' ? 'ok' : pacote.laudo.veredito === 'barrado' ? 'ruim' : 'esperando'}">${esc(humano(pacote.laudo.veredito))}</span>
+      <p style="font-size:.92rem">${esc(pacote.laudo.resumo)}</p>
+    `, pacote.laudo.veredito === 'barrado' ? 'alerta' : '') : '',
+  ].filter(Boolean).join('');
+}
+
+// --- aba: estratégia --------------------------------------------------------
+async function abaEstrategia() {
+  const e = await lerEstado('estrategia');
+  if (!e) {
+    el('p-estrategia').innerHTML = vazio('A estratégia é definida no ciclo semanal de crescimento. Dispare o workflow "Estúdio · Estratégia e indicadores" para gerar a primeira.');
+    return;
+  }
+
+  const m = e.monetizacao || {};
+  const acoes = (e.acoes || []).map((a) => `<li>
+      <span class="chip ${a.quemFaz === 'dono' ? 'esperando' : 'neutro'}">${a.quemFaz === 'dono' ? 'você' : 'sistema'}</span>
+      <strong style="display:block;margin-top:.3rem">${esc(a.acao)}</strong>
+      <span style="color:var(--ink-3);font-size:.86rem">${esc(a.porque)} · esforço ${esc(a.esforco)}</span>
+    </li>`).join('');
+
+  const frentes = (m.frentes || []).map((f) =>
+    `<tr><td>${esc(f.frente)}</td><td>${esc(f.quando)}</td><td class="n">${esc(f.potencial)}</td></tr>`).join('');
+
+  el('p-estrategia').innerHTML = [
+    e.alertaSeguranca ? cartao(e.alertaSeguranca.titulo, `<p style="font-size:.93rem">${esc(e.alertaSeguranca.texto)}</p>`, 'alerta') : '',
+
+    cartao('', `
+      <div style="display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:center">
+        <p class="eyebrow">Fase do canal</p>
+        <span class="chip esperando">${esc(humano(e.fase))}</span>
+      </div>
+      <p style="font-size:.95rem">${esc(e.diagnostico)}</p>
+      <div style="border-left:3px solid var(--gold-lit);padding-left:.85rem;margin-top:.4rem">
+        <span class="rotulo">Gargalo agora</span>
+        <p style="font-size:.93rem;margin-bottom:.5rem">${esc(e.gargaloAtual)}</p>
+        <span class="rotulo">Meta dos próximos 7 dias</span>
+        <p style="font-size:.93rem">${esc(e.metaDaSemana)}</p>
+      </div>
+    `, 'destaque'),
+
+    acoes ? cartao('Ações da semana', `<ul class="lista">${acoes}</ul>`) : '',
+
+    cartao('Monetização', `
+      <p style="font-size:.93rem">${esc(m.situacao || '')}</p>
+      <div class="kpis" style="margin:.4rem 0">
+        <div class="kpi"><span class="kpi-k">Próxima trava</span><span class="kpi-n" style="font-size:.87rem;color:var(--ink-2)">${esc(m.proximaTrava || '—')}</span></div>
+        <div class="kpi"><span class="kpi-k">Receita esperada</span><span class="kpi-v mono" style="font-size:1.05rem;color:var(--teal)">${esc(m.receitaEsperada || '—')}</span></div>
+      </div>
+      ${frentes ? `<div class="scroller"><table><thead><tr><th>Frente</th><th>Quando faz sentido</th><th>Potencial</th></tr></thead><tbody>${frentes}</tbody></table></div>` : ''}
+    `),
+
+    (e.pararDeFazer || []).length ? cartao('Parar de fazer', `<ul class="lista">${e.pararDeFazer.map((p) => `<li>${esc(p)}</li>`).join('')}</ul>`) : '',
+  ].filter(Boolean).join('');
+}
+
+// --- aba: marca e instagram -------------------------------------------------
+async function abaMarca() {
+  const pacotes = await listarPacotes();
+  const marcaGuardada = await lerEstado('marca');
+  let ig = null, data = null;
+
+  for (const nome of pacotes.slice(0, 7)) {
+    const p = await lerEstado(nome);
+    if (p?.marca) { ig = p.marca; data = p.data; break; }
+  }
+
+  if (!ig && !marcaGuardada) {
+    el('p-marca').innerHTML = vazio('O pacote do Instagram é gerado junto com o vídeo, na esteira da tarde. Ainda não há nenhum.');
+    return;
+  }
+
+  const partes = [];
+
+  if (marcaGuardada) {
+    partes.push(cartao('Identidade acumulada', `
+      <p style="font-size:.9rem;color:var(--ink-3)">O que já se repete e virou marca. Isto só cresce — o time de Marca acrescenta, nunca apaga.</p>
+      <ul class="lista">${(marcaGuardada.constantes || []).map((c) => `<li>${esc(c)}</li>`).join('') || '<li class="vazio">ainda se formando</li>'}</ul>
+      ${marcaGuardada.ultimaNota !== undefined ? `
+      <span class="rotulo">Coerência do último pacote</span>
+      <div class="barra"><i style="width:${Math.max(0, Math.min(100, marcaGuardada.ultimaNota))}%"></i></div>
+      <span class="kpi-n">${esc(marcaGuardada.ultimaNota)}/100${(marcaGuardada.ultimosDesvios || []).length ? ' · desvios: ' + esc(marcaGuardada.ultimosDesvios.join('; ')) : ''}</span>` : ''}
+    `, 'destaque'));
+  }
+
+  if (ig) {
+    const r = ig.instagram.reels, c = ig.instagram.carrossel, s = ig.instagram.stories || [];
+
+    partes.push(cartao(`Reels · ${data}`, `
+      <pre class="copiavel">${esc(r.legenda)}\n\n${esc((r.hashtags || []).map((h) => '#' + h).join(' '))}</pre>
+      <span class="rotulo">Ajustes em relação ao TikTok</span>
+      <ul class="lista">${(r.ajustes || []).map((a) => `<li>${esc(a)}</li>`).join('')}</ul>
+    `));
+
+    partes.push(cartao('Carrossel', `
+      <div class="scroller"><table><thead><tr><th>#</th><th>Título</th><th>Corpo</th></tr></thead><tbody>
+      ${(c.telas || []).map((t, i) => `<tr><td class="n">${i + 1}</td><td>${esc(t.titulo)}</td><td>${esc(t.corpo)}</td></tr>`).join('')}
+      </tbody></table></div>
+      <pre class="copiavel">${esc(c.legenda)}</pre>
+    `));
+
+    partes.push(cartao('Stories', `<ul class="lista">${s.map((x) =>
+      `<li>${esc(x.texto)}${x.interacao && x.interacao !== 'nenhuma' ? ` <span class="chip neutro">${esc(x.interacao)}</span> <span style="color:var(--ink-3);font-size:.85rem">${esc((x.opcoes || []).join(' / '))}</span>` : ''}</li>`
+    ).join('')}</ul>`));
+
+    partes.push(cartao('Retroalimentação entre as plataformas', `
+      <p style="font-size:.9rem;color:var(--ink-3)">Como uma plataforma alimenta a outra. É o que impede o projeto de depender de uma conta só.</p>
+      <ul class="lista">${(ig.retroalimentacao || []).map((x) =>
+        `<li><strong>${esc(x.de)} → ${esc(x.para)}</strong><br>${esc(x.jogada)}</li>`).join('')}</ul>
+    `, 'bom'));
+  }
+
+  el('p-marca').innerHTML = partes.join('');
+}
+
+// --- aba: indicadores -------------------------------------------------------
+async function abaNumeros() {
+  const [aprend, numeros, metricas] = await Promise.all([
+    lerEstado('aprendizados'), lerEstado('numeros'), lerEstado('metricas'),
+  ]);
+
+  const seg = numeros?.seguidoresTiktok || 0;
+  const views30 = numeros?.views30d || 0;
+  const pct = (v, meta) => Math.min(100, Math.round((v / meta) * 100));
+
+  const partes = [cartao('Distância da monetização', `
+    <p style="font-size:.9rem;color:var(--ink-3)">As duas travas do programa de criadores. Precisam estar abertas ao mesmo tempo.</p>
+    <div class="kpis">
+      <div class="kpi"><span class="kpi-k">Seguidores</span><span class="kpi-v mono">${num(seg)}</span>
+        <div class="barra"><i style="width:${pct(seg, 10000)}%"></i></div>
+        <span class="kpi-n">${pct(seg, 10000)}% de 10.000</span></div>
+      <div class="kpi"><span class="kpi-k">Views em 30 dias</span><span class="kpi-v mono">${num(views30)}</span>
+        <div class="barra"><i style="width:${pct(views30, 100000)}%"></i></div>
+        <span class="kpi-n">${pct(views30, 100000)}% de 100.000</span></div>
+      <div class="kpi"><span class="kpi-k">Vídeos com números</span><span class="kpi-v mono">${num((metricas?.videos || []).length)}</span>
+        <span class="kpi-n">lançados por você</span></div>
+    </div>
+  `, seg >= 10000 && views30 >= 100000 ? 'bom' : 'destaque')];
+
+  if (aprend?.aprendizados?.length) {
+    partes.push(cartao('O que os números ensinaram', `
+      <p style="font-size:.92rem">${esc(aprend.leituraGeral)}</p>
+      <ul class="lista">${aprend.aprendizados.map((a) =>
+        `<li><span class="chip ${a.confianca === 'alta' ? 'ok' : a.confianca === 'media' ? 'esperando' : 'neutro'}">${esc(a.confianca)}</span>
+         <strong style="display:block;margin-top:.3rem">${esc(a.regra)}</strong>
+         <span style="color:var(--ink-3);font-size:.86rem">${esc(a.evidencia)} → time de ${esc(a.paraQuemTime)}</span></li>`).join('')}</ul>
+    `));
+  } else {
+    partes.push(vazio('Ainda não há vídeos com números suficientes para gerar regra. Lance as métricas em estado/metricas.json depois de postar.'));
+  }
+
+  if (aprend?.alertas?.length) {
+    partes.push(cartao('Alertas', `<ul class="lista">${aprend.alertas.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>`, 'alerta'));
+  }
+
+  el('p-numeros').innerHTML = partes.join('');
+}
+
+// --- aba: custo -------------------------------------------------------------
+async function abaCusto() {
+  const mes = new Date().toISOString().slice(0, 7);
+  const livro = await lerEstado(`custos-${mes}`);
+
+  if (!livro) {
+    el('p-custo').innerHTML = vazio(`Nenhum gasto registrado em ${mes}. O custo aparece aqui assim que a esteira rodar.`);
+    return;
+  }
+
+  const total = livro.totalUSD || 0;
+  const TETO = 30, ALERTA = 22;
+  const pctTeto = Math.min(100, Math.round((total / TETO) * 100));
+  const brl = (total * 5.4).toFixed(2);
+
+  const porTime = Object.entries(livro.porTime || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, v]) => `<tr><td>${esc(t)}</td><td class="n">US$ ${v.toFixed(4)}</td><td class="n">${Math.round((v / total) * 100)}%</td></tr>`)
+    .join('');
+
+  el('p-custo').innerHTML = [
+    cartao(`Gasto de ${mes}`, `
+      <div class="kpis">
+        <div class="kpi"><span class="kpi-k">Total no mês</span><span class="kpi-v mono" style="color:${total >= ALERTA ? 'var(--tally)' : 'var(--teal)'}">US$ ${total.toFixed(2)}</span><span class="kpi-n">≈ R$ ${brl}</span></div>
+        <div class="kpi"><span class="kpi-k">Chamadas ao modelo</span><span class="kpi-v mono">${num(livro.chamadas)}</span></div>
+        <div class="kpi"><span class="kpi-k">Teto configurado</span><span class="kpi-v mono">US$ ${TETO}</span><span class="kpi-n">alerta em US$ ${ALERTA}</span></div>
+      </div>
+      <div class="barra"><i class="${total >= ALERTA ? 'perto' : ''}" style="width:${pctTeto}%"></i></div>
+      <span class="kpi-n">${pctTeto}% do teto do mês</span>
+    `, total >= ALERTA ? 'alerta' : 'bom'),
+
+    porTime ? cartao('Onde o dinheiro foi', `<div class="scroller"><table><thead><tr><th>Time</th><th>Custo</th><th>Fatia</th></tr></thead><tbody>${porTime}</tbody></table></div>`) : '',
+  ].filter(Boolean).join('');
+}
+
+// --- navegação --------------------------------------------------------------
+const CARREGADORES = { hoje: abaHoje, estrategia: abaEstrategia, marca: abaMarca, numeros: abaNumeros, custo: abaCusto };
+const jaCarregou = new Set();
+
+async function mostrar(alvo) {
+  document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.alvo === alvo)));
+  document.querySelectorAll('.painel').forEach((p) => { p.hidden = p.id !== `p-${alvo}`; });
+
+  if (!jaCarregou.has(alvo)) {
+    jaCarregou.add(alvo);
+    el(`p-${alvo}`).innerHTML = `<div class="card"><p class="vazio">carregando…</p></div>`;
+    try {
+      await CARREGADORES[alvo]();
+    } catch (e) {
+      jaCarregou.delete(alvo);
+      el(`p-${alvo}`).innerHTML = vazio(`Não consegui carregar: ${e.message}`);
+    }
+  }
+}
+
+document.querySelectorAll('.tab').forEach((t) =>
+  t.addEventListener('click', () => { location.hash = t.dataset.alvo; mostrar(t.dataset.alvo); }));
+
+// --- início -----------------------------------------------------------------
+(async () => {
+  el('rodapeRepo').textContent = `Repositório: ${REPO}`;
+
+  const cfg = await fetch(`${API}/contents/estudio/config/estudio.json`, {
+    headers: { Accept: 'application/vnd.github.raw+json' },
+  }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+
+  if (cfg) {
+    el('tituloCanal').textContent = cfg.canal.nome && cfg.canal.nome !== 'A definir' ? cfg.canal.nome : 'Estúdio';
+    el('subtitulo').textContent = cfg.canal.tagline || 'Painel de operação';
+    el('statusFonte').textContent = `${cfg.ritmo.videosPorDia} vídeo por dia · dois portões`;
+  } else {
+    el('statusFonte').textContent = 'painel offline — não consegui ler o repositório';
+  }
+
+  const inicial = location.hash.replace('#', '') || 'hoje';
+  mostrar(CARREGADORES[inicial] ? inicial : 'hoje');
+})();
+</script>
+</body>
+</html>
