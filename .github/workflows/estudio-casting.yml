@@ -1,0 +1,37 @@
+name: Estúdio · Casting do apresentador
+
+# Escolhe quem apresenta o jornal, entre pessoas reais de bancos com uso
+# comercial liberado. Rodar duas vezes: a primeira monta o elenco e abre a
+# issue; a segunda registra o "escolher N" que você comentou nela.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  casting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Procurar candidatos e registrar a escolha
+        working-directory: estudio
+        env:
+          GITHUB_TOKEN:      ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PEXELS_API_KEY:    ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY:   ${{ secrets.PIXABAY_API_KEY }}
+        run: node src/esteira/casting.js
+
+      - name: Guardar o elenco no repositório
+        run: |
+          git config user.name  "Estúdio IA"
+          git config user.email "actions@github.com"
+          git add estudio/estado estudio/ativos/elenco
+          git diff --staged --quiet || git commit -m "Casting do apresentador"
+          git push

@@ -66,20 +66,29 @@ Editar `config/estudio.json` pelo próprio GitHub (botão de lápis no arquivo):
 - `apresentador.nome`, `apresentador.jeito` — quem apresenta e como fala
 - `formato.duracaoAlvoSegundos` — deixe acima de 61, ou o vídeo não monetiza
 
-### 5. Trocar o apresentador (opcional)
+### 5. Escolher o apresentador
 
-O apresentador que vem no repositório é um marcador de posição gerado por
-código. Para trocar, substitua os dois arquivos em `ativos/`:
+O apresentador que vem no repositório é um **desenho feito em código**: homem
+afro-brasileiro, em selo circular de telejornal. Ele existe para o estúdio
+produzir desde o primeiro dia sem depender de arte pronta — e, por melhor que
+fique, é ilustração e não vira fotografia.
 
-- `apresentador-fechada.png` — boca fechada
-- `apresentador-aberta.png` — boca aberta
+Para ter uma **pessoa real** apresentando:
 
-Quadrados, fundo transparente, 512×512. O sistema alterna entre os dois
-conforme o volume da fala.
+Aba **Actions** › **Estúdio · Casting do apresentador** › **Run workflow**.
 
-Para ter trilha de fundo, basta colocar um `ativos/trilha.mp3` livre de
-direitos. Ela entra abaixada e recua sozinha quando o apresentador fala. Sem o
-arquivo, o vídeo sai só com a locução.
+O casting procura retratos em bancos com uso comercial liberado e abre uma
+issue com os candidatos. Você comenta `escolher 3` e roda o workflow de novo
+para registrar. Isso exige `PEXELS_API_KEY` ou `PIXABAY_API_KEY` (gratuitas).
+
+Com a pessoa escolhida, o estúdio passa ao **modo realista**: o movimento da
+boca vira lipsync de verdade sobre a foto, o que exige `FAL_KEY` e custa cerca
+de US$ 0,30 por vídeo. Sem essa chave nada quebra — a produção continua com o
+apresentador ilustrado.
+
+Prefere sua própria arte? Substitua os dois arquivos em `ativos/`:
+`apresentador-fechada.png` e `apresentador-aberta.png`, quadrados, fundo
+transparente, 512×512.
 
 ### 6. Ligar a esteira
 
@@ -140,6 +149,32 @@ existem para que os outros consigam trabalhar.
 | **Plantão** | Classifica a falha e separa o que resolve sozinho do que depende de você |
 | **Guarda as regras** | `config/regras.json` — 6 inegociáveis e 6 de qualidade |
 | **Relata** | Toda segunda: entrega, incidentes, custo por vídeo, times instáveis |
+
+### Ele aprende e ganha independência
+
+O diretor **aposta no que você vai decidir antes de você decidir**, e a aposta
+fica registrada antes de a resposta existir. É o que separa aprendizado
+verificável de um resumo plausível do histórico.
+
+| Nível | O que ele faz |
+|---|---|
+| 0 · Observa | Não decide nada. Só prevê e registra o acerto |
+| 1 · Sugere | Recomenda com o motivo, mas espera você |
+| 2 · Decide e avisa | Decide sozinho e te informa. Você pode reverter |
+| 3 · Conduz | Decide e registra. Só te chama fora do padrão |
+
+A escada é **por domínio** — pauta, roteiro, publicação, mídia, custo e
+estratégia — porque ele pode já ser confiável para escolher pauta e ainda não
+ser para publicar. Sobe no máximo um degrau por rodada, e a promoção depende do
+placar de previsões: 8 decisões e 75% de acerto para o nível 1, 20 e 85% para o
+2, 40 e 92% para o 3.
+
+**Uma reversão sua derruba um nível na hora.** A assimetria é deliberada: subir
+exige dezenas de acertos, cair exige um erro. Para travar um domínio, ajuste
+`tetoDoDono` em `estado/autonomia.json`.
+
+Os precedentes que ele aprende ficam em `estado/doutrina.json`. Cada um só ganha
+confiança prevendo certo, e precedente que erra demais é aposentado sozinho.
 
 **Duas conferências, dois mecanismos.** O que se verifica com código é verificado
 com código (`src/diretor/contratos.js`); o julgamento editorial vem depois, e só
