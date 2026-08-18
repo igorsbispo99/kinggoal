@@ -1,4 +1,4 @@
-import { lerConfig, lerEstado, gravarEstado, listarEstados, dataDeHoje } from '../nucleo/estado.js';
+import { lerConfig, lerEstado, gravarEstado, listarEstados, dataDeHoje, caminhos } from '../nucleo/estado.js';
 import { gastoDoMes } from '../nucleo/llm.js';
 import { coletarFeeds } from '../fontes/rss.js';
 import { coletarGdelt } from '../fontes/gdelt.js';
@@ -9,7 +9,6 @@ import { abrirPortao } from '../github/issues.js';
 import { log } from '../nucleo/log.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { caminhos } from '../nucleo/estado.js';
 
 /** Assuntos dos últimos dias, para a Pauta não repetir o que já foi ao ar. */
 function assuntosRecentes(dias = 5) {
