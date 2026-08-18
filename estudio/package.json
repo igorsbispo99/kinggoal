@@ -9,7 +9,7 @@
     "manha": "node src/esteira/manha.js",
     "tarde": "node src/esteira/tarde.js",
     "indicadores": "node src/esteira/indicadores.js",
-    "teste": "node --test test/"
+    "teste": "node --test test/*.test.mjs"
   },
   "dependencies": {}
 }

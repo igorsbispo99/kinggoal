@@ -8,6 +8,7 @@ import { aprendizadosAtivos } from '../times/09-indicadores.js';
 import { abrirPortao } from '../github/issues.js';
 import { Supervisor } from '../diretor/supervisor.js';
 import { conferirPautas, conferirEdicao } from '../diretor/contratos.js';
+import { antesDoPortao, formatoDoPortao } from '../diretor/ciclo.js';
 import { log } from '../nucleo/log.js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,7 +20,7 @@ function assuntosRecentes(dias = 5) {
     .flatMap((nome) => (lerEstado(nome)?.edicao?.escolhidas || []).map((e) => e.assunto));
 }
 
-function corpoDoPortao(data, edicao, pautas) {
+function corpoDoPortao(data, edicao, pautas, { aposta, formato } = {}) {
   const escolhidas = edicao.escolhidas
     .map((n, i) => `**${i + 1}. ${n.assunto}**\n${n.resumo}\n\n> Ângulo: *${n.angulo}*\n> Tom: ${n.tom}${n.permiteHumor ? '' : ' · **humor bloqueado**'}`)
     .join('\n\n');
@@ -31,6 +32,39 @@ function corpoDoPortao(data, edicao, pautas) {
   const outras = pautas.slice(0, 8)
     .map((p) => `- \`${String(p.nota).padStart(3)}\` ${p.assunto}`)
     .join('\n');
+
+  // A previsão aparece SEMPRE, mesmo quando o diretor não decide nada. É como
+  // você vê, dia a dia, se ele está entendendo você — e é o que justifica a
+  // autonomia quando ela vier.
+  const prev = aposta?.previsao;
+  const blocoPrevisao = prev
+    ? `### O palpite do diretor
+
+Ele acha que você vai **${prev.decisao}**, com **${prev.confianca}%** de confiança.
+
+> ${prev.raciocinio}
+
+${prev.baseadoEm?.length ? `Baseado em: ${prev.baseadoEm.map((x) => `\`${x}\``).join(', ')}` : '_Sem precedente aprendido ainda — este é palpite de situação._'}
+${prev.oQueMeFariaMudar ? `\nEm dúvida por: ${prev.oQueMeFariaMudar}` : ''}
+
+_O acerto deste palpite é conferido quando você decidir. É assim que ele ganha autonomia._`
+    : '';
+
+  const comoResponder = formato?.modo === 'aviso'
+    ? `### Já está decidido
+
+${formato.explicacao}
+
+Se discordar, comente **reverter** com o motivo. A reversão custa um nível de autonomia ao diretor e o motivo entra na memória dele.`
+    : `### Como aprovar
+
+| Ação | O que fazer |
+|---|---|
+| **Aprovar** | Reaja com 👍, ou comente **aprovado** |
+| **Reprovar** | Reaja com 👎, ou comente o que mudar — o motivo vira instrução para o roteiro |
+| **Trocar uma notícia** | Comente qual sai e qual entra |
+
+Sem aprovação até o horário do segundo portão, o vídeo do dia não é produzido.`;
 
   return `## Pauta de ${data}
 
@@ -53,15 +87,11 @@ ${outras}
 
 ---
 
-### Como aprovar
+${blocoPrevisao}
 
-| Ação | O que fazer |
-|---|---|
-| **Aprovar** | Reaja com 👍 nesta issue, ou comente **aprovado** |
-| **Reprovar** | Reaja com 👎, ou comente o que mudar — o motivo vira instrução para o roteiro |
-| **Trocar uma notícia** | Comente qual sai e qual entra |
+---
 
-Sem aprovação até o horário do segundo portão, o vídeo do dia não é produzido.`;
+${comoResponder}`;
 }
 
 async function principal() {
@@ -104,10 +134,31 @@ async function principal() {
     { contrato: (e) => conferirEdicao(e, { noticiasPorVideo: cfg.formato.noticiasPorVideo }) });
   const edicao = rEdicao.valor;
 
+  // O diretor aposta no que você vai decidir ANTES de você decidir. A aposta
+  // fica registrada e é conferida depois — é assim que a autonomia dele é
+  // conquistada em vez de concedida.
+  const aposta = await antesDoPortao({
+    dominio: 'pauta',
+    referencia: 'portao1',
+    situacao: {
+      fio: edicao.fio,
+      assuntos: edicao.escolhidas.map((e) => e.assunto),
+      tons: edicao.escolhidas.map((e) => e.tom),
+      editorias: pautas.slice(0, 3).map((p) => p.editoria),
+      melhorNota: pautas[0]?.nota,
+      temPautaSensivel: edicao.escolhidas.some((e) => e.permiteHumor === false),
+    },
+  });
+
+  const formato = formatoDoPortao('pauta', aposta.autonomia);
+  const decidiuSozinho = formato.modo === 'aviso';
+
   const issue = await abrirPortao({
-    titulo: `Portão 1 · Pauta de ${data}`,
-    corpo: corpoDoPortao(data, edicao, pautas),
-    etiquetas: ['portao-1', 'estudio'],
+    titulo: decidiuSozinho
+      ? `Pauta de ${data} — decidida pelo diretor`
+      : `Portão 1 · Pauta de ${data}`,
+    corpo: corpoDoPortao(data, edicao, pautas, { aposta, formato }),
+    etiquetas: [decidiuSozinho ? 'aviso-diretor' : 'portao-1', 'estudio'],
   });
 
   gravarEstado(`pacote-${data}`, {
@@ -117,7 +168,15 @@ async function principal() {
     manchetesColetadas: crus.length,
     pautas,
     edicao,
-    portao1: { issue: issue.number, url: issue.html_url },
+    portao1: {
+      issue: issue.number,
+      url: issue.html_url,
+      modo: formato.modo,
+      observacao: aposta.id,
+      previsao: aposta.previsao,
+      autonomia: aposta.autonomia,
+    },
+    etapaPortao1: decidiuSozinho ? 'aprovado-pelo-diretor' : 'aguardando-voce',
     supervisaoManha: chefe.resumo(),
     custoAcumuladoUSD: Number(gastoDoMes().totalUSD.toFixed(4)),
   });

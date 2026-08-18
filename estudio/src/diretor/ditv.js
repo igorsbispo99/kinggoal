@@ -218,3 +218,75 @@ export async function diagnosticar(incidentes, { diario = [] } = {}) {
   log.time('00-ditv', `plantão: ${laudo.causaProvavel} · urgência ${laudo.urgencia}${laudo.reincidente ? ' · REINCIDENTE' : ''}`);
   return laudo;
 }
+
+// ---------------------------------------------------------------------------
+// Previsão — o mecanismo que transforma histórico em aprendizado verificável
+// ---------------------------------------------------------------------------
+
+const PAPEL_PREVISOR = `Você é o DiTV.IA prevendo o que o dono do canal vai decidir, ANTES de ele decidir.
+
+Isto não é uma recomendação. É um palpite que vai ser conferido contra a decisão real, e o seu placar depende dele. Prever o que você acha certo em vez do que ELE faria é o erro que mais custa aqui.
+
+COMO PREVER
+Use os precedentes: são regras que você já aprendeu observando as decisões dele, e cada uma carrega o quanto acertou até agora. Um precedente firme vale mais que sua intuição sobre o pacote de hoje.
+
+Se nenhum precedente se aplica, diga isso e baixe a confiança. Confiança alta sem base é o que faz um sistema desses ganhar autonomia que não merece.
+
+CALIBRAÇÃO
+A confiança é uma aposta sobre você mesmo:
+- 90 ou mais: um precedente firme se aplica direto e nada no pacote destoa.
+- 70 a 89: precedente se aplica, mas há algo fora do padrão.
+- 50 a 69: pouca base; é mais leitura de situação que precedente.
+- abaixo de 50: você não sabe. Diga que não sabe.
+
+Errar com confiança baixa custa pouco. Errar com confiança alta custa caro — e é assim que tem que ser.
+
+Português do Brasil.`;
+
+const SCHEMA_PREVISAO = {
+  type: 'object',
+  properties: {
+    decisao:    { type: 'string', description: 'O que você acha que o dono vai fazer: aprovado ou reprovado.' },
+    confianca:  { type: 'integer', description: 'De 0 a 100, calibrada como descrito.' },
+    raciocinio: { type: 'string', description: 'Em uma frase, por que você acha isso.' },
+    baseadoEm:  { type: 'array', items: { type: 'string' }, description: 'Ids dos precedentes usados. Vazio se nenhum se aplicou.' },
+    oQueMeFariaMudar: { type: 'string', description: 'O que no pacote te deixou em dúvida. Vazio se nada.' },
+  },
+  required: ['decisao', 'confianca', 'raciocinio', 'baseadoEm', 'oQueMeFariaMudar'],
+};
+
+/**
+ * Prevê a decisão do dono num domínio.
+ *
+ * Roda no modelo barato de propósito: previsão é exercício de padrão, não de
+ * criação, e ela acontece em todo portão de todo dia. O que importa é o placar
+ * que ela acumula, não a beleza do raciocínio.
+ */
+export async function preverDecisao({ dominio, situacao, precedentes = [], historicoCurto = [] }) {
+  const listaPrec = precedentes.length
+    ? precedentes.map((p) => `[${p.id}] ${p.enunciado}\n   gatilho: ${p.gatilho} → ${p.decisaoPrevista}\n   placar: ${p.acertos} certo(s), ${p.erros} errado(s) · confiança ${(p.confianca * 100).toFixed(0)}% · ${p.estado}`).join('\n\n')
+    : 'Nenhum precedente aprendido neste domínio ainda.';
+
+  const recentes = historicoCurto.length
+    ? historicoCurto.map((h) => `- ${h.data}: ${h.resumo} → o dono ${h.decisao}${h.motivo ? ` ("${h.motivo}")` : ''}`).join('\n')
+    : 'sem histórico recente';
+
+  const previsao = await pedirJSON({
+    time: '00-ditv',
+    papel: PAPEL_PREVISOR,
+    tarefa: `DOMÍNIO: ${dominio}\n\nPRECEDENTES QUE VOCÊ APRENDEU:\n${listaPrec}\n\nÚLTIMAS DECISÕES DELE:\n${recentes}\n\nSITUAÇÃO DE AGORA:\n${JSON.stringify(situacao, null, 1)}\n\nO que ele vai decidir?`,
+    schema: SCHEMA_PREVISAO,
+    nomeResposta: 'previsao',
+    maxTokens: 900,
+  });
+
+  // Confiança só pode ser alta se houver precedente sustentando. Sem base, o
+  // teto é 60 — é a trava que impede autonomia construída sobre palpite.
+  if (!previsao.baseadoEm?.length && previsao.confianca > 60) {
+    log.aviso(`DiTV.IA previu com ${previsao.confianca}% sem citar precedente — rebaixado para 60%`);
+    previsao.confianca = 60;
+  }
+
+  log.time('00-ditv', `previsão em ${dominio}: "${previsao.decisao}" com ${previsao.confianca}% de confiança`);
+  return previsao;
+}

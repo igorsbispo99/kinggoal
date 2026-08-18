@@ -15,6 +15,7 @@ import { Supervisor } from '../diretor/supervisor.js';
 import { conferirRoteiro, conferirLocucao, conferirVideo } from '../diretor/contratos.js';
 import { conferirContinuidade, carregarHistorico, resumoParaDiretor } from '../diretor/continuidade.js';
 import { revisarPacote, diagnosticar } from '../diretor/ditv.js';
+import { depoisDoPortao, reverter } from '../diretor/ciclo.js';
 import { lerVeredito, abrirPortao, comentar, fechar, publicarVideo } from '../github/issues.js';
 import { log } from '../nucleo/log.js';
 import { corpoDoPortao2, corpoDeIncidente } from './textos.js';
@@ -30,19 +31,53 @@ async function principal() {
   if (!pacote) throw new Error(`não existe pacote para ${data}. A esteira da manhã rodou?`);
   if (pacote.etapa === 'publicado') { log.aviso('o vídeo de hoje já foi produzido'); return; }
 
-  // --- Portão 1 -----------------------------------------------------------
+  // --- Portão 1: a decisão real chega e a aposta do diretor é conferida ----
+  const decidiuSozinho = pacote.etapaPortao1 === 'aprovado-pelo-diretor';
   const veredito = await lerVeredito(pacote.portao1.issue);
-  log.info(`portão 1: ${veredito.decisao}${veredito.via ? ` (via ${veredito.via})` : ''}`);
+  log.info(`portão 1: ${veredito.decisao}${veredito.via ? ` (via ${veredito.via})` : ''}${decidiuSozinho ? ' · decidido pelo diretor' : ''}`);
 
-  if (veredito.decisao === 'pendente') {
-    log.aviso('pauta ainda não aprovada — a esteira para aqui e tenta na próxima execução');
-    return;
-  }
-  if (veredito.decisao === 'reprovado') {
-    await comentar(pacote.portao1.issue, `Pauta reprovada. O vídeo de ${data} não será produzido.\n\nO motivo registrado vira instrução para a edição de amanhã.`);
-    await fechar(pacote.portao1.issue, 'not_planned');
-    gravarEstado(`pacote-${data}`, { ...pacote, etapa: 'reprovado-portao-1', motivoReprovacao: veredito.motivo });
-    return;
+  // Quando o diretor decidiu sozinho, o silêncio é consentimento e só a
+  // palavra "reverter" desfaz. Exigir aprovação de novo anularia a autonomia.
+  const pediuReverter = /\breverter\b/i.test(veredito.motivo || '');
+
+  if (decidiuSozinho) {
+    if (pediuReverter || veredito.decisao === 'reprovado') {
+      const queda = reverter({
+        id: pacote.portao1.observacao,
+        dominio: 'pauta',
+        motivo: veredito.motivo || 'o dono reverteu sem dar motivo',
+      });
+      await comentar(pacote.portao1.issue,
+        `Revertido. ${queda ? `O DiTV.IA caiu do nível ${queda.de} para o ${queda.para} em pauta.` : ''}\n\nO motivo entrou na memória dele e vai pesar nas próximas decisões.`);
+      await fechar(pacote.portao1.issue, 'not_planned');
+      gravarEstado(`pacote-${data}`, { ...pacote, etapa: 'revertido-portao-1', motivoReprovacao: veredito.motivo });
+      return;
+    }
+    // Sem reversão, segue.
+  } else {
+    if (veredito.decisao === 'pendente') {
+      log.aviso('pauta ainda não aprovada — a esteira para aqui e tenta na próxima execução');
+      return;
+    }
+
+    // A aposta é conferida aqui, e a doutrina paga ou recebe por ela.
+    const aprendizado = depoisDoPortao({
+      id: pacote.portao1.observacao,
+      previsao: pacote.portao1.previsao,
+      decisao: veredito.decisao,
+      motivo: veredito.motivo,
+      autonomia: pacote.portao1.autonomia,
+    });
+    if (aprendizado.precedentesMexidos.length) {
+      log.info(`${aprendizado.precedentesMexidos.length} precedente(s) atualizado(s) pela sua decisão`);
+    }
+
+    if (veredito.decisao === 'reprovado') {
+      await comentar(pacote.portao1.issue, `Pauta reprovada. O vídeo de ${data} não será produzido.\n\nO motivo registrado vira instrução para a edição de amanhã.`);
+      await fechar(pacote.portao1.issue, 'not_planned');
+      gravarEstado(`pacote-${data}`, { ...pacote, etapa: 'reprovado-portao-1', motivoReprovacao: veredito.motivo, aprendizado });
+      return;
+    }
   }
 
   const instrucaoDoDono = veredito.motivo && !/^(ok|aprovado|sim|vai|manda)\W*$/i.test(veredito.motivo)

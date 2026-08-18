@@ -3,6 +3,8 @@ import { analisarIndicadores, aprendizadosAtivos } from '../times/09-indicadores
 import { definirEstrategia } from '../times/10-estrategia.js';
 import { abrirPortao } from '../github/issues.js';
 import { escreverRelatorio, formatarRelatorio } from '../diretor/relatorio.js';
+import { destilar, resumoDaDoutrina } from '../diretor/doutrina.js';
+import { reavaliar, panorama, NIVEIS } from '../diretor/autonomia.js';
 import { log } from '../nucleo/log.js';
 
 /**
@@ -84,6 +86,38 @@ ${estrategia.alertaSeguranca ? `---\n\n> [!IMPORTANT]\n> ## ${estrategia.alertaS
 ${acoesDoDono.length
   ? `**${acoesDoDono.length} ação(ões) dependem de você esta semana.** As demais o sistema executa sozinho.`
   : 'Nenhuma ação depende de você esta semana — o sistema dá conta.'}`;
+
+  // O diretor aprende antes de relatar: destila doutrina das decisões da
+  // semana e só então reavalia se merece mais autonomia.
+  const { criados } = await destilar();
+  const promocoes = reavaliar();
+  const doutrina = resumoDaDoutrina();
+  const escada = panorama();
+
+  const blocoAprendizado = `## O que o diretor aprendeu esta semana
+
+${criados ? `**${criados} precedente(s) novo(s)** destilado(s) das suas decisões.` : '_Nenhum precedente novo — ainda não houve decisões suficientes para concluir um padrão._'}
+
+Doutrina hoje: **${doutrina.firmes} firme(s)**, ${doutrina.provisorios} provisório(s), ${doutrina.aposentados} aposentado(s).
+${doutrina.contradicoes?.length ? `\nOnde suas decisões ainda se contradizem:\n${doutrina.contradicoes.map((c) => `- ${c}`).join('\n')}` : ''}
+
+### Escada de autonomia
+
+| Domínio | Nível | Acerto das previsões | Falta para subir |
+|---|---|---|---|
+${escada.map((e) => `| ${e.dominio} | **${e.nivel}** · ${e.nome} | ${e.placar.total ? `${(e.placar.taxa * 100).toFixed(0)}% em ${e.placar.total}` : 'sem dados'} | ${e.faltaPara[0] || '—'} |`).join('\n')}
+
+${promocoes.length
+  ? `> [!IMPORTANT]\n> **O diretor subiu de nível:** ${promocoes.map((m) => `${m.dominio} para o nível ${m.para} (${NIVEIS[m.para].nome})`).join(', ')}.\n> A partir de agora ele decide sozinho nesses domínios e só te avisa. Comente **reverter** em qualquer decisão para derrubá-lo um nível.`
+  : '_Nenhuma promoção esta semana._'}
+
+Para travar um domínio num nível, edite \`estado/autonomia.json\` e ajuste \`tetoDoDono\`.`;
+
+  await abrirPortao({
+    titulo: `🧠 DiTV.IA · aprendizado da semana`,
+    corpo: blocoAprendizado,
+    etiquetas: ['aprendizado', 'estudio'],
+  });
 
   // O relatório do diretor sai junto: estratégia diz para onde ir, relatório
   // diz se o estúdio está de pé para ir.
