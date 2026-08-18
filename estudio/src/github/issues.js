@@ -84,37 +84,3 @@ export async function lerVeredito(numero) {
 
   return { decisao: 'pendente', motivo: '', via: null };
 }
-
-/** Publica o vídeo como arquivo de uma release, para baixar direto no tablet. */
-export async function publicarVideo({ tag, nome, descricao, arquivo }) {
-  const { token, repo } = contexto();
-  const { readFileSync, statSync } = await import('node:fs');
-
-  let release;
-  try {
-    release = await api(`/releases/tags/${tag}`);
-  } catch {
-    release = await api('/releases', {
-      method: 'POST',
-      body: JSON.stringify({ tag_name: tag, name: nome, body: descricao, draft: false, prerelease: false }),
-    });
-  }
-
-  const dados = readFileSync(arquivo);
-  const url = `https://uploads.github.com/repos/${repo}/releases/${release.id}/assets?name=${encodeURIComponent(nome)}`;
-
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'content-type': 'video/mp4',
-      'content-length': String(statSync(arquivo).size),
-    },
-    body: dados,
-  });
-  if (!r.ok) throw new Error(`upload do vídeo falhou (${r.status}): ${(await r.text()).slice(0, 200)}`);
-
-  const asset = await r.json();
-  log.ok(`vídeo publicado: ${asset.browser_download_url}`);
-  return asset.browser_download_url;
-}

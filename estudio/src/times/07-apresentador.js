@@ -3,6 +3,8 @@ import { promisify } from 'node:util';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { log } from '../nucleo/log.js';
+import { areaDeTrabalho } from '../github/anexos.js';
+import { caminhos } from '../nucleo/estado.js';
 
 const rodar = promisify(execFile);
 const FFMPEG = process.env.FFMPEG_BIN || 'ffmpeg';
@@ -80,8 +82,57 @@ export function expressaoBocaAberta(trechos) {
 }
 
 /**
- * Modo realista: envia áudio e vídeo-base para um serviço de lipsync hospedado.
- * Custa por vídeo e exige chave; o modo ilustrado continua sendo o padrão.
+ * O retrato do apresentador, quando existe um.
+ *
+ * Basta o dono subir uma imagem em ativos/ com esse nome — gerada por IA,
+ * fotografada ou escolhida no casting. É o caminho para ter uma pessoa real
+ * no vídeo em vez do desenho que vem no repositório.
+ */
+export function acharRetrato() {
+  for (const ext of ['png', 'jpg', 'jpeg', 'webp']) {
+    const p = join(caminhos.RAIZ, 'ativos', `apresentador.${ext}`);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * Transforma o retrato parado num vídeo-base do tamanho da locução.
+ *
+ * O serviço de lipsync anima um vídeo, não uma foto. Enquadra em 9:16 pela
+ * parte de cima da imagem, que é onde está o rosto num retrato — cortar pelo
+ * centro decapitaria metade dos enquadramentos.
+ */
+async function montarVideoBase(retrato, duracao, pasta) {
+  const destino = join(pasta, 'apresentador-base.mp4');
+
+  await rodar(FFMPEG, [
+    '-y', '-hide_banner',
+    '-loop', '1', '-t', String(Math.ceil(duracao) + 1), '-i', retrato,
+    '-vf', 'scale=720:-2,crop=720:1280:0:0,setsar=1,fps=25,format=yuv420p',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+    '-movflags', '+faststart',
+    destino,
+  ], { maxBuffer: 32 * 1024 * 1024, timeout: 300000 });
+
+  if (!existsSync(destino)) throw new Error('não consegui montar o vídeo-base a partir do retrato');
+  return destino;
+}
+
+async function baixar(url, destino) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`download do lipsync falhou: HTTP ${r.status}`);
+  const { writeFileSync: escrever } = await import('node:fs');
+  escrever(destino, Buffer.from(await r.arrayBuffer()));
+  return destino;
+}
+
+/**
+ * Modo realista: manda o retrato animado e a locução para o lipsync hospedado.
+ *
+ * O serviço busca os arquivos por URL, e o estúdio não tem armazenamento
+ * próprio — a solução é anexá-los a uma release de trabalho, que num
+ * repositório público já é uma URL pública, e apagar depois.
  */
 async function lipsyncHospedado({ audioUrl, videoUrl }) {
   const chave = process.env.FAL_KEY;
@@ -95,16 +146,55 @@ async function lipsyncHospedado({ audioUrl, videoUrl }) {
   if (!r.ok) throw new Error(`lipsync HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
 
   const d = await r.json();
-  return d.video?.url || d.url;
+  const url = d.video?.url || d.url;
+  if (!url) throw new Error('o serviço de lipsync respondeu sem devolver vídeo');
+  return url;
 }
 
-export async function prepararApresentador(locucao, { pasta, modo = 'ilustrado', ativos = {} } = {}) {
+async function apresentadorRealista(locucao, { pasta }) {
+  const retrato = acharRetrato();
+  if (!retrato) {
+    throw new Error(
+      'Modo realista pedido, mas não há retrato. Suba uma imagem em ativos/apresentador.png (ou .jpg).'
+    );
+  }
+
+  log.time('07-apresentador', `modo realista · retrato ${retrato.split('/').pop()}`);
+  const base = await montarVideoBase(retrato, locucao.duracaoSegundos, pasta);
+
+  const area = await areaDeTrabalho('apresentador');
+  try {
+    const [videoUrl, audioUrl] = await Promise.all([
+      area.subir(base, 'base.mp4'),
+      area.subir(locucao.audio, 'locucao.mp3'),
+    ]);
+
+    const resultado = await lipsyncHospedado({ videoUrl, audioUrl });
+    const arquivo = await baixar(resultado, join(pasta, 'apresentador-falando.mp4'));
+
+    log.time('07-apresentador', 'lipsync pronto');
+    return { modo: 'realista', retrato, video: arquivo };
+  } finally {
+    await area.limpar();
+  }
+}
+
+export async function prepararApresentador(locucao, { pasta, modo = 'ilustrado' } = {}) {
   if (!existsSync(pasta)) mkdirSync(pasta, { recursive: true });
 
-  if (modo === 'realista') {
-    log.time('07-apresentador', 'modo realista · enviando para lipsync hospedado');
-    const url = await lipsyncHospedado({ audioUrl: ativos.audioUrl, videoUrl: ativos.videoBaseUrl });
-    return { modo, videoUrl: url };
+  // Um retrato na pasta de ativos é a intenção declarada do dono: se ele
+  // existe e há chave de lipsync, o realista é o padrão sem precisar de flag.
+  const temRetrato = Boolean(acharRetrato());
+  const querRealista = modo === 'realista' || (temRetrato && process.env.FAL_KEY);
+
+  if (querRealista) {
+    try {
+      return await apresentadorRealista(locucao, { pasta });
+    } catch (e) {
+      // O vídeo do dia não pode morrer porque o lipsync falhou: cai para o
+      // ilustrado, que sempre funciona, e o incidente vai para o relatório.
+      log.aviso(`modo realista falhou, caindo para o ilustrado: ${String(e.message).slice(0, 180)}`);
+    }
   }
 
   log.time('07-apresentador', 'modo ilustrado · derivando a boca da envoltória do áudio');

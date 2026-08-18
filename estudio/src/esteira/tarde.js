@@ -16,7 +16,8 @@ import { conferirRoteiro, conferirLocucao, conferirVideo } from '../diretor/cont
 import { conferirContinuidade, carregarHistorico, resumoParaDiretor } from '../diretor/continuidade.js';
 import { revisarPacote, diagnosticar } from '../diretor/ditv.js';
 import { depoisDoPortao, reverter } from '../diretor/ciclo.js';
-import { lerVeredito, abrirPortao, comentar, fechar, publicarVideo } from '../github/issues.js';
+import { lerVeredito, abrirPortao, comentar, fechar } from '../github/issues.js';
+import { publicarVideo } from '../github/anexos.js';
 import { log } from '../nucleo/log.js';
 import { corpoDoPortao2, corpoDeIncidente } from './textos.js';
 

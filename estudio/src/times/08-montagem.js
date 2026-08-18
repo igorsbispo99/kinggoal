@@ -78,9 +78,16 @@ export function construirGrafo({ fatias, entradaDoSegmento, formato, apresentado
 
   let atual = 'fundo';
 
-  // 3. O apresentador entra como selo circular, com a boca trocando conforme
-  //    a envoltória do áudio calculou.
-  if (apresentador?.indiceFechada !== undefined) {
+  // 3. O apresentador entra como selo, seja em vídeo (modo realista) ou pela
+  //    troca de boca fechada e aberta (modo ilustrado).
+  if (apresentador?.indiceVideo !== undefined) {
+    const lado = Math.round(L * 0.34);
+    const x = Math.round(L - lado - L * 0.05);
+    const y = Math.round(A - lado - A * 0.16);
+    partes.push(`[${apresentador.indiceVideo}:v]scale=${lado}:-2,crop=${lado}:${lado}:0:0,setsar=1[apVid]`);
+    partes.push(`[${atual}][apVid]overlay=${x}:${y}:shortest=0[comAp]`);
+    atual = 'comAp';
+  } else if (apresentador?.indiceFechada !== undefined) {
     const lado = Math.round(L * 0.30);
     const x = Math.round(L - lado - L * 0.05);
     const y = Math.round(A - lado - A * 0.16);
@@ -142,6 +149,11 @@ export async function montarVideo({ roteiro, locucao, arte, apresentador, format
   const entradaDoSegmento = [];
   let indiceEntrada = 0;
 
+  // No modo realista o apresentador não é um par de PNGs: é um vídeo já
+  // falando, devolvido pelo lipsync. Ele entra como camada de vídeo em vez de
+  // troca de imagem.
+  const apresentadorEmVideo = apresentador?.modo === 'realista' && apresentador.video;
+
   // Cada fundo com imagem vira uma entrada -loop 1 com duração própria.
   // Segmento sem imagem não gera entrada nenhuma e fica marcado como null.
   fatias.forEach((f, i) => {
@@ -156,7 +168,11 @@ export async function montarVideo({ roteiro, locucao, arte, apresentador, format
   });
   let blocoApresentador;
 
-  if (apresentador?.expressao && ativos?.bocaFechada && ativos?.bocaAberta) {
+  if (apresentadorEmVideo) {
+    entradas.push('-i', apresentador.video);
+    blocoApresentador = { indiceVideo: indiceEntrada };
+    indiceEntrada += 1;
+  } else if (apresentador?.expressao && ativos?.bocaFechada && ativos?.bocaAberta) {
     entradas.push('-loop', '1', '-i', ativos.bocaFechada);
     entradas.push('-loop', '1', '-i', ativos.bocaAberta);
     blocoApresentador = {

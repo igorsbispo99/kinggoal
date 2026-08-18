@@ -68,27 +68,66 @@ Editar `config/estudio.json` pelo próprio GitHub (botão de lápis no arquivo):
 
 ### 5. Escolher o apresentador
 
-O apresentador que vem no repositório é um **desenho feito em código**: homem
-afro-brasileiro, em selo circular de telejornal. Ele existe para o estúdio
-produzir desde o primeiro dia sem depender de arte pronta — e, por melhor que
-fique, é ilustração e não vira fotografia.
+O que vem no repositório é um **desenho feito em código**: homem afro-brasileiro
+em selo de telejornal. Existe para o estúdio produzir desde o primeiro dia — e,
+por melhor que fique, é ilustração e não vira fotografia.
 
-Para ter uma **pessoa real** apresentando:
+Três caminhos para ter uma pessoa de verdade:
+
+#### A. Imagem que você gerou (recomendado)
+
+Gere o apresentador onde preferir e suba **um arquivo só**:
+
+1. No GitHub, abra a pasta `estudio/ativos/`
+2. **Add file › Upload files** (funciona no navegador do tablet)
+3. Nomeie como `apresentador.png` ou `apresentador.jpg`
+
+O estúdio detecta o arquivo sozinho e passa ao modo realista. Não precisa de
+duas versões de boca: quem move a boca é o lipsync.
+
+**O que a imagem precisa ter** para o lipsync funcionar bem:
+
+- rosto **de frente**, olhando para a câmera
+- **boca fechada** e expressão neutra — é dela que o lipsync parte
+- enquadramento dos ombros para cima, rosto ocupando boa parte do quadro
+- luz uniforme no rosto, sem sombra forte cortando
+- fundo simples, **vertical** de preferência
+- nada de óculos escuros, mão no rosto ou microfone tapando a boca
+
+Prompt que costuma dar esse resultado:
+
+> Retrato fotográfico de um homem negro brasileiro de 28 anos, apresentador de
+> telejornal moderno. Rosto de frente, olhando direto para a câmera, boca
+> fechada, expressão neutra e confiante. Enquadramento dos ombros para cima.
+> Camisa social escura. Luz de estúdio suave e uniforme no rosto. Fundo liso
+> em azul-escuro desfocado. Formato vertical 9:16, alta resolução, fotorrealista.
+
+Guarde o prompt: é com ele que você gera variações do mesmo personagem depois.
+
+#### B. Casting de banco de imagem
 
 Aba **Actions** › **Estúdio · Casting do apresentador** › **Run workflow**.
 
-O casting procura retratos em bancos com uso comercial liberado e abre uma
-issue com os candidatos. Você comenta `escolher 3` e roda o workflow de novo
-para registrar. Isso exige `PEXELS_API_KEY` ou `PIXABAY_API_KEY` (gratuitas).
+Busca retratos de pessoas reais em bancos com uso comercial liberado e abre uma
+issue com os candidatos; você comenta `escolher 3` e roda de novo. Exige
+`PEXELS_API_KEY` ou `PIXABAY_API_KEY` (gratuitas).
 
-Com a pessoa escolhida, o estúdio passa ao **modo realista**: o movimento da
-boca vira lipsync de verdade sobre a foto, o que exige `FAL_KEY` e custa cerca
-de US$ 0,30 por vídeo. Sem essa chave nada quebra — a produção continua com o
-apresentador ilustrado.
+#### C. Sua própria arte ilustrada
 
-Prefere sua própria arte? Substitua os dois arquivos em `ativos/`:
-`apresentador-fechada.png` e `apresentador-aberta.png`, quadrados, fundo
-transparente, 512×512.
+Substitua os dois arquivos em `ativos/`: `apresentador-fechada.png` e
+`apresentador-aberta.png`, quadrados, fundo transparente, 512×512. O estúdio
+alterna entre eles conforme o volume da fala, sem custo nenhum.
+
+---
+
+**O modo realista custa.** O lipsync roda em serviço hospedado e exige `FAL_KEY`
+— cerca de US$ 0,30 por vídeo, ou ~US$ 9/mês a um vídeo por dia. Sem essa chave
+nada quebra: se o lipsync falhar ou faltar a chave, a produção do dia continua
+com o apresentador ilustrado e o incidente aparece no relatório do DiTV.IA.
+
+**Sobre direitos:** imagem que você gerou é sua para usar comercialmente na
+maioria dos serviços, mas confirme os termos do que você usar. Todo vídeo sai
+com o rótulo de conteúdo gerado por IA, que a plataforma exige.
 
 ### 6. Ligar a esteira
 
