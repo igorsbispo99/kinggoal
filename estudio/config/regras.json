@@ -1,0 +1,78 @@
+{
+  "comentario": "A constituição do estúdio. O DiTV.IA guarda estas regras e faz valer — nenhum time passa por cima. Editar aqui muda o comportamento de toda a operação sem tocar em código.",
+  "versao": 1,
+
+  "inegociaveis": [
+    {
+      "id": "duracao-monetizavel",
+      "regra": "Nenhum vídeo vai ao ar abaixo da duração mínima de monetização.",
+      "porque": "Abaixo disso o vídeo não gera receita, e produzir de graça é desperdiçar o dia.",
+      "acao": "bloquear"
+    },
+    {
+      "id": "rotulo-ia",
+      "regra": "Todo vídeo carrega o rótulo de conteúdo gerado por IA.",
+      "porque": "A plataforma exige. A ausência desmonetiza o canal inteiro, não só o vídeo.",
+      "acao": "bloquear"
+    },
+    {
+      "id": "checagem-grave",
+      "regra": "Apontamento grave da checagem barra o vídeo, sem exceção.",
+      "porque": "Acusação sem apoio gera processo; piada com vítima destrói a marca.",
+      "acao": "bloquear"
+    },
+    {
+      "id": "sem-piada-com-vitima",
+      "regra": "Pauta marcada como humor proibido nunca recebe tratamento cômico.",
+      "porque": "O canal é irreverente, não insensível. A diferença é o negócio inteiro.",
+      "acao": "bloquear"
+    },
+    {
+      "id": "teto-de-custo",
+      "regra": "A operação nunca ultrapassa o teto mensal de custo definido na configuração.",
+      "porque": "Um erro em laço pode gastar em um dia o orçamento do mês.",
+      "acao": "bloquear"
+    },
+    {
+      "id": "sem-atalho-artificial",
+      "regra": "Nunca comprar seguidor, engajamento ou alcance.",
+      "porque": "Derruba a entrega orgânica e arrisca a monetização de forma irreversível.",
+      "acao": "bloquear"
+    }
+  ],
+
+  "qualidade": [
+    { "id": "gancho-sem-saudacao", "regra": "O vídeo nunca abre com saudação, nome do canal ou 'hoje no jornal'.", "acao": "corrigir" },
+    { "id": "gancho-curto", "regra": "A primeira frase cabe em 3 segundos de fala.", "acao": "corrigir" },
+    { "id": "sem-pedido-de-like", "regra": "O roteiro nunca pede curtida, seguir ou comentário.", "acao": "corrigir" },
+    { "id": "sem-repeticao", "regra": "Assunto que foi ao ar nos últimos 5 dias não volta sem fato novo.", "acao": "avisar" },
+    { "id": "audio-audivel", "regra": "O áudio final fica na faixa de loudness que as plataformas esperam.", "acao": "corrigir" },
+    { "id": "legenda-sempre", "regra": "Todo vídeo tem legenda queimada.", "acao": "bloquear" }
+  ],
+
+  "operacao": {
+    "tentativasPorTime": 2,
+    "minutosMaximosPorEsteira": 40,
+    "custoMaximoPorVideoUSD": 1.5,
+    "avisarDonoAcimaDeIncidentes": 3,
+    "desligarTimeApos": 3,
+    "manchetesMinimasParaProduzir": 10
+  },
+
+  "timesOpcionais": {
+    "comentario": "Times que o diretor pode desligar sozinho quando faltar chave, quando o custo apertar ou quando falharem seguidamente. Os demais são essenciais e a falta deles para a esteira.",
+    "opcionais": ["06-arte", "11-marca", "13-gc"],
+    "essenciais": ["01-pauta", "02-editorial", "03-roteiro", "04-checagem", "05-voz", "07-apresentador", "08-montagem", "12-audio"]
+  },
+
+  "degradacao": {
+    "comentario": "O que o diretor sacrifica primeiro quando algo aperta. Ordem importa: o de cima cai antes.",
+    "ordem": [
+      { "quando": "custo do mês passou do alerta", "fazer": "trocar os times criativos para o modelo barato" },
+      { "quando": "banco de imagens fora do ar", "fazer": "produzir com fundo sólido e legenda grande" },
+      { "quando": "time de marca falhou", "fazer": "publicar só o TikTok e adiar o pacote do Instagram" },
+      { "quando": "lipsync realista indisponível", "fazer": "cair para o apresentador ilustrado" },
+      { "quando": "voz recusada por volume", "fazer": "esperar e tentar na próxima janela da esteira" }
+    ]
+  }
+}
