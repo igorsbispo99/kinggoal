@@ -3,7 +3,11 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const DIR_ESTADO = join(RAIZ, 'estado');
+
+// O diretório de estado é redirecionável para que os testes não escrevam na
+// memória real do diretor. Estado aqui é dado de produção — um teste que
+// gravasse nele corromperia o aprendizado acumulado.
+const DIR_ESTADO = process.env.ESTUDIO_DIR_ESTADO || join(RAIZ, 'estado');
 const DIR_CONFIG = join(RAIZ, 'config');
 
 let cacheConfig = null;

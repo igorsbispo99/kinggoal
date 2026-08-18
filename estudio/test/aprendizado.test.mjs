@@ -1,11 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rmSync, existsSync } from 'node:fs';
+import { rmSync, existsSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
-import { caminhos } from '../src/nucleo/estado.js';
-import { abrirObservacao, fecharObservacao, registrarReversao, placar } from '../src/diretor/memoria.js';
-import { reavaliar, rebaixar, nivelDe, panorama, definirTeto, podeDecidirSozinho } from '../src/diretor/autonomia.js';
-import { confiancaDe, estadoDe } from '../src/diretor/doutrina.js';
+import { tmpdir } from 'node:os';
+
+// Precisa vir ANTES de qualquer import que leia o módulo de estado: ele
+// resolve o diretório na carga. Sem isso os testes gravam na memória real do
+// diretor e corrompem o aprendizado de verdade.
+process.env.ESTUDIO_DIR_ESTADO = mkdtempSync(join(tmpdir(), 'estudio-teste-'));
+
+const { caminhos } = await import('../src/nucleo/estado.js');
+const { abrirObservacao, fecharObservacao, registrarReversao, placar } = await import('../src/diretor/memoria.js');
+const { reavaliar, rebaixar, nivelDe, panorama, definirTeto, podeDecidirSozinho } = await import('../src/diretor/autonomia.js');
+const { confiancaDe, estadoDe } = await import('../src/diretor/doutrina.js');
+
+test('os testes não escrevem no estado real do estúdio', () => {
+  assert.ok(caminhos.DIR_ESTADO.includes('estudio-teste-'),
+    `os testes deveriam usar um diretório temporário, mas estão em ${caminhos.DIR_ESTADO}`);
+});
 
 /** Cada teste começa do zero: o aprendizado é acumulativo por natureza. */
 function limpar() {
