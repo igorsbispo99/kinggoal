@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#14161A">
+<title>Rota Viva</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="vendor/maplibre-gl.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="map"></div>
+
+<!-- HUD superior -->
+<div id="hud">
+  <div class="hud-speed"><b id="spd">--</b><span>km/h</span></div>
+  <div id="hud-mid">
+    <div id="nav-instr" class="hidden">
+      <div class="instr-main" id="instrText">—</div>
+      <div class="instr-sub" id="instrDist">—</div>
+    </div>
+    <div id="hud-status">Aguardando GPS…</div>
+  </div>
+  <div class="hud-rec" id="recBadge" hidden><span class="dot"></span>REC</div>
+</div>
+
+<div id="alertBar" hidden></div>
+
+<!-- Botões flutuantes -->
+<div id="fabs">
+  <button class="fab" id="fabCenter" title="Centralizar" aria-label="Centralizar no meu local">◎</button>
+  <button class="fab" id="fabFollow" title="Modo guidão" aria-label="Modo guidão (mapa gira com você)">▲</button>
+  <button class="fab" id="fabLayers" title="Camadas" aria-label="Mostrar ou ocultar camadas">≡</button>
+</div>
+
+<!-- Painel inferior -->
+<div id="sheet" class="collapsed">
+  <button id="grip" aria-label="Abrir ou fechar painel"><span></span></button>
+  <nav id="tabs">
+    <button data-tab="go" class="on">Ir</button>
+    <button data-tab="rec">Gravar</button>
+    <button data-tab="map">Camadas</button>
+    <button data-tab="cfg">Config</button>
+  </nav>
+
+  <section data-panel="go" class="panel on">
+    <div class="row">
+      <input id="q" type="search" placeholder="Para onde? (endereço ou lugar)" autocomplete="off" enterkeyhint="search">
+      <button id="btnSearch" class="btn">Buscar</button>
+    </div>
+    <div id="results" class="results"></div>
+    <p class="hint">Dica: segure o dedo no mapa para marcar o destino direto.</p>
+
+    <div id="routeBox" hidden>
+      <div class="stats">
+        <div><b id="rDist">—</b><span>distância</span></div>
+        <div><b id="rTime">—</b><span>tempo</span></div>
+        <div><b id="rClimb">—</b><span>subida</span></div>
+        <div><b id="rCycle">—</b><span>em ciclovia</span></div>
+      </div>
+      <div id="audit" class="audit"></div>
+      <div class="row">
+        <button id="btnNav" class="btn primary">Iniciar navegação</button>
+        <button id="btnClear" class="btn ghost">Limpar</button>
+      </div>
+      <details id="stepsBox"><summary>Instruções do trajeto</summary><ol id="steps"></ol></details>
+    </div>
+  </section>
+
+  <section data-panel="rec" class="panel">
+    <div class="row">
+      <button id="btnRec" class="btn primary">Começar a gravar</button>
+      <button id="btnStop" class="btn ghost" hidden>Parar</button>
+    </div>
+    <div class="stats">
+      <div><b id="tKm">0,0</b><span>km</span></div>
+      <div><b id="tMin">0</b><span>min</span></div>
+      <div><b id="tMarks">0</b><span>reportes</span></div>
+    </div>
+    <p class="hint">Marque o que te atrapalhou. Isso vira o mapa que nenhum app tem. <b>Pare a scooter antes de tocar.</b></p>
+    <div class="marks">
+      <button class="mk" data-mk="buraco">Buraco / piso ruim</button>
+      <button class="mk" data-mk="fim-ciclofaixa">Ciclofaixa acabou</button>
+      <button class="mk" data-mk="obra">Obra / bloqueio</button>
+      <button class="mk" data-mk="perigo">Perigo / risco</button>
+      <button class="mk" data-mk="nao-passa">Não deu pra passar</button>
+      <button class="mk good" data-mk="bom">Trecho ótimo</button>
+    </div>
+    <div class="row">
+      <button id="btnGpx" class="btn ghost">Exportar GPX</button>
+      <button id="btnGeo" class="btn ghost">Exportar reportes</button>
+    </div>
+    <div id="tripList" class="triplist"></div>
+  </section>
+
+  <section data-panel="map" class="panel">
+    <label class="chk"><input type="checkbox" id="ckCycle" checked> Rede cicloviária <i>(verde)</i></label>
+    <label class="chk"><input type="checkbox" id="ckNo" checked> Vias proibidas pra mim <i>(vermelho)</i></label>
+    <label class="chk"><input type="checkbox" id="ckMarks" checked> Meus reportes</label>
+    <div class="row">
+      <button id="btnLoadOsm" class="btn">Baixar mapa desta região</button>
+    </div>
+    <p class="hint" id="osmStatus">Baixa ciclovias e vias rápidas num raio de 5 km da sua posição. Faça isso no wi-fi antes de sair.</p>
+  </section>
+
+  <section data-panel="cfg" class="panel">
+    <label class="fld">
+      <span>Como você conduz</span>
+      <select id="cfgSeat">
+        <option value="50">Sentado — vias de até 50 km/h (portaria SP)</option>
+        <option value="40">Em pé — vias de até 40 km/h</option>
+      </select>
+    </label>
+    <label class="fld">
+      <span>Chave do OpenRouteService <i>(grátis, necessária para traçar rotas)</i></span>
+      <input id="cfgKey" type="password" placeholder="cole aqui sua chave" autocomplete="off">
+    </label>
+    <p class="hint">Crie em <b>openrouteservice.org</b> → Sign up → Dashboard → Request a token. Leva 2 minutos e são 2.000 rotas por dia, de graça. A chave fica só neste celular.</p>
+    <label class="chk"><input type="checkbox" id="cfgVoice" checked> Falar as instruções em voz alta</label>
+    <label class="chk"><input type="checkbox" id="cfgHills" checked> Fugir de ladeira quando der</label>
+    <label class="chk"><input type="checkbox" id="cfgWake" checked> Manter a tela ligada navegando</label>
+    <div class="row"><button id="btnSaveCfg" class="btn primary">Salvar</button></div>
+    <p class="hint" id="ver"></p>
+  </section>
+</div>
+
+<div id="toast" hidden></div>
+
+<script src="vendor/maplibre-gl.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
