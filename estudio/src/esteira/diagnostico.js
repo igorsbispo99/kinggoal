@@ -33,9 +33,16 @@ const ROTEIRO_TESTE = {
 
 const passos = [];
 
-function registrar(nome, ok, detalhe) {
-  passos.push({ nome, ok, detalhe });
-  (ok ? log.ok : log.erro)(`${nome} — ${detalhe}`);
+/**
+ * Três estados, não dois. Um retrato que ainda não foi enviado não é falha —
+ * o estúdio produz sem ele — mas marcar com o mesmo ✅ de quem passou faz o
+ * dono ler "está tudo certo" onde falta uma providência dele.
+ */
+function registrar(nome, estado, detalhe) {
+  const ok = estado === true || estado === 'ok';
+  const informativo = estado === 'info';
+  passos.push({ nome, ok, informativo, detalhe });
+  (informativo ? log.info : ok ? log.ok : log.erro)(`${nome} — ${detalhe}`);
 }
 
 async function verificar(nome, fn) {
@@ -86,10 +93,18 @@ async function principal() {
   for (const [chave, nome] of [['PEXELS_API_KEY', 'Pexels'], ['PIXABAY_API_KEY', 'Pixabay']]) {
     registrar(
       `Banco de imagens ${nome}`,
-      true,
+      process.env[chave] ? true : 'info',
       process.env[chave] ? 'cadastrado' : 'sem chave — a busca cai para o Wikimedia, que não exige cadastro'
     );
   }
+
+  registrar(
+    'Modo do apresentador',
+    process.env.FAL_KEY ? true : 'info',
+    process.env.FAL_KEY
+      ? 'FAL_KEY cadastrada — quem tiver retrato entra em vídeo real'
+      : 'sem FAL_KEY — a bancada entra pelo apresentador ilustrado'
+  );
 
   // --- ativos -------------------------------------------------------------
   const ativos = {
@@ -109,7 +124,7 @@ async function principal() {
     const retrato = retratoDe(a);
     registrar(
       `Retrato de ${a.nome}`,
-      true,
+      retrato ? true : 'info',
       retrato
         ? `${retrato.split('/').pop()} · voz ${a.voz}`
         : `ainda não enviado — suba em ${a.retrato} para ${a.nome} aparecer em vídeo`
@@ -152,7 +167,7 @@ async function principal() {
   }
 
   // --- relatório ----------------------------------------------------------
-  const falhas = passos.filter((p) => !p.ok);
+  const falhas = passos.filter((p) => !p.ok && !p.informativo);
   const linhas = [
     '## Diagnóstico do estúdio',
     '',
@@ -162,7 +177,7 @@ async function principal() {
     '',
     '| | Verificação | Resultado |',
     '|---|---|---|',
-    ...passos.map((p) => `| ${p.ok ? '✅' : '❌'} | ${p.nome} | ${p.detalhe.replace(/\|/g, '\\|')} |`),
+    ...passos.map((p) => `| ${p.informativo ? '➖' : p.ok ? '✅' : '❌'} | ${p.nome} | ${p.detalhe.replace(/\|/g, '\\|')} |`),
     '',
     falhas.length ? '' : 'O vídeo de teste está em **Artifacts**, no fim desta página — baixe e assista para conferir voz, legenda, imagem e selo de IA.',
   ];
