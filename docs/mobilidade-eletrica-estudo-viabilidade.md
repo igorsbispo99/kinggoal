@@ -13,20 +13,24 @@ Versão navegável (artifact): https://claude.ai/code/artifact/e937aca9-a6ea-484
 | Custo do MVP pessoal | **~R$ 60/mês**; ano 1 até alfa fechado: R$ 3–8 mil |
 | "Waze das elétricas" como negócio | **Difícil** — o modelo do Waze exige escala de milhões; receita real está em dados agregados e seguro |
 
-## 1. Regra central: 40 km/h, não 50
+## 1. Regra central: depende de como você conduz
 
-Resolução CONTRAN nº 996/2023 (autopropelido: até 1.000 W, 32 km/h, 1,30 m; sem CNH e sem emplacamento;
-campainha, sinalização noturna e indicador de velocidade obrigatórios).
+**Correção (27/08/2026):** São Paulo separou os dois casos. A **Portaria SMT/SEMTRA nº 023**,
+publicada em 14/08/2026 e **em vigor desde 28/08/2026**, distingue equipamento conduzido em pé
+(vias de até **40 km/h**) do conduzido sentado (vias de até **50 km/h**). A Resolução CONTRAN
+nº 996/2023 segue como base federal do equipamento: até 1.000 W, 32 km/h, 1,30 m; sem CNH e sem
+emplacamento; campainha, sinalização noturna e indicador de velocidade obrigatórios.
 
-| Espaço viário | Regra | Motor de rotas |
+| Espaço viário | Regra em São Paulo | Motor de rotas |
 | --- | --- | --- |
 | Ciclovia / ciclofaixa / ciclorrota | Preferencial, até 20 km/h | Custo mínimo |
-| Via urbana com limite ≤ 40 km/h | Permitido na ausência de estrutura cicloviária | Custo médio |
-| Via urbana com limite > 40 km/h | Proibido | Removida do grafo |
+| Via urbana, conduzindo sentado | Permitido até 50 km/h | Custo médio |
+| Via urbana, conduzindo em pé | Permitido até 40 km/h | Mesmo cálculo, corte diferente |
+| Via acima do limite aplicável | Proibido | Removida do grafo |
 | Rodovia / via de trânsito rápido | Proibido | Removida do grafo, inclusive alças |
-| Calçada / passeio | Só com autorização local, 6 km/h | Nunca roteada; só como "empurre aqui" |
+| Espaço compartilhado com pedestre | Máx. 6 km/h | Nunca roteado; só como "empurre aqui" |
 
-Verificar a portaria municipal de São Paulo — pode restringir mais que a norma federal.
+O limite é **parâmetro do usuário**, não constante de código.
 
 ## 2. Concorrência
 
@@ -113,5 +117,5 @@ modo micromobilidade · consumo de bateria do celular.
 - [ ] Marcar todo ponto onde houve dúvida "por aqui pode?"
 - [ ] Subir Valhalla com extrato da Grande SP + perfil autopropelido
 - [ ] Comparar 20 rotas geradas vs. reais — meta de 70% de aprovação
-- [ ] Ler a norma municipal de SP sobre autopropelidos
+- [ ] Ler a íntegra da Portaria SMT/SEMTRA nº 023 (em vigor desde 28/08/2026)
 - [ ] Conversar com 5 entregadores de bike elétrica
