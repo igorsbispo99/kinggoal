@@ -117,6 +117,16 @@ os dois como tipo **Secret** (criptografado), nunca como texto puro:
 - `ML_CLIENT_ID` — o App ID
 - `ML_CLIENT_SECRET` — a Secret Key
 
+**O `keep_vars` do `wrangler.jsonc` precisa estar ligado.** Sem ele, cada
+deploy pela integração do GitHub apaga os segredos definidos no painel. A
+documentação afirma que segredos sobrevivem ao deploy; com essa integração,
+não sobrevivem (cloudflare/workers-sdk#8871). O sintoma engana: o painel
+mostra os dois segredos, com os nomes certos e o valor criptografado, e o
+Worker responde `"variaveisVisiveis": []`.
+
+Ordem que funciona: primeiro publique uma versão já com `keep_vars`, só
+depois cadastre os segredos no painel. Cadastrar antes é jogar fora.
+
 **Salvar o segredo não basta.** Este Worker usa versionamento: alterar uma
 variável cria uma versão nova, e a versão em execução continua sendo a
 anterior — sem os segredos — até que a nova seja publicada. Se o painel não

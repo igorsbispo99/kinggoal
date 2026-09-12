@@ -9,6 +9,12 @@
   // Central não se aplica.
   "name": "aylla-imports",
   "main": "servidor/index.js",
+  // Impede que cada deploy apague as variaveis e segredos definidos no
+  // painel. A documentacao diz que segredos sobrevivem; com a integracao do
+  // GitHub, que e a nossa, eles nao sobrevivem — e o sintoma e cruel: o
+  // painel mostra os segredos no lugar certo e o Worker responde
+  // "variaveisVisiveis": []. Ver cloudflare/workers-sdk#8871.
+  "keep_vars": true,
   "compatibility_date": "2026-09-01",
   // O banco guarda o token do Mercado Livre, que precisa sobreviver entre
   // requisições, e mais adiante a sincronização entre os dois celulares.
