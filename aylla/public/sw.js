@@ -5,7 +5,10 @@
 // navegação tenta a rede primeiro (para ela receber a versão nova), o resto
 // responde do cache e se atualiza por tras.
 
-const CACHE = 'aylla-v2'
+// A versao sobe a cada mudanca que precisa chegar em quem ja instalou: o
+// activate apaga todo cache que nao seja este, entao sobrar versao velha
+// deixa de ser possivel.
+const CACHE = 'aylla-v3'
 
 self.addEventListener('install', (evento) => {
   self.skipWaiting()
