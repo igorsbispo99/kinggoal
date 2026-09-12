@@ -7,7 +7,7 @@
 
 import { analisarBusca, paraPesquisa } from './analise.js'
 import {
-  temCredenciais, temBanco, trocarCodigo, obterToken, obterTokenParaLeitura,
+  temCredenciais, temBanco, trocarCodigo, obterTokenParaLeitura,
   buscar, enriquecer, diagnosticar,
 } from './mercadolivre.js'
 
@@ -160,13 +160,18 @@ export default {
       if (!temCredenciais(env) || !temBanco(env)) {
         return Response.json({ configurado: false, conectado: false, detalhe })
       }
+      // Ter token nao e o mesmo que poder ler: o token do proprio aplicativo
+      // e aceito pelo Mercado Livre e recusado na busca com 403. Entao o
+      // estado faz uma busca minima e responde pelo que realmente funciona.
       let conectado = false
       let erro = null
       let origem = null
       try {
         const obtido = await obterTokenParaLeitura(env)
-        conectado = Boolean(obtido.token)
         origem = obtido.origem
+        const prova = await buscar(env, { termo: 'teste', limite: 1, token: obtido.token })
+        conectado = prova.ok
+        if (!prova.ok) erro = `O Mercado Livre recusou a leitura com ${prova.status}.`
       } catch (falha) { erro = falha.message }
       return Response.json({ configurado: true, conectado, origem, erro, detalhe })
     }

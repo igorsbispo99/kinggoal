@@ -277,16 +277,21 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
           </p>
         ) : radar.conectado ? (
           <p className="dica">
-            O radar está lendo o mercado com o token do próprio aplicativo, sem depender de autorização — e isso basta para
-            tudo que ele faz hoje. Conectar a conta dela é opcional: serve para o dia em que o sistema for ler as vendas dela.
+            O radar está lendo com o token do próprio aplicativo.
           </p>
         ) : (
-          <p className="dica">Falta autorizar uma vez com a conta do Mercado Livre dela.</p>
+          <>
+            <p className="dica">
+              Falta autorizar uma vez com a conta do Mercado Livre dela. O token do próprio aplicativo até é emitido,
+              mas o Mercado Livre o recusa na busca — a leitura de mercado exige uma conta por trás.
+            </p>
+            {radar.erro ? <Aviso nivel="atencao" titulo="Última tentativa">{radar.erro}</Aviso> : null}
+          </>
         )}
 
         {radar.configurado ? (
           <a className={`botao cheio${radar.conectado ? '' : ' primario'}`} href="/api/ml/conectar">
-            {radar.origem === 'conta' ? 'Reconectar conta' : 'Conectar conta do Mercado Livre (opcional)'}
+            {radar.origem === 'conta' && radar.conectado ? 'Reconectar conta' : 'Conectar conta do Mercado Livre'}
           </a>
         ) : null}
 
