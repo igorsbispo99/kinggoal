@@ -16,43 +16,62 @@ Igor. São contas diferentes, de pessoas diferentes, e isso importa no caminho A
 
 ## Caminho A — conectar ao GitHub (recomendado)
 
-Vale o trabalho porque, depois de configurado, **todo commit republica sozinho**.
-É o que faz as fases seguintes chegarem no celular dela sem ninguém mexer em nada.
+Depois de configurado, **todo commit republica sozinho**. É o que faz as fases
+seguintes chegarem no celular dela sem ninguém mexer em nada.
 
-1. No painel, clique em **Create app** (cartão "Ship something new").
-   No menu lateral o mesmo lugar fica em **Compute → Workers & Pages → Create**.
-2. Escolha a aba **Pages** e depois **Connect to Git** / *Import a repository*.
-3. A Cloudflare vai pedir para instalar o app dela no GitHub. **Quem precisa
-   autorizar aqui é o Igor**, porque o repositório é da conta dele: faça o login
-   do GitHub como `igorsbispo99` nessa etapa e libere o repositório `kinggoal`
-   (pode liberar só ele, não precisa dar acesso a todos).
-4. Escolha o repositório `kinggoal` e preencha:
+1. **Página inicial da conta → Ship something new** (ou **Computação → Workers e
+   Pages → Criar**) e escolha importar um repositório Git.
+2. Selecione `kinggoal`. Se ele não aparecer, há um link na tela para configurar
+   quais repositórios a Cloudflare enxerga — libere o `kinggoal` e volte.
+3. Dê ao projeto o nome **`aylla-imports`**, não `kinggoal`: é o nome que vira o
+   endereço.
+4. O fluxo novo da Cloudflare não pergunta o diretório raiz na criação. Depois
+   que o projeto existir, vá em **Configurações → Build** e ajuste:
 
    | Campo | Valor |
    |---|---|
-   | Production branch | `claude/import-resale-marketplace-system-le13if` |
-   | Framework preset | `None` |
-   | Build command | `npm install && npm run build` |
-   | Build output directory | `dist` |
-   | Root directory | `aylla` |
+   | Diretório raiz | `aylla` |
+   | Comando de build | `npm install && npm run build` |
+   | Branch de produção | `claude/import-resale-marketplace-system-le13if` |
 
-5. **Save and Deploy**. Em cerca de um minuto sai um endereço terminado em
-   `.pages.dev`.
+   O diretório raiz é o campo decisivo. Sem ele a Cloudflare compila o KingGoal,
+   que é outro projeto que mora no mesmo repositório.
 
-O arquivo `.node-version` deste diretório fixa o Node 22 na Cloudflare. Sem ele,
-a suíte de testes que roda antes do build pode falhar numa versão antiga.
+5. **Repetir implantação**. O log deve terminar em verde, e sai um endereço
+   terminado em `.workers.dev`.
 
-## Caminho B — subir o pacote pronto (60 segundos)
+### O que o `wrangler.jsonc` resolve
 
-Se a autorização do GitHub travar, ou se a ideia for só ver no ar hoje:
+Este diretório tem um `wrangler.jsonc` declarando que o projeto é um Worker só
+de arquivos estáticos, servindo `dist`. Sem ele, o Workers Builds tenta adivinhar
+o projeto, escolhe o caminho do plugin oficial de Vite e falha com
+*"cannot be automatically configured, please update Vite to at least 6"*.
 
-1. Baixe o `aylla-imports-site.zip` que eu mando na conversa.
-2. No painel, arraste o arquivo para a área **"Drop a folder, or a zip"**.
-3. Dê o nome `aylla-imports` e publique.
+O Vite aqui foi atualizado para a versão 6 pelo mesmo motivo, e o
+`.node-version` fixa o Node 22 — sem ele, a suíte de testes que roda antes do
+build pode quebrar numa versão antiga do ambiente.
 
-Funciona igual para quem usa. A diferença é que **não atualiza sozinho**: a cada
-fase nova eu teria que mandar um zip e alguém teria que subir de novo. Serve de
-ponte, não de destino — vale migrar para o caminho A quando der.
+## Caminho B — subir o pacote pronto
+
+Serve de ponte para ver no ar hoje, se o caminho A travar. Arraste o
+`aylla-imports-site.zip` para a área **"Drop a folder, or a zip"** e publique.
+
+Funciona igual para quem usa, mas **não atualiza sozinho**: a cada fase alguém
+teria que subir um zip novo. Migre para o caminho A quando der.
+
+### Se o upload ficar com as rodinhas girando sem parar
+
+Elas não param nesse fluxo — é indicador por arquivo, não barra de progresso.
+Role a caixa, preencha o nome e clique em **Deploy** mesmo assim.
+
+## Uma conta do GitHub não conecta em duas contas Cloudflare
+
+A integração é 1:1 na prática. Se o repositório é da conta do Igor, a
+hospedagem tem que ficar na conta Cloudflare dele. Isso não muda nada para a
+Aylla: ela só abre um endereço, não precisa de conta nenhuma.
+
+A conta Cloudflare dela serve melhor para registrar o domínio em nome dela e,
+na F5, hospedar o banco de dados do negócio.
 
 ## Instalar no celular dela
 
