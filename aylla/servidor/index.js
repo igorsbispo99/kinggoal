@@ -12,6 +12,7 @@ import {
 } from './mercadolivre.js'
 import { explorar, mapearRaizes } from './explorador.js'
 import { categoria, raizes } from './categorias.js'
+import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -263,6 +264,49 @@ export default {
     }
 
     if (caminho === '/api/ml/analisar') return rotaRadar(request, env, url)
+
+    // A descoberta. Existe desde que a permissao de leitura foi liberada no
+    // formulario do aplicativo — antes tudo isto respondia 403.
+    if (caminho.startsWith('/api/ml/descobrir')) {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      let token = null
+      try { token = (await obterTokenParaLeitura(env)).token } catch (falha) {
+        return Response.json({ erro: falha.message, precisaReconectar: true }, { status: 401 })
+      }
+      const q = (url.searchParams.get('q') || '').trim()
+      const cat = url.searchParams.get('categoria')
+      try {
+        if (caminho === '/api/ml/descobrir/tendencias') {
+          return Response.json(await tendencias(env, { categoria: cat, token }))
+        }
+        if (caminho === '/api/ml/descobrir/onde') {
+          if (!q) return erro('Diga o que você quer vender.')
+          return Response.json({ termo: q, destinos: await ondeIssoVive(env, { termo: q, token }) })
+        }
+        if (caminho === '/api/ml/descobrir/campeoes') {
+          if (!cat) return erro('Falta a categoria.')
+          // O total da categoria vem do cache da arvore e entra na analise
+          // como "quantos anuncios existem aqui" — sem ele, a barreira de
+          // entrada mediria o volume dos doze campeoes, que nao quer dizer
+          // nada.
+          let totalDaCategoria = null
+          try { totalDaCategoria = (await categoria(env, cat, token)).anuncios } catch { /* segue sem */ }
+          return Response.json(await maisVendidos(env, { categoria: cat, token, totalDaCategoria }))
+        }
+        if (caminho === '/api/ml/descobrir/catalogo') {
+          if (!q) return erro('Diga o que procurar.')
+          return Response.json(await buscarNoCatalogo(env, { termo: q, token }))
+        }
+        if (caminho === '/api/ml/descobrir/tarifa') {
+          const preco = Number(url.searchParams.get('preco'))
+          if (!cat || !Number.isFinite(preco) || preco <= 0) return erro('Falta categoria ou preço.')
+          return Response.json(await comissaoReal(env, { categoria: cat, preco, token }))
+        }
+        return erro('Caminho de descoberta não existe.', 404)
+      } catch (falha) {
+        return Response.json({ erro: falha.message, status: falha.status || 502 }, { status: 502 })
+      }
+    }
 
     // A arvore de categorias: o unico caminho de descoberta que o Mercado
     // Livre deixou de pe, e o que responde "eu nao sei o que pesquisar".

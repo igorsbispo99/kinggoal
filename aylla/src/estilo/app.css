@@ -470,3 +470,28 @@ details.dobra > div { padding-top: 10px; }
 .linha-categoria .numeros small { font-size: .7rem; color: var(--tinta-3); text-align: right; max-width: 140px; }
 .linha-categoria .numeros small.bom { color: var(--verde); }
 .linha-categoria .numeros small.ruim { color: var(--negativo); }
+
+/* ---------- descoberta ---------- */
+
+.separa-secao {
+  display: flex; align-items: center; gap: 10px;
+  margin: 14px 0 4px; color: var(--tinta-3); font-size: .76rem;
+}
+.separa-secao::before, .separa-secao::after {
+  content: ''; flex: 1; height: 1px; background: var(--linha);
+}
+
+.nuvem-termos { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.termo {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--linha-forte); border-radius: 999px;
+  padding: 6px 11px 6px 6px; font-size: .8rem; font-weight: 600;
+  color: var(--tinta); text-decoration: none; background: var(--carta);
+}
+.termo .posicao {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 19px; height: 19px; border-radius: 999px;
+  background: var(--afundado); color: var(--tinta-3);
+  font-size: .66rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.termo:active { background: var(--afundado); }

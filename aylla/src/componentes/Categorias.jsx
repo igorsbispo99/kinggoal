@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { Aviso } from './Campos.jsx'
 import { raizesDeCategoria, abrirCategoria, lerFatia } from '../lib/categorias.js'
+import { campeoesDaCategoria } from '../lib/descobrir.js'
+import { reais } from '../lib/formato.js'
 
 const numero = (n) => (n === null || n === undefined ? '—' : Number(n).toLocaleString('pt-BR'))
 
@@ -14,11 +16,13 @@ const numero = (n) => (n === null || n === undefined ? '—' : Number(n).toLocal
  * disputada para a mais, porque quem está começando não ganha da
  * multidão; ganha achando a porta onde a multidão não está.
  */
-export default function Categorias({ aoEscolher }) {
+export default function Categorias({ aoEscolher, abrirId = null }) {
   const [nivel, setNivel] = useState(null)
   const [listaRaiz, setListaRaiz] = useState(null)
   const [carregando, setCarregando] = useState(false)
   const [falha, setFalha] = useState(null)
+  const [campeoes, setCampeoes] = useState(null)
+  const [lendoCampeoes, setLendoCampeoes] = useState(false)
 
   async function carregarRaizes() {
     setCarregando(true); setFalha(null)
@@ -38,8 +42,17 @@ export default function Categorias({ aoEscolher }) {
   useEffect(() => { carregarRaizes() }, [])
 
   async function descer(id) {
-    setCarregando(true); setFalha(null)
+    setCarregando(true); setFalha(null); setCampeoes(null)
     try { setNivel(await abrirCategoria(id)) } catch (erro) { setFalha(erro.message) } finally { setCarregando(false) }
+  }
+
+  // Quando a tradução da ideia dela aponta uma categoria, a árvore abre lá.
+  useEffect(() => { if (abrirId) descer(abrirId) }, [abrirId])
+
+  async function verCampeoes() {
+    if (!nivel) return
+    setLendoCampeoes(true); setFalha(null)
+    try { setCampeoes(await campeoesDaCategoria(nivel.id)) } catch (erro) { setFalha(erro.message) } finally { setLendoCampeoes(false) }
   }
 
   function voltarPara(id) {
@@ -131,10 +144,58 @@ export default function Categorias({ aoEscolher }) {
         </>
       ) : null}
 
+      {nivel ? (
+        <>
+          <div className="separa-secao"><span>o que mais vende aqui</span></div>
+          {!campeoes ? (
+            <button type="button" className="botao cheio" disabled={lendoCampeoes} onClick={verCampeoes}>
+              {lendoCampeoes ? 'Lendo os mais vendidos...' : 'Ver os mais vendidos desta categoria'}
+            </button>
+          ) : null}
+
+          {campeoes && campeoes.analise && !campeoes.analise.vazio ? (
+            <>
+              <div className="painel">
+                <span className="titulo">Barreira de entrada</span>
+                <span className={`valor-mor${campeoes.analise.barreira.nota >= 70 ? ' ruim' : ''}`}>
+                  {campeoes.analise.barreira.nota}<small style={{ fontSize: '1rem', fontWeight: 500 }}>/100</small>
+                </span>
+              </div>
+              <Aviso
+                nivel={campeoes.analise.barreira.nota >= 70 ? 'critico' : campeoes.analise.barreira.nota >= 45 ? 'atencao' : 'info'}
+                titulo="Dá para entrar aqui?"
+              >
+                {campeoes.analise.resumo}
+              </Aviso>
+            </>
+          ) : null}
+
+          {campeoes && campeoes.itens && campeoes.itens.length ? (
+            <ul className="lista-categorias">
+              {campeoes.itens.map((i) => (
+                <li key={i.id}>
+                  <a className="linha-categoria" href={i.permalink} target="_blank" rel="noreferrer">
+                    <span className="nome">{i.title}</span>
+                    <span className="numeros">
+                      <b>{reais(i.price)}</b>
+                      <small>{i.official_store_id ? 'loja oficial' : i.catalog_listing ? 'catálogo' : 'vendedor comum'}</small>
+                    </span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {campeoes && campeoes.semItens ? (
+            <p className="dica">O Mercado Livre não listou campeões para esta categoria.</p>
+          ) : null}
+        </>
+      ) : null}
+
       <p className="dica">
-        Um aviso honesto: poucos anúncios pode ser um canto livre <b>ou</b> um lugar onde ninguém compra.
-        O Mercado Livre fechou os dados de venda para aplicativos, então esta tela mede disputa, não demanda.
-        O sinal bom é uma categoria pequena dentro de uma categoria grande.
+        A contagem mede <b>disputa</b>: quanta gente já está vendendo ali. Quem diz se tem <b>procura</b>
+        são os mais vendidos acima — se os campeões de uma categoria vendem pouco, o canto é vazio
+        por falta de comprador, não por sorte.
       </p>
     </section>
   )

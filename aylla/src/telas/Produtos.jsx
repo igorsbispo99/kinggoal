@@ -8,12 +8,14 @@ import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
 import RadarMercado from '../componentes/Radar.jsx'
 import Categorias from '../componentes/Categorias.jsx'
+import Descobrir from '../componentes/Descobrir.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
 const faixaDe = (r) => (r.nota === null ? 'sem' : r.completo ? 'completo' : 'parcial')
 
 export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCalcular, radar = { configurado: false, conectado: false } }) {
   const [aberto, setAberto] = useState(null)      // produto em detalhe
+  const [categoriaAlvo, setCategoriaAlvo] = useState(null) // vinda da descoberta
   const [editando, setEditando] = useState(null)  // produto em formulário
   const ranqueados = useMemo(
     () => ranquear({ produtos, fornecedores, config }),
@@ -75,7 +77,10 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
       {/* Antes dos produtos, porque no comeco nao ha produto nenhum: a
           primeira pergunta dela nao e "quanto rende este" e sim "o que
           vender". */}
+      <Descobrir aoAbrirCategoria={setCategoriaAlvo} />
+
       <Categorias
+        abrirId={categoriaAlvo}
         aoEscolher={(cat) => setEditando({
           ...PRODUTO_VAZIO,
           categoria: cat.nome,
