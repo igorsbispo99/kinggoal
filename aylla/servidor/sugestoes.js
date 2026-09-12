@@ -131,20 +131,55 @@ export async function depurarFunil(env, { token, termo = null }) {
         primeiros: conteudo.slice(0, 3),
       })
 
-      const ids = conteudo.filter((c) => c.id).slice(0, 3).map((c) => c.id)
-      if (ids.length) {
-        const m = await fetch(`${API}/items?ids=${ids.join(',')}&attributes=id,title,price,sold_quantity,date_created`, {
+      // Passo 4: o PRODUCT de catalogo vira anuncio? E a duvida que sobrou.
+      const umProduto = conteudo.find((c) => c.type === 'PRODUCT' && c.id)
+      if (umProduto) {
+        const pr = await fetch(`${API}/products/${umProduto.id}`, {
           headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         })
-        const mj = await m.json().catch(() => null)
-        const entrada = Array.isArray(mj) ? mj[0] : null
-        anotar('multiget_items', {
-          ok: m.ok,
-          status: m.status,
-          codigos: Array.isArray(mj) ? mj.map((e) => e.code) : null,
-          camposDoCorpo: entrada && entrada.body ? Object.keys(entrada.body) : null,
+        const pj = await pr.json().catch(() => null)
+        const ganhador = pj && pj.buy_box_winner
+        anotar('products_por_id', {
+          ok: pr.ok,
+          status: pr.status,
+          id: umProduto.id,
+          campos: pj ? Object.keys(pj).slice(0, 20) : null,
+          temBuyBoxWinner: Boolean(ganhador),
+          camposDoGanhador: ganhador ? Object.keys(ganhador).slice(0, 20) : null,
+          itemId: ganhador ? (ganhador.item_id || null) : null,
         })
       }
+
+      // Caminho alternativo, caso buy_box_winner venha vazio: a lista de
+      // anuncios daquele produto de catalogo.
+      if (umProduto) {
+        const li = await fetch(`${API}/products/${umProduto.id}/items`, {
+          headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        })
+        const lj = await li.json().catch(() => null)
+        const primeiro = lj && lj.results && lj.results[0]
+        anotar('produto_items', {
+          ok: li.ok,
+          status: li.status,
+          quantos: (lj && lj.results && lj.results.length) || 0,
+          camposDoPrimeiro: primeiro ? Object.keys(primeiro).slice(0, 20) : null,
+          itemId: primeiro ? (primeiro.item_id || primeiro.id || null) : null,
+        })
+      }
+
+      // Passo 6: o funil de verdade, do jeito que o aplicativo roda.
+      const campeoes = await maisVendidos(env, { categoria: catId, token, quantos: 12, orcamentoDeProdutos: 3 })
+      anotar('mais_vendidos', {
+        ok: Boolean(campeoes.itens && campeoes.itens.length),
+        porTipo: campeoes.porTipo || null,
+        resolvidosDeCatalogo: campeoes.resolvidosDeCatalogo ?? null,
+        quantosItens: (campeoes.itens || []).length,
+        codigosDoMultiget: campeoes.codigosDoMultiget || null,
+        erroNoMultiget: campeoes.erroNoMultiget || null,
+        semItens: campeoes.semItens || false,
+        analiseVazia: campeoes.analise ? campeoes.analise.vazio : 'sem analise',
+        camposDoPrimeiroItem: campeoes.itens && campeoes.itens[0] ? Object.keys(campeoes.itens[0]) : null,
+      })
     } catch (e) { anotar('highlights', { ok: false, erro: e.message }) }
   }
 
