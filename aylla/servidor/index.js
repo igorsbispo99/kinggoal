@@ -10,6 +10,7 @@ import {
   temCredenciais, temBanco, trocarCodigo, obterTokenParaLeitura,
   buscar, enriquecer, diagnosticar, resumoDaConexao,
 } from './mercadolivre.js'
+import { explorar, mapearRaizes } from './explorador.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -261,6 +262,27 @@ export default {
     }
 
     if (caminho === '/api/ml/analisar') return rotaRadar(request, env, url)
+
+    // A sonda larga. Existe porque adivinhar o que a API ainda responde
+    // custou dias, e medir custa uma requisicao.
+    if (caminho === '/api/ml/explorar') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      try {
+        let token = null
+        try { token = (await obterTokenParaLeitura(env)).token } catch { /* sonda anonima serve */ }
+        const [provas, raizes] = [await explorar(env, token), await mapearRaizes(env, token)]
+        const funcionam = provas.filter((p) => p.ok).length
+        return Response.json({
+          verificadoEm: new Date().toISOString(),
+          comToken: Boolean(token),
+          resumo: `${funcionam} de ${provas.length} endereços respondem; ${raizes.filter((r) => !r.erro).length} de ${raizes.length} categorias raiz`,
+          provas,
+          raizes,
+        })
+      } catch (falha) {
+        return Response.json({ erro: falha.message }, { status: 500 })
+      }
+    }
 
     if (caminho === '/api/ml/diagnostico') {
       try {
