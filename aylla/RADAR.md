@@ -23,19 +23,82 @@ Três fatos que a pesquisa da API deixou claros:
 
 ## Passo 1 — criar o aplicativo no Mercado Livre
 
-Em `developers.mercadolivre.com.br`, com a conta da Aylla, crie uma aplicação:
+Conferido na prática em 12/09/2026. O portal mudou e vários caminhos que a
+documentação indica não existem mais.
+
+### Chegar no formulário certo
+
+1. Faça login em `mercadolivre.com.br` com a conta de vendedora **antes**.
+2. Na mesma aba, vá para `developers.mercadolivre.com.br/devcenter/create-app`.
+
+Sem a sessão do Mercado Livre ativa, `/devcenter` redireciona para o Mercado
+Pago, e o assistente de lá só oferece integrações de pagamento — Checkout,
+Bricks, Point. Nenhuma delas serve, e não há opção de Mercado Livre naquele
+fluxo. Se você caiu em "Escolha o tipo de pagamento que quer integrar",
+está no formulário errado.
+
+### Informações básicas
 
 | Campo | Valor |
 |---|---|
-| Nome | Aylla Imports |
-| URI de redirect | `https://aylla-imports.igorsilva1971.workers.dev/api/ml/callback` |
-| Escopos | leitura (`read`) |
+| Nome | `Aylla Imports` |
+| Nome curto | `aylla-imports` (único no Mercado Livre inteiro) |
+| Descrição | a frase que ela vê na tela de autorização |
+| Propósito | Negócios |
+| Usuários | a menor faixa |
+| Logotipo | **obrigatório** — use `public/icone-512.png` |
 
-Guarde o **App ID** e a **Secret Key**.
+### Configuração e scopes
 
-> A URI de redirect precisa bater **exatamente** com o endereço do Worker. Se
-> um dia mudar o domínio, atualize aqui também, senão a autorização falha com
-> `invalid_grant`.
+| O quê | Como |
+|---|---|
+| URI de redirect | `https://<worker>/api/ml/callback`, e clique em **Adicionar** |
+| Fluxos OAuth | **os três marcados**, inclusive **Refresh Token** |
+| PKCE | **desmarcado** |
+| Negócios | **Mercado Livre** marcado, VIS não |
+
+Três detalhes que custam tempo:
+
+**O `Refresh Token` vem desmarcado.** É o equivalente do `offline_access`:
+sem ele o Mercado Livre autoriza, devolve um token de seis horas e o radar
+morre no dia seguinte sem erro que aponte a causa. O código recusa essa
+conexão de propósito, com a explicação na tela.
+
+**O PKCE tem que ficar desmarcado.** Nosso fluxo roda no servidor com o
+segredo protegido e não envia `code_challenge`. Marcar PKCE quebra toda
+autorização.
+
+**Clicar em "Adicionar URI de redirect" cria uma linha vazia** que passa a ser
+obrigatória e trava o formulário. Preencha só o primeiro campo.
+
+### Permissões: peça o mínimo
+
+O formulário exige **pelo menos uma permissão com acesso** — não aceita tudo
+em "Sem acesso". Sendo obrigatório escolher uma, escolha **Métricas do
+negócio → Leitura**: são dados da própria conta dela (vendas, estoque,
+reputação), e é a permissão que a importação automática de vendas vai usar
+quando existir.
+
+| Permissão | Valor |
+|---|---|
+| Usuários | fixo em Leitura e escrita, não editável |
+| Métricas do negócio | **Leitura** — a obrigatória |
+| Todas as outras | **Sem acesso** |
+
+A que mais importa manter fechada é **Publicação e sincronização**: ela
+permite *"pausar e excluir uma ou todas as publicações da loja"*. Um app que
+só lê o mercado não tem motivo para poder apagar os anúncios dela.
+
+Em **Tópicos**, não marque nada. São notificações que o Mercado Livre
+empurraria para um endereço nosso a cada evento; o radar só pergunta quando
+ela pede.
+
+### Descoberta
+
+O fluxo **Client Credentials** existe no formulário, ao contrário do que a
+documentação pública sugere. Se o diagnóstico confirmar que ele funciona para
+busca, dá para consultar o mercado sem depender da autorização dela — e a
+conexão fica mais simples. Deixe marcado.
 
 ## Passo 2 — criar o banco na Cloudflare
 
