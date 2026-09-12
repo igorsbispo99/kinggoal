@@ -5,7 +5,7 @@
 // navegação tenta a rede primeiro (para ela receber a versão nova), o resto
 // responde do cache e se atualiza por tras.
 
-const CACHE = 'aylla-v1'
+const CACHE = 'aylla-v2'
 
 self.addEventListener('install', (evento) => {
   self.skipWaiting()
@@ -26,6 +26,13 @@ self.addEventListener('fetch', (evento) => {
 
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
+
+  // Nada de /api/ passa por cache. Duas coisas quebravam aqui:
+  // a resposta de "radar desligado", gravada antes de as credenciais
+  // existirem, continuava sendo servida depois de tudo configurado; e uma
+  // navegação para /api/... era guardada como se fosse a página do aplicativo,
+  // fazendo o app abrir mostrando JSON quando sem sinal.
+  if (url.pathname.startsWith('/api/')) return
 
   if (req.mode === 'navigate') {
     evento.respondWith(
