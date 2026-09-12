@@ -175,7 +175,7 @@ export default function Categorias({ aoEscolher, abrirId = null }) {
               {campeoes.itens.map((i) => (
                 <li key={i.id}>
                   <a className="linha-categoria" href={i.permalink} target="_blank" rel="noreferrer">
-                    <span className="nome">{i.title}</span>
+                    <span className="nome">{i.title || 'Anúncio de catálogo'}</span>
                     <span className="numeros">
                       <b>{reais(i.price)}</b>
                       <small>{i.official_store_id ? 'loja oficial' : i.catalog_listing ? 'catálogo' : 'vendedor comum'}</small>

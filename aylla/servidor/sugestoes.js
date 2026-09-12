@@ -167,7 +167,33 @@ export async function depurarFunil(env, { token, termo = null }) {
         })
       }
 
-      // Passo 6: o funil de verdade, do jeito que o aplicativo roda.
+      // Passo 6: a procura ainda e recuperavel? O multiget veio 403; o
+      // endereco singular pode nao ter a mesma trava, e e dele que sairiam
+      // sold_quantity e date_created — sem os dois nao ha velocidade.
+      const umAnuncio = conteudo.find((c) => c.type === 'ITEM' && c.id)
+      if (umAnuncio) {
+        for (const [nome, caminho] of [
+          ['item_singular', `/items/${umAnuncio.id}`],
+          ['item_singular_com_campos', `/items/${umAnuncio.id}?attributes=id,title,price,sold_quantity,date_created`],
+          ['multiget_sem_attributes', `/items?ids=${umAnuncio.id}`],
+        ]) {
+          const it = await fetch(`${API}${caminho}`, {
+            headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          })
+          const ij = await it.json().catch(() => null)
+          const corpo = Array.isArray(ij) ? (ij[0] && ij[0].body) : ij
+          anotar(nome, {
+            ok: it.ok,
+            status: it.status,
+            codigoInterno: Array.isArray(ij) && ij[0] ? ij[0].code : null,
+            temSoldQuantity: corpo ? corpo.sold_quantity !== undefined : null,
+            temDateCreated: corpo ? corpo.date_created !== undefined : null,
+            campos: corpo ? Object.keys(corpo).slice(0, 14) : null,
+          })
+        }
+      }
+
+      // Passo 7: o funil de verdade, do jeito que o aplicativo roda.
       const campeoes = await maisVendidos(env, { categoria: catId, token, quantos: 12, orcamentoDeProdutos: 3 })
       anotar('mais_vendidos', {
         ok: Boolean(campeoes.itens && campeoes.itens.length),
@@ -266,7 +292,9 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       termo: t.termo,
       posicaoNaTendencia: t.posicao,
       linkDaBusca: t.link,
-      produtoExemplo: campeoes.itens[0] ? campeoes.itens[0].title : t.termo,
+      // Anúncio de catálogo não traz título; então pega o primeiro que tiver,
+      // e se nenhum tiver, o próprio termo da tendência serve de nome.
+      produtoExemplo: (campeoes.itens.find((i) => i.title) || {}).title || t.termo,
       categoria: cat.nome,
       categoriaId: cat.id,
       caminho: cat.caminho.map((c) => c.nome),
@@ -287,7 +315,7 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       lojasOficiais: analise.concorrencia.lojasOficiais,
       catalogo: analise.concorrencia.catalogo,
       exemplos: campeoes.itens.slice(0, 3).map((i) => ({
-        titulo: i.title, preco: i.price, link: i.permalink,
+        titulo: i.title || 'Anúncio de catálogo', preco: i.price, link: i.permalink,
       })),
     })
   }

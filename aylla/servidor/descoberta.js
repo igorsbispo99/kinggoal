@@ -110,31 +110,65 @@ export async function ondeIssoVive(env, { termo, token }) {
  * de itens, numa chamada só: uma por item queimaria o limite à toa.
  */
 /**
- * Resolve ids de catálogo em ids de anúncio.
- *
- * /highlights mistura três tipos, e só um deles serve para /items:
- *
- *   ITEM ......... o anúncio em si, e o multiget aceita
- *   PRODUCT ...... a ficha de catálogo; /items devolve 404. O anúncio real
- *                  está em buy_box_winner.item_id — quem está ganhando a
- *                  caixa de compra daquele produto
- *   USER_PRODUCT . listagem própria do vendedor, sem endereço público
- *                  conhecido; fica de fora
- *
- * Medido em produção: numa categoria de bolsas, as posições 1 e 2 eram
- * PRODUCT, a 3 era USER_PRODUCT, e o multiget respondeu 404 nas três.
- *
- * Custa uma requisição por produto, por isso o limite: o Worker gratuito
- * faz 50 subrequisições por requisição e isto roda dentro de um laço.
+ * Multiget de anúncios. Devolve os códigos junto porque o Mercado Livre
+ * responde 200 no envelope e o erro real vem dentro, por entrada.
  */
-async function anunciosDeProdutos(ids, token, limite = 3) {
-  const encontrados = []
-  for (const id of ids.slice(0, limite)) {
-    const r = await pegar(`/products/${id}`, token, { cacheSegundos: 3600 })
-    const ganhador = r.ok && r.json && r.json.buy_box_winner
-    if (ganhador && ganhador.item_id) encontrados.push(ganhador.item_id)
+async function multigetDeAnuncios(ids, token) {
+  if (!ids.length) return { itens: [], codigos: null }
+  const campos = 'id,title,price,sold_quantity,date_created,permalink,seller_id,official_store_id,catalog_listing,shipping,condition'
+  const r = await pegar(`/items?ids=${ids.join(',')}&attributes=${campos}`, token, { cacheSegundos: 1800 })
+  if (!r.ok) return { itens: [], codigos: [r.status] }
+  const entradas = Array.isArray(r.json) ? r.json : []
+  return {
+    itens: entradas.filter((e) => e.code === 200 && e.body).map((e) => e.body),
+    codigos: [...new Set(entradas.map((e) => e.code))],
   }
-  return encontrados
+}
+
+/**
+ * Anúncios de um produto de catálogo.
+ *
+ * Medido em produção, e as duas primeiras tentativas falharam:
+ *
+ *   /items?ids=... .............. 403 em cada entrada, com ids reais de
+ *                                 anúncio. O multiget está fechado.
+ *   /products/{id} .............. 200, mas buy_box_winner vem NULO — o
+ *                                 campo existe na resposta e não tem nada
+ *                                 dentro, que é diferente de não existir.
+ *   /products/{id}/items ........ 200, e devolve o que interessa direto:
+ *                                 item_id, price, seller_id,
+ *                                 official_store_id, shipping, condition.
+ *
+ * Então este é o caminho, e ele nem precisa de multiget depois: os campos
+ * que o motor de análise lê já vêm aqui. O que não vem é sold_quantity nem
+ * date_created — ou seja, não dá para medir velocidade de venda por aqui, e
+ * isso fica null em vez de virar estimativa.
+ */
+async function anunciosDoProduto(id, token) {
+  const r = await pegar(`/products/${id}/items`, token, { cacheSegundos: 3600 })
+  const lista = (r.ok && r.json && r.json.results) || []
+  return lista.map((a) => {
+    const anuncioId = a.item_id || a.id
+    return {
+      id: anuncioId,
+      // Nem título nem link vêm daqui. O link se monta a partir do id, que o
+      // Mercado Livre resolve; o título fica null e a tela diz isso em vez
+      // de mostrar "undefined".
+      title: null,
+      permalink: anuncioId ? `https://produto.mercadolivre.com.br/${String(anuncioId).replace(/^MLB/, 'MLB-')}` : null,
+      price: a.price,
+      seller_id: a.seller_id,
+      official_store_id: a.official_store_id || null,
+      shipping: a.shipping || null,
+      condition: a.condition || null,
+      // É um anúncio de catálogo por construção: foi daí que ele saiu.
+      catalog_listing: true,
+      // sold_quantity e date_created não existem neste endereço, então a
+      // velocidade de venda sai null — nunca estimada.
+      sold_quantity: undefined,
+      date_created: undefined,
+    }
+  })
 }
 
 export async function maisVendidos(env, {
@@ -160,45 +194,48 @@ export async function maisVendidos(env, {
   const idsDeAnuncio = conteudo.filter((c) => c.id && (c.type === 'ITEM' || !c.type)).map((c) => c.id)
   const idsDeProduto = conteudo.filter((c) => c.id && c.type === 'PRODUCT').map((c) => c.id)
 
-  // Os anúncios diretos bastam quando há bastante. Quando não há, vale gastar
-  // algumas requisições resolvendo produtos de catálogo — senão categorias
-  // inteiras, onde a disputa é toda por catálogo, ficariam sem leitura.
-  let ids = idsDeAnuncio.slice(0, quantos)
-  let resolvidosDeCatalogo = 0
-  if (ids.length < 4 && idsDeProduto.length && orcamentoDeProdutos > 0) {
-    const extras = await anunciosDeProdutos(idsDeProduto, token, orcamentoDeProdutos)
-    resolvidosDeCatalogo = extras.length
-    ids = [...ids, ...extras].slice(0, quantos)
+  // Tenta o multiget dos anúncios diretos. Ele pode vir 403 — está vindo —
+  // e nesse caso o caminho do catálogo assume sozinho.
+  let itensDiretos = []
+  let codigosDoMultiget = null
+  if (idsDeAnuncio.length) {
+    const r2 = await multigetDeAnuncios(idsDeAnuncio.slice(0, quantos), token)
+    itensDiretos = r2.itens
+    codigosDoMultiget = r2.codigos
   }
 
-  if (!ids.length) return { categoria, itens: [], semItens: true, porTipo, resolvidosDeCatalogo }
-
-  const campos = 'id,title,price,sold_quantity,date_created,permalink,seller_id,official_store_id,catalog_listing,shipping'
-  const multi = await pegar(`/items?ids=${ids.join(',')}&attributes=${campos}`, token, { cacheSegundos: 1800 })
-  if (!multi.ok) return { categoria, itens: [], ids, porTipo, erroNoMultiget: multi.status }
-
-  const entradas = Array.isArray(multi.json) ? multi.json : []
-  const itens = entradas.filter((e) => e.code === 200 && e.body).map((e) => e.body)
-
-  if (!itens.length) {
-    return {
-      categoria, itens: [], porTipo, resolvidosDeCatalogo, semItens: true,
-      codigosDoMultiget: [...new Set(entradas.map((e) => e.code))],
+  // Catálogo: cada produto custa uma requisição, por isso o orçamento.
+  const itensDeCatalogo = []
+  if (itensDiretos.length < 4 && idsDeProduto.length && orcamentoDeProdutos > 0) {
+    for (const idProduto of idsDeProduto.slice(0, orcamentoDeProdutos)) {
+      const achados = await anunciosDoProduto(idProduto, token)
+      itensDeCatalogo.push(...achados)
     }
   }
 
-  // O motor de leitura de mercado volta inteiro aqui. Ele foi escrito para
-  // uma busca por texto, mas o que ele mede — quem ocupa o topo, quanto
-  // custa entrar, a que velocidade se vende — vale melhor sobre os mais
-  // vendidos de uma categoria do que sobre um termo que ela teria que
-  // adivinhar. Os itens ja trazem date_created, entao a velocidade sai
-  // medida em vez de estimada.
+  const itens = [...itensDiretos, ...itensDeCatalogo].slice(0, quantos)
+
+  if (!itens.length) {
+    return {
+      categoria, itens: [], porTipo, semItens: true, codigosDoMultiget,
+      resolvidosDeCatalogo: 0,
+    }
+  }
+
   const analise = analisarBusca({
     busca: { results: itens, paging: { total: totalDaCategoria ?? itens.length } },
     enriquecidos: itens,
   })
 
-  return { categoria, itens, analise, porTipo, resolvidosDeCatalogo, doCache: r.doCache }
+  return {
+    categoria,
+    itens,
+    analise,
+    porTipo,
+    codigosDoMultiget,
+    resolvidosDeCatalogo: itensDeCatalogo.length,
+    doCache: r.doCache,
+  }
 }
 
 /** Busca no catálogo — o que sobrou de busca por texto, e funciona. */
