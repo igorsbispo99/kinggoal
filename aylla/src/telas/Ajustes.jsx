@@ -261,7 +261,7 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
         <header>
           <h2>Radar de mercado</h2>
           {radar.conectado
-            ? <span className="selo-confirmado">conectado</span>
+            ? <span className="selo-confirmado">{radar.origem === 'conta' ? 'conta conectada' : 'pelo aplicativo'}</span>
             : <span className="nao-confirmado">{radar.configurado ? 'não conectado' : 'desligado'}</span>}
         </header>
 
@@ -271,9 +271,14 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
             de entrar numa categoria. Ainda falta configurar as credenciais — o passo a passo está no
             arquivo RADAR.md do projeto.
           </p>
+        ) : radar.conectado && radar.origem === 'conta' ? (
+          <p className="dica">
+            A conta da Aylla está conectada e o token se renova sozinho. Se o radar parar de responder, reconecte por aqui.
+          </p>
         ) : radar.conectado ? (
           <p className="dica">
-            A conta está conectada e o token se renova sozinho. Se o radar parar de responder, reconecte por aqui.
+            O radar está lendo o mercado com o token do próprio aplicativo, sem depender de autorização — e isso basta para
+            tudo que ele faz hoje. Conectar a conta dela é opcional: serve para o dia em que o sistema for ler as vendas dela.
           </p>
         ) : (
           <p className="dica">Falta autorizar uma vez com a conta do Mercado Livre dela.</p>
@@ -281,7 +286,7 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
 
         {radar.configurado ? (
           <a className={`botao cheio${radar.conectado ? '' : ' primario'}`} href="/api/ml/conectar">
-            {radar.conectado ? 'Reconectar conta' : 'Conectar conta do Mercado Livre'}
+            {radar.origem === 'conta' ? 'Reconectar conta' : 'Conectar conta do Mercado Livre (opcional)'}
           </a>
         ) : null}
 

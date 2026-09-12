@@ -194,7 +194,10 @@ export default {
         await trocarCodigo(env, codigo, enderecoDeRetorno(request))
         return Response.redirect(`${url.origin}/?ml=conectado`, 302)
       } catch (falha) {
-        return Response.redirect(`${url.origin}/?ml=erro`, 302)
+        // O motivo vai junto: "nao completou" sozinho nao permite consertar
+        // nada. Aqui so trafega a mensagem de erro, nunca credencial.
+        const motivo = encodeURIComponent(String(falha.message || 'erro desconhecido').slice(0, 300))
+        return Response.redirect(`${url.origin}/?ml=erro&motivo=${motivo}`, 302)
       }
     }
 

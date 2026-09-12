@@ -28,6 +28,7 @@ export default function App() {
   const [instalador, setInstalador] = useState(null)
   const [radar, setRadar] = useState({ configurado: false, conectado: false })
   const [recadoRadar, setRecadoRadar] = useState(() => new URLSearchParams(window.location.search).get('ml'))
+  const [motivoRadar] = useState(() => new URLSearchParams(window.location.search).get('motivo'))
 
   // As simulações da fase 1 viram produtos, sem apagar o original.
   const [produtos, setProdutos] = useState(() => {
@@ -126,7 +127,11 @@ export default function App() {
           <div className="aviso info"><b>Mercado Livre conectado</b><span>O radar já pode ler o mercado.</span></div>
         ) : null}
         {recadoRadar === 'erro' ? (
-          <div className="aviso critico"><b>A conexão não completou</b><span>Tente de novo pelos Ajustes.</span></div>
+          <div className="aviso critico">
+            <b>A conexão com a conta não completou</b>
+            <span>{motivoRadar || 'O Mercado Livre recusou a autorização.'}</span>
+            <span>O radar segue funcionando com o token do próprio aplicativo.</span>
+          </div>
         ) : null}
 
         {instalador ? (
