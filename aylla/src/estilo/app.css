@@ -498,3 +498,35 @@ details.dobra > div { padding-top: 10px; }
   font-size: .66rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
 .termo:active { background: var(--afundado); }
+
+/* ---------- sugestoes ---------- */
+
+.sugestao {
+  border: 1px solid var(--linha); border-radius: 10px;
+  padding: 12px; display: flex; flex-direction: column; gap: 9px;
+  background: var(--carta);
+}
+.cabeca-sugestao {
+  border: 0; background: none; padding: 0; cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.titulo-sugestao {
+  display: flex; align-items: center; gap: 7px;
+  font-size: .96rem; font-weight: 650; color: var(--tinta);
+}
+.sub-sugestao { font-size: .75rem; color: var(--tinta-3); }
+
+.cenarios { display: flex; gap: 8px; flex-wrap: wrap; }
+.cenario {
+  flex: 1 1 140px; border: 1px solid var(--verde); border-radius: 8px;
+  background: var(--verde-fundo); padding: 9px 10px;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.cenario.impossivel { border-color: var(--linha-forte); background: var(--afundado); }
+.rotulo-cenario { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; color: var(--tinta-3); }
+.pague-ate { font-size: 1.05rem; font-weight: 700; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.detalhe-cenario { font-size: .7rem; color: var(--tinta-3); line-height: 1.35; }
+.nao-da { font-size: .8rem; font-weight: 600; color: var(--tinta-3); }
+
+.botoes { display: flex; gap: 8px; }
+.botoes > * { flex: 1; }

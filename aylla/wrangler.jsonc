@@ -15,6 +15,9 @@
   // painel mostra os segredos no lugar certo e o Worker responde
   // "variaveisVisiveis": []. Ver cloudflare/workers-sdk#8871.
   "keep_vars": true,
+  // O cron das sugestoes: 06:00 UTC = 03:00 em Sao Paulo. Madrugada porque
+  // o limite de subrequisicoes e por requisicao, e ninguem esta esperando.
+  "triggers": { "crons": ["0 6 * * *"] },
   "compatibility_date": "2026-09-01",
   // O banco guarda o token do Mercado Livre, que precisa sobreviver entre
   // requisições, e mais adiante a sincronização entre os dois celulares.

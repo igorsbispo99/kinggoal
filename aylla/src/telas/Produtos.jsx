@@ -9,6 +9,7 @@ import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
 import RadarMercado from '../componentes/Radar.jsx'
 import Categorias from '../componentes/Categorias.jsx'
 import Descobrir from '../componentes/Descobrir.jsx'
+import Sugestoes from '../componentes/Sugestoes.jsx'
 import CategoriaDoProduto from '../componentes/CategoriaDoProduto.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
@@ -78,6 +79,32 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
       {/* Antes dos produtos, porque no comeco nao ha produto nenhum: a
           primeira pergunta dela nao e "quanto rende este" e sim "o que
           vender". */}
+      {/* Primeiro as sugestoes prontas, porque foi isso que ela pediu:
+          produtos com numeros, nao uma caixa de busca. A descoberta e a
+          arvore ficam abaixo, para quando ela quiser procurar por conta. */}
+      <Sugestoes
+        config={config}
+        aoCadastrar={(s, leitura) => setEditando({
+          ...PRODUTO_VAZIO,
+          nome: s.produtoExemplo || s.termo,
+          categoria: s.categoria,
+          categoriaId: s.categoriaId,
+          precoVendaAlvo: s.precoMediano ? String(s.precoMediano) : '',
+          tarifa: s.tarifa ? { ...s.tarifa, precoConsultado: s.precoMediano, medidoEm: new Date().toISOString() } : null,
+          observacoes: leitura && leitura.cenarios[0] && !leitura.cenarios[0].impossivel
+            ? `Pagar no máximo US$ ${leitura.cenarios[0].precoMaximoUSD} para ${Math.round(leitura.cenarios[0].margem * 100)}% de margem.`
+            : '',
+          pesquisa: {
+            anunciosConcorrentes: s.anunciosNaCategoria,
+            vendasDoLiderMes: s.vendasPorMesTopo !== null ? Math.round(s.vendasPorMesTopo) : '',
+            precoMin: s.precoMin,
+            precoMax: s.precoMax,
+            origem: `Tendência "${s.termo}" no Mercado Livre`,
+            medidoEm: new Date().toISOString(),
+          },
+        })}
+      />
+
       <Descobrir aoAbrirCategoria={setCategoriaAlvo} />
 
       <Categorias

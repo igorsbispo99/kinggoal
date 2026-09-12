@@ -13,6 +13,7 @@ import {
 import { explorar, mapearRaizes } from './explorador.js'
 import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
+import { montarSugestoes, lerDoCache } from './sugestoes.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -147,6 +148,24 @@ async function rotaRadar(request, env, url) {
 /* ------------------------------------------------------------ worker */
 
 export default {
+  /**
+   * O "envia" do pedido dela. O cron roda de madrugada, monta as sugestoes
+   * e grava; quando ela abre o aplicativo de manha, ja esta pronto.
+   */
+  async scheduled(evento, env, contexto) {
+    if (!temCredenciais(env) || !temBanco(env)) return
+    contexto.waitUntil((async () => {
+      try {
+        const { token } = await obterTokenParaLeitura(env)
+        await montarSugestoes(env, { token })
+      } catch (falha) {
+        // Sem ninguem para avisar aqui: a tela mostra a data do que esta
+        // gravado, entao sugestao velha aparece como velha.
+        console.error('cron de sugestoes falhou:', falha.message)
+      }
+    })())
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url)
     const caminho = url.pathname
@@ -264,6 +283,29 @@ export default {
     }
 
     if (caminho === '/api/ml/analisar') return rotaRadar(request, env, url)
+
+    // As sugestoes prontas. Ler vem do banco — quem abre o aplicativo nao
+    // espera cinquenta chamadas a API. Montar so acontece quando nao ha nada
+    // gravado ou quando o cron da madrugada roda.
+    if (caminho === '/api/ml/sugestoes') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      const guardado = await lerDoCache(env, 'semana')
+      if (guardado && !url.searchParams.get('refazer')) {
+        return Response.json({ ...guardado, doCache: true })
+      }
+      let token = null
+      try { token = (await obterTokenParaLeitura(env)).token } catch (falha) {
+        return Response.json({ erro: falha.message, precisaReconectar: true }, { status: 401 })
+      }
+      try {
+        return Response.json({ ...(await montarSugestoes(env, { token })), doCache: false })
+      } catch (falha) {
+        // Se a montagem falhar mas houver algo velho guardado, melhor entregar
+        // o velho marcado do que uma tela vazia.
+        if (guardado) return Response.json({ ...guardado, doCache: true, avisoDeFalha: falha.message })
+        return Response.json({ erro: falha.message }, { status: 502 })
+      }
+    }
 
     // A descoberta. Existe desde que a permissao de leitura foi liberada no
     // formulario do aplicativo — antes tudo isto respondia 403.
