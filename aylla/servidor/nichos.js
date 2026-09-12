@@ -240,12 +240,23 @@ export function notaDoNicho({ visitasPorVendedor, vendedores, temLojaOficial }) 
   ]
   const presentes = sinais.filter((s) => s.valor !== null)
   const faltando = sinais.filter((s) => s.valor === null).map((s) => s.nome)
-  if (!presentes.length) return { nota: null, completo: false, faltando }
+  if (!presentes.length) return { nota: null, semProcura: true, completo: false, faltando }
 
   const soma = presentes.reduce((t, s) => t + s.peso, 0)
   const nota = presentes.reduce((t, s) => t + s.valor * (s.peso / soma), 0)
+
+  // Sem a atencao medida nao ha veredito. Ela pesa mais que os outros dois
+  // juntos, e redistribuir o peso dela faz um produto de procura
+  // desconhecida tirar 75 e aparecer como "bom lugar para entrar" — que e
+  // exatamente o conselho que faria ela comprar estoque no escuro.
+  //
+  // Entao a nota sai, porque o que foi medido vale, mas vem marcada: quem
+  // le sabe que falta o principal, e a ordenacao poe essas atras.
+  const semProcura = porAtencao === null
+
   return {
     nota: Math.round(Math.min(100, Math.max(0, nota))),
+    semProcura,
     completo: faltando.length === 0,
     cobertura: Math.round(soma * 100) / 100,
     faltando,
@@ -254,7 +265,7 @@ export function notaDoNicho({ visitasPorVendedor, vendedores, temLojaOficial }) 
 }
 
 /** A frase do nicho. Números sem porquê não ensinam ninguém a escolher. */
-export function explicarNicho({ nota, visitas, vendedores, visitasPorVendedor, temLojaOficial }) {
+export function explicarNicho({ nota, visitas, vendedores, visitasPorVendedor, temLojaOficial, semProcura }) {
   const pedacos = []
   if (Number.isFinite(visitas) && Number.isFinite(vendedores)) {
     pedacos.push(`${visitas.toLocaleString('pt-BR')} visitas em 30 dias divididas entre ${vendedores} ${vendedores === 1 ? 'vendedor' : 'vendedores'}`)
@@ -262,12 +273,21 @@ export function explicarNicho({ nota, visitas, vendedores, visitasPorVendedor, t
   if (Number.isFinite(visitasPorVendedor)) {
     pedacos.push(`${Math.round(visitasPorVendedor).toLocaleString('pt-BR')} por concorrente`)
   }
-  if (temLojaOficial) pedacos.push('mas há loja oficial na ficha, e ela costuma levar a caixa de compra')
+  if (!pedacos.length && Number.isFinite(vendedores)) {
+    pedacos.push(`${vendedores} ${vendedores === 1 ? 'vendedor disputa' : 'vendedores disputam'} esta ficha`)
+  }
+  if (temLojaOficial) pedacos.push('há loja oficial na ficha, e ela costuma levar a caixa de compra')
 
-  const veredito = nota === null ? 'Sem nota'
-    : nota >= 65 ? 'Esse é um bom lugar para entrar'
-      : nota >= 40 ? 'Dá para tentar, com cuidado'
-        : 'Aqui a atenção não sobra'
+  // Sem procura medida nao se emite veredito. Dizer "bom lugar para entrar"
+  // sobre um produto cuja demanda ninguem mediu e o pior conselho possivel
+  // para quem vai comprar estoque com dinheiro contado.
+  if (semProcura || nota === null) {
+    return `Não deu para medir a procura deste produto — ${pedacos.join('; ') || 'sem sinal suficiente'}.`
+  }
+
+  const veredito = nota >= 65 ? 'Esse é um bom lugar para entrar'
+    : nota >= 40 ? 'Dá para tentar, com cuidado'
+      : 'Aqui a atenção não sobra'
 
   return `${veredito}: ${pedacos.join('; ')}.`
 }

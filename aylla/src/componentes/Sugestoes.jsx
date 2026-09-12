@@ -77,13 +77,23 @@ export default function Sugestoes({ config, aoCadastrar }) {
               <span className="sub-sugestao">{s.categoria}</span>
             </button>
 
+            {/* Sem procura medida a faixa nao fica verde e a nota nao vira
+                veredito: ela sai cinza, com o numero entre parenteses. Verde
+                em produto de demanda desconhecida seria um convite a comprar
+                estoque no escuro. */}
             {n.nota !== null && n.nota !== undefined ? (
-              <div className={`faixa-entrada${n.nota >= 65 ? ' boa' : n.nota >= 40 ? ' media' : ' ruim'}`}>
-                <span className="rotulo-entrada">Dá para competir neste produto?</span>
-                <span className="nota-entrada">{n.nota}<small>/100</small></span>
+              <div className={`faixa-entrada${n.semProcura ? ' incerta' : n.nota >= 65 ? ' boa' : n.nota >= 40 ? ' media' : ' ruim'}`}>
+                <span className="rotulo-entrada">
+                  {n.semProcura ? 'Procura não medida' : 'Dá para competir neste produto?'}
+                </span>
+                <span className="nota-entrada">
+                  {n.semProcura ? `(${n.nota})` : n.nota}<small>/100</small>
+                </span>
                 <span className="frase-entrada">{s.resumoDoNicho}</span>
                 {!n.completo ? (
-                  <span className="frase-entrada tenue">Nota parcial — faltou: {n.faltando.join(', ')}.</span>
+                  <span className="frase-entrada tenue">
+                    A nota saiu de {porcento(n.cobertura, 0)} dos sinais — faltou: {n.faltando.join(', ')}.
+                  </span>
                 ) : null}
               </div>
             ) : null}

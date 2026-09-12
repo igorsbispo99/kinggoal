@@ -549,3 +549,5 @@ details.dobra > div { padding-top: 10px; }
 .nota-entrada small { font-size: .85rem; font-weight: 500; color: var(--tinta-3); }
 .frase-entrada { font-size: .8rem; line-height: 1.4; color: var(--tinta-2); }
 .frase-entrada.tenue { opacity: .8; font-size: .74rem; }
+.faixa-entrada.incerta { background: var(--afundado); border-color: var(--linha-forte); }
+.faixa-entrada.incerta .nota-entrada { color: var(--tinta-3); }

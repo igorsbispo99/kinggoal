@@ -118,3 +118,46 @@ test('sem visitas medidas, a nota sai parcial e não zerada', async () => {
   assert.deepEqual(r.faltando, ['atenção por concorrente'])
   assert.ok(r.nota > 0, 'o que foi medido continua valendo')
 })
+
+test('sem procura medida não se emite veredito', async () => {
+  const { notaDoNicho, explicarNicho } = await import('../servidor/nichos.js')
+  // Este é o caso real que apareceu na tela: 1 vendedor, loja oficial,
+  // visitas não medidas. A nota deu 75 e a frase dizia "Esse é um bom lugar
+  // para entrar" — sobre um produto cuja demanda ninguém mediu. É o pior
+  // conselho possível para quem vai comprar estoque com dinheiro contado.
+  const r = notaDoNicho({ visitasPorVendedor: null, vendedores: 1, temLojaOficial: true })
+  assert.equal(r.semProcura, true)
+  assert.ok(r.nota > 0, 'o que foi medido continua valendo')
+
+  const frase = explicarNicho({
+    nota: r.nota, semProcura: r.semProcura, visitas: null,
+    vendedores: 1, visitasPorVendedor: null, temLojaOficial: true,
+  })
+  assert.match(frase, /Não deu para medir a procura/)
+  assert.ok(!/bom lugar para entrar/.test(frase), 'nunca convidar a entrar sem medir a procura')
+})
+
+test('nota sem procura não disputa posição com nota inteira', () => {
+  // Mesma regra do ranking de produtos: nota parcial numa faixa atrás. Sem
+  // isso, produto de demanda desconhecida sobe ao topo justamente por não
+  // ter nada que o derrube.
+  const lista = [
+    { termo: 'sem procura', nota: { nota: 75, semProcura: true } },
+    { termo: 'medido', nota: { nota: 62, semProcura: false } },
+  ]
+  const faixa = (x) => (x.nota.semProcura ? 1 : 0)
+  lista.sort((a, b) => (faixa(a) - faixa(b)) || ((b.nota.nota ?? -1) - (a.nota.nota ?? -1)))
+  assert.equal(lista[0].termo, 'medido', '62 medido vale mais que 75 no escuro')
+})
+
+test('as visitas vão em lotes de vinte', () => {
+  // Três produtos com cinquenta anúncios cada dão cento e cinquenta ids numa
+  // URL só, e o Mercado Livre devolvia vazio sem erro — era a causa de
+  // "faltou: atenção por concorrente" em toda sugestão.
+  const ids = Array.from({ length: 47 }, (_, i) => `MLB${i}`)
+  const lotes = []
+  for (let i = 0; i < ids.length; i += 20) lotes.push(ids.slice(i, i + 20))
+  assert.equal(lotes.length, 3)
+  assert.equal(lotes[0].length, 20)
+  assert.equal(lotes[2].length, 7)
+})

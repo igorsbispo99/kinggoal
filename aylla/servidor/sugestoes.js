@@ -349,9 +349,15 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
     })
   }
 
-  // Ordena pela chance de competir, nao pela posicao na tendencia. O termo
+  // Ordena pela chance de competir, nao pela posicao na tendencia — o termo
   // mais buscado do Brasil costuma ser exatamente onde ela nao entra.
-  sugestoes.sort((a, b) => (b.nota.nota ?? -1) - (a.nota.nota ?? -1))
+  //
+  // Em duas faixas: primeiro as que tem procura medida, depois as que nao
+  // tem. Nota tirada sem o sinal principal nao pode disputar posicao com
+  // nota inteira; se disputar, produto de demanda desconhecida sobe ao topo
+  // por nao ter nada que o derrube. E a mesma regra do ranking de produtos.
+  const faixa = (x) => (x.nota.semProcura ? 1 : 0)
+  sugestoes.sort((a, b) => (faixa(a) - faixa(b)) || ((b.nota.nota ?? -1) - (a.nota.nota ?? -1)))
 
   const resultado = { sugestoes, descartadas, termosLidos: termos.length }
   await guardar(env, 'semana', resultado)

@@ -165,9 +165,19 @@ export function ordenarPorAderencia(destinos, termo) {
  */
 async function visitasDeAnuncios(ids, token) {
   if (!ids.length) return {}
-  const r = await pegar(`/visits/items?ids=${ids.join(',')}`, token, { cacheSegundos: 3600 })
-  if (!r.ok || !r.json || typeof r.json !== 'object') return {}
-  return r.json
+
+  // Em lotes de vinte. Tres produtos de catalogo com cinquenta anuncios cada
+  // sao cento e cinquenta ids numa URL so — e o Mercado Livre nao devolveu
+  // nada. Era esse o motivo de "faltou: atencao por concorrente" aparecer em
+  // toda sugestao: o pedido inteiro falhava e voltava vazio, sem erro.
+  const tamanhoDoLote = 20
+  const junto = {}
+  for (let i = 0; i < ids.length; i += tamanhoDoLote) {
+    const lote = ids.slice(i, i + tamanhoDoLote)
+    const r = await pegar(`/visits/items?ids=${lote.join(',')}`, token, { cacheSegundos: 3600 })
+    if (r.ok && r.json && typeof r.json === 'object') Object.assign(junto, r.json)
+  }
+  return junto
 }
 
 /**
@@ -214,7 +224,9 @@ async function produtosComDisputa(ids, token, limite) {
   for (const id of ids.slice(0, limite)) {
     const r = await pegar(`/products/${id}/items?limit=50`, token, { cacheSegundos: 3600 })
     if (!r.ok || !r.json) continue
-    const anuncios = (r.json.results || []).map((a) => ({
+    // O paging ja diz quantos disputam; dos anuncios em si basta uma
+    // amostra — e cada um custa lugar no lote de visitas.
+    const anuncios = (r.json.results || []).slice(0, 10).map((a) => ({
       id: a.item_id || a.id,
       price: Number(a.price),
       seller_id: a.seller_id,
