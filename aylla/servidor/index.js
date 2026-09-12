@@ -11,6 +11,7 @@ import {
   buscar, enriquecer, diagnosticar, resumoDaConexao,
 } from './mercadolivre.js'
 import { explorar, mapearRaizes } from './explorador.js'
+import { categoria, raizes } from './categorias.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -262,6 +263,21 @@ export default {
     }
 
     if (caminho === '/api/ml/analisar') return rotaRadar(request, env, url)
+
+    // A arvore de categorias: o unico caminho de descoberta que o Mercado
+    // Livre deixou de pe, e o que responde "eu nao sei o que pesquisar".
+    if (caminho === '/api/ml/categorias') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      let token = null
+      try { token = (await obterTokenParaLeitura(env)).token } catch { /* categoria le sem token */ }
+      const id = url.searchParams.get('id')
+      try {
+        const dados = id ? await categoria(env, id, token) : await raizes(env, token)
+        return Response.json(dados, { headers: { 'cache-control': 'private, max-age=3600' } })
+      } catch (falha) {
+        return Response.json({ erro: falha.message, status: falha.status || 502 }, { status: 502 })
+      }
+    }
 
     // A sonda larga. Existe porque adivinhar o que a API ainda responde
     // custou dias, e medir custa uma requisicao.

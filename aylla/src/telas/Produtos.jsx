@@ -7,6 +7,7 @@ import {
 import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
 import RadarMercado from '../componentes/Radar.jsx'
+import Categorias from '../componentes/Categorias.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
 const faixaDe = (r) => (r.nota === null ? 'sem' : r.completo ? 'completo' : 'parcial')
@@ -66,11 +67,26 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
         <section className="cartao">
           <p className="vazio">
             Nenhum produto ainda.<br /><br />
-            Cadastre o que você estiver estudando, mesmo sem ter decidido comprar.
-            Guardar as pesquisas é o que permite comparar depois, com o dólar de outro dia.
+            Não sabe por onde começar? A árvore abaixo mostra onde tem menos gente disputando.
           </p>
         </section>
       ) : null}
+
+      {/* Antes dos produtos, porque no comeco nao ha produto nenhum: a
+          primeira pergunta dela nao e "quanto rende este" e sim "o que
+          vender". */}
+      <Categorias
+        aoEscolher={(cat) => setEditando({
+          ...PRODUTO_VAZIO,
+          categoria: cat.nome,
+          observacoes: `${cat.anuncios.toLocaleString('pt-BR')} anúncios concorrentes nesta categoria (${cat.id}).`,
+          pesquisa: {
+            anunciosConcorrentes: cat.anuncios,
+            origem: `Categoria ${cat.nome} no Mercado Livre`,
+            medidoEm: new Date().toISOString(),
+          },
+        })}
+      />
 
       <div className="lista-cartoes">
         {ranqueados.map((r, i) => {
