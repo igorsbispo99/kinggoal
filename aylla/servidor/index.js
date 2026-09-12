@@ -13,7 +13,7 @@ import {
 import { explorar, mapearRaizes } from './explorador.js'
 import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
-import { montarSugestoes, lerDoCache } from './sugestoes.js'
+import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -287,6 +287,18 @@ export default {
     // As sugestoes prontas. Ler vem do banco — quem abre o aplicativo nao
     // espera cinquenta chamadas a API. Montar so acontece quando nao ha nada
     // gravado ou quando o cron da madrugada roda.
+    // Onde o funil corta. "Nenhuma sugestao fechou" nao diz nada, e eu nao
+    // alcanco a API daqui para descobrir.
+    if (caminho === '/api/ml/sugestoes/depurar') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      try {
+        const { token } = await obterTokenParaLeitura(env)
+        return Response.json(await depurarFunil(env, { token, termo: url.searchParams.get('q') }))
+      } catch (falha) {
+        return Response.json({ erro: falha.message }, { status: 502 })
+      }
+    }
+
     if (caminho === '/api/ml/sugestoes') {
       if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
       const guardado = await lerDoCache(env, 'semana')

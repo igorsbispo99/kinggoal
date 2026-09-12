@@ -20,9 +20,11 @@
 // configurações dela (ICMS do estado, dólar do dia, margem alvo). Aqui sai
 // só o que vem do Mercado Livre.
 
-import { maisVendidos, tendencias, buscarNoCatalogo, comissaoReal } from './descoberta.js'
+import { maisVendidos, tendencias, comissaoReal, ondeIssoVive } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
 
+const API = 'https://api.mercadolibre.com'
+const SITE = 'MLB'
 const VALIDADE_MS = 24 * 60 * 60 * 1000
 
 async function prepararCache(env) {
@@ -67,7 +69,89 @@ const mediana = (lista) => {
  * categoria, campeões). Por isso o passo é pequeno e o resultado fica
  * gravado — quem abre o aplicativo lê do banco, não da API.
  */
-export async function montarSugestoes(env, { token, quantas = 8 }) {
+/**
+ * Roda o funil para um termo so e devolve o cru de cada passo.
+ *
+ * Existe porque "nenhuma sugestao fechou" nao diz onde cortou, e eu nao
+ * alcanco a API daqui para descobrir sozinho. Sem credencial nenhuma na
+ * resposta: so formatos e contagens.
+ */
+export async function depurarFunil(env, { token, termo = null }) {
+  const passos = []
+  const anotar = (nome, dados) => { passos.push({ nome, ...dados }); return dados }
+
+  let alvo = termo
+  if (!alvo) {
+    const t = await tendencias(env, { token })
+    alvo = t.termos[0] ? t.termos[0].termo : null
+    anotar('tendencias', { ok: Boolean(alvo), quantos: t.termos.length, primeiro: alvo })
+  }
+  if (!alvo) return { passos }
+
+  // Passo 1: em que categoria esse termo vive
+  let porDominio = null
+  try {
+    porDominio = await ondeIssoVive(env, { termo: alvo, token })
+    anotar('domain_discovery', { ok: true, quantos: porDominio.length, amostra: porDominio.slice(0, 2) })
+  } catch (e) { anotar('domain_discovery', { ok: false, erro: e.message }) }
+
+  // Passo 2: o catalogo devolve category_id? Esta e a duvida principal.
+  try {
+    const r = await fetch(
+      `${API}/products/search?site_id=${SITE}&status=active&q=${encodeURIComponent(alvo)}&limit=2`,
+      { headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) } },
+    )
+    const j = await r.json().catch(() => null)
+    const primeiro = j && j.results && j.results[0]
+    anotar('products_search', {
+      ok: r.ok,
+      status: r.status,
+      quantos: (j && j.results && j.results.length) || 0,
+      camposDoPrimeiro: primeiro ? Object.keys(primeiro) : null,
+      temCategoryId: primeiro ? primeiro.category_id !== undefined : null,
+    })
+  } catch (e) { anotar('products_search', { ok: false, erro: e.message }) }
+
+  const catId = porDominio && porDominio[0] ? porDominio[0].categoriaId : null
+
+  // Passo 3: os campeoes vem como ITEM ou como PRODUCT? Muda o multiget.
+  if (catId) {
+    try {
+      const r = await fetch(`${API}/highlights/${SITE}/category/${catId}`, {
+        headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      })
+      const j = await r.json().catch(() => null)
+      const conteudo = (j && j.content) || []
+      anotar('highlights', {
+        ok: r.ok,
+        status: r.status,
+        categoria: catId,
+        quantos: conteudo.length,
+        tipos: [...new Set(conteudo.map((c) => c.type || 'sem type'))],
+        primeiros: conteudo.slice(0, 3),
+      })
+
+      const ids = conteudo.filter((c) => c.id).slice(0, 3).map((c) => c.id)
+      if (ids.length) {
+        const m = await fetch(`${API}/items?ids=${ids.join(',')}&attributes=id,title,price,sold_quantity,date_created`, {
+          headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        })
+        const mj = await m.json().catch(() => null)
+        const entrada = Array.isArray(mj) ? mj[0] : null
+        anotar('multiget_items', {
+          ok: m.ok,
+          status: m.status,
+          codigos: Array.isArray(mj) ? mj.map((e) => e.code) : null,
+          camposDoCorpo: entrada && entrada.body ? Object.keys(entrada.body) : null,
+        })
+      }
+    } catch (e) { anotar('highlights', { ok: false, erro: e.message }) }
+  }
+
+  return { termo: alvo, passos }
+}
+
+export async function montarSugestoes(env, { token, quantas = 6 }) {
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
   const descartadas = []
@@ -75,27 +159,48 @@ export async function montarSugestoes(env, { token, quantas = 8 }) {
   for (const t of termos) {
     if (sugestoes.length >= quantas) break
 
-    let catalogo
-    try { catalogo = await buscarNoCatalogo(env, { termo: t.termo, token, limite: 3 }) } catch { continue }
-    const primeiro = catalogo.produtos[0]
-    if (!primeiro || !primeiro.categoriaId) {
-      descartadas.push({ termo: t.termo, porque: 'sem produto de catálogo' })
+    // A categoria sai do domain_discovery, nao do catalogo. /products/search
+    // responde 200 mas nao garante category_id no resultado, e depender dele
+    // fazia o funil cortar tudo caladamente. O domain_discovery existe
+    // exatamente para traduzir texto em categoria, e devolve category_id
+    // sempre — foi assim que a sonda o mediu.
+    let destinos = []
+    try { destinos = await ondeIssoVive(env, { termo: t.termo, token }) } catch (e) {
+      descartadas.push({ termo: t.termo, porque: `domain_discovery falhou: ${e.message}` })
+      continue
+    }
+    const destino = destinos[0]
+    if (!destino) {
+      descartadas.push({ termo: t.termo, porque: 'nenhuma categoria reconhecida para o termo' })
       continue
     }
 
     let cat
-    try { cat = await lerCategoria(env, primeiro.categoriaId, token) } catch { continue }
+    try { cat = await lerCategoria(env, destino.categoriaId, token) } catch (e) {
+      descartadas.push({ termo: t.termo, porque: `categoria ${destino.categoriaId} não abriu` })
+      continue
+    }
 
     let campeoes
     try {
       campeoes = await maisVendidos(env, {
-        categoria: primeiro.categoriaId, token, quantos: 12, totalDaCategoria: cat.anuncios,
+        categoria: destino.categoriaId, token, quantos: 12, totalDaCategoria: cat.anuncios,
       })
-    } catch { continue }
+    } catch (e) {
+      descartadas.push({ termo: t.termo, porque: `mais vendidos falhou: ${e.message}` })
+      continue
+    }
 
     const analise = campeoes.analise
     if (!analise || analise.vazio) {
-      descartadas.push({ termo: t.termo, porque: 'sem campeões para medir' })
+      descartadas.push({
+        termo: t.termo,
+        categoria: cat.nome,
+        porque: 'sem campeões para medir',
+        tiposVistos: campeoes.tiposVistos || null,
+        codigosDoMultiget: campeoes.codigosDoMultiget || null,
+        erroNoMultiget: campeoes.erroNoMultiget || null,
+      })
       continue
     }
 
@@ -109,7 +214,7 @@ export async function montarSugestoes(env, { token, quantas = 8 }) {
     if (precoMedianoDaCategoria) {
       try {
         const t = await comissaoReal(env, {
-          categoria: primeiro.categoriaId,
+          categoria: destino.categoriaId,
           preco: Math.round(precoMedianoDaCategoria),
           token,
         })
@@ -122,7 +227,7 @@ export async function montarSugestoes(env, { token, quantas = 8 }) {
       termo: t.termo,
       posicaoNaTendencia: t.posicao,
       linkDaBusca: t.link,
-      produtoExemplo: primeiro.nome,
+      produtoExemplo: campeoes.itens[0] ? campeoes.itens[0].title : t.termo,
       categoria: cat.nome,
       categoriaId: cat.id,
       caminho: cat.caminho.map((c) => c.nome),

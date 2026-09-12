@@ -160,8 +160,18 @@ export default function Sugestoes({ config, aoCadastrar }) {
 
       {dados && dados.sugestoes && !dados.sugestoes.length && !carregando ? (
         <Aviso nivel="atencao" titulo="Nenhuma sugestão fechou">
-          As tendências vieram, mas nenhuma tinha campeões com dados suficientes para medir.
-          Tente atualizar daqui a pouco.
+          <span>
+            {dados.termosLidos
+              ? `Li ${dados.termosLidos} tendências e nenhuma chegou até o fim do funil.`
+              : 'As tendências não vieram.'}
+          </span>
+          {/* O motivo aparece. Vazio mudo obriga a adivinhar, e adivinhar
+              foi o que custou os ultimos dias deste projeto. */}
+          {dados.descartadas && dados.descartadas.length ? (
+            <span>
+              Primeiros motivos: {dados.descartadas.slice(0, 3).map((d) => `"${d.termo}" — ${d.porque}`).join('; ')}.
+            </span>
+          ) : null}
         </Aviso>
       ) : null}
 

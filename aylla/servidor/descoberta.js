@@ -117,20 +117,28 @@ export async function maisVendidos(env, { categoria, token, quantos = 12, totalD
     throw erro
   }
   const conteudo = (r.json && r.json.content) || []
-  const ids = conteudo
-    .filter((c) => c.id && (c.type === 'ITEM' || !c.type))
-    .slice(0, quantos)
-    .map((c) => c.id)
+  // Sem filtrar por type. /highlights devolve ITEM em umas categorias e
+  // PRODUCT em outras, e descartar o que nao fosse ITEM zerava categorias
+  // inteiras em silencio. Os tipos vistos voltam na resposta para a causa
+  // aparecer em vez de virar "nenhuma sugestao fechou".
+  const tiposVistos = [...new Set(conteudo.map((c) => c.type || 'sem-type'))]
+  const ids = conteudo.filter((c) => c.id).slice(0, quantos).map((c) => c.id)
 
-  if (!ids.length) return { categoria, itens: [], semItens: true }
+  if (!ids.length) return { categoria, itens: [], semItens: true, tiposVistos }
 
   const campos = 'id,title,price,sold_quantity,date_created,permalink,seller_id,official_store_id,catalog_listing,shipping'
   const multi = await pegar(`/items?ids=${ids.join(',')}&attributes=${campos}`, token, { cacheSegundos: 1800 })
-  if (!multi.ok) return { categoria, itens: [], ids, erroNoMultiget: multi.status }
+  if (!multi.ok) return { categoria, itens: [], ids, tiposVistos, erroNoMultiget: multi.status }
 
-  const itens = (Array.isArray(multi.json) ? multi.json : [])
-    .filter((e) => e.code === 200 && e.body)
-    .map((e) => e.body)
+  const entradas = Array.isArray(multi.json) ? multi.json : []
+  const itens = entradas.filter((e) => e.code === 200 && e.body).map((e) => e.body)
+
+  if (!itens.length) {
+    return {
+      categoria, itens: [], tiposVistos, semItens: true,
+      codigosDoMultiget: [...new Set(entradas.map((e) => e.code))],
+    }
+  }
 
   // O motor de leitura de mercado volta inteiro aqui. Ele foi escrito para
   // uma busca por texto, mas o que ele mede — quem ocupa o topo, quanto
@@ -143,7 +151,7 @@ export async function maisVendidos(env, { categoria, token, quantos = 12, totalD
     enriquecidos: itens,
   })
 
-  return { categoria, itens, analise, doCache: r.doCache }
+  return { categoria, itens, analise, tiposVistos, doCache: r.doCache }
 }
 
 /** Busca no catálogo — o que sobrou de busca por texto, e funciona. */
