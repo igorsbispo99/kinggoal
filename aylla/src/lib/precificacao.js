@@ -1,16 +1,21 @@
 import { custosDaVenda } from './marketplaces.js'
 
 /** Resultado de uma venda a um preco dado, por unidade e pelo lote inteiro. */
-export function calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade = 1, outrosPorUnidade = 0 }) {
+export function calcularVenda({
+  mp, tipoId, preco, custoUnitario, quantidade = 1, outrosPorUnidade = 0, comissaoMedida = null,
+}) {
   const p = Number(preco) || 0
   const qtd = Math.max(1, Number(quantidade) || 1)
-  const custos = custosDaVenda(mp, p, tipoId)
+  const custos = custosDaVenda(mp, p, tipoId, { comissaoMedida })
   const lucroUnitario = p - custos.total - custoUnitario - outrosPorUnidade
   const margem = p > 0 ? lucroUnitario / p : 0
   const retorno = custoUnitario > 0 ? lucroUnitario / custoUnitario : 0
   return {
     preco: p,
     custos,
+    comissaoMedida: comissaoMedida === null || comissaoMedida === undefined || comissaoMedida === ''
+      ? null
+      : Number(comissaoMedida),
     custoUnitario,
     lucroUnitario,
     margem,
@@ -28,12 +33,14 @@ export function calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade = 1
  * (o frete grátis do ML acima de R$ 79, o teto de comissão da Shopee).
  * Formula fechada erraria justamente nos degraus, que e onde ela mais decide.
  */
-export function precoParaMargem({ mp, tipoId, custoUnitario, margemAlvo, outrosPorUnidade = 0 }) {
+export function precoParaMargem({
+  mp, tipoId, custoUnitario, margemAlvo, outrosPorUnidade = 0, comissaoMedida = null,
+}) {
   const alvo = Number(margemAlvo) || 0
   if (alvo >= 0.95) return null
 
   const margemEm = (p) =>
-    calcularVenda({ mp, tipoId, preco: p, custoUnitario, outrosPorUnidade }).margem
+    calcularVenda({ mp, tipoId, preco: p, custoUnitario, outrosPorUnidade, comissaoMedida }).margem
 
   let baixo = 0.01
   let alto = Math.max(10, (custoUnitario + outrosPorUnidade + 100) * 25)

@@ -15,6 +15,10 @@ export const FORMULARIO_VAZIO = {
   outrosCustosBRL: '',
   precoVenda: '',
   canal: 'mercadolivre',
+  categoria: '',
+  // Percentual confirmado pelo Mercado Livre para a categoria, quando o
+  // calculo veio de um produto que ja perguntou.
+  comissaoMedida: null,
 }
 
 export default function Calculadora({ config, setConfig, formulario, setFormulario, aoSalvar, aoAbrirAjustes }) {
@@ -45,18 +49,21 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
   const preco = paraNumero(f.precoVenda)
   const quantidade = importacao.quantidade
 
+  // So vale para o Mercado Livre: a medicao veio da API dele.
+  const comissaoMedida = mp.id === 'mercadolivre' ? (f.comissaoMedida ?? null) : null
+
   const venda = useMemo(
-    () => calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade }),
-    [mp, tipoId, preco, custoUnitario, quantidade],
+    () => calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida }),
+    [mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida],
   )
 
   const precoAlvo = useMemo(
-    () => precoParaMargem({ mp, tipoId, custoUnitario, margemAlvo: config.margemAlvo }),
-    [mp, tipoId, custoUnitario, config.margemAlvo],
+    () => precoParaMargem({ mp, tipoId, custoUnitario, margemAlvo: config.margemAlvo, comissaoMedida }),
+    [mp, tipoId, custoUnitario, config.margemAlvo, comissaoMedida],
   )
   const equilibrio = useMemo(
-    () => pontoDeEquilibrio({ mp, tipoId, custoUnitario }),
-    [mp, tipoId, custoUnitario],
+    () => pontoDeEquilibrio({ mp, tipoId, custoUnitario, comissaoMedida }),
+    [mp, tipoId, custoUnitario, comissaoMedida],
   )
 
   const canais = useMemo(
@@ -169,7 +176,14 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
           <span className="etapa">Marketplace</span>
         </header>
 
-        {!mp.confirmadoEm ? (
+        {comissaoMedida !== null ? (
+          <Aviso nivel="info" titulo="Comissão confirmada pelo Mercado Livre">
+            {porcento(comissaoMedida, 1)} é o que ele cobra na categoria
+            {f.categoria ? ` "${f.categoria}"` : ' deste produto'} — respondido pela API dele, não estimado por mim.
+          </Aviso>
+        ) : null}
+
+        {comissaoMedida === null && !mp.confirmadoEm ? (
           <Aviso nivel="atencao" titulo={`A comissão do ${mp.nome} ainda é um palpite meu`}>
             {porcento(((mp.tipos.find((t) => t.id === tipoId) || mp.tipos[0]).comissao), 0)} é o valor de referência que eu coloquei — a comissão real muda por categoria e por reputação.
             Confira no painel de vendedor dela e marque como confirmada nos Ajustes. Até lá, trate o lucro aqui como aproximado.

@@ -26,6 +26,12 @@ export const FORNECEDOR_VAZIO = {
 export const PRODUTO_VAZIO = {
   nome: '',
   categoria: '',
+  // Id da categoria no Mercado Livre. E ele que permite perguntar a
+  // comissao real; o nome sozinho nao serve para nada na API.
+  categoriaId: '',
+  // { percentual, custoFixo, tipo, medidoEm } respondido por
+  // /sites/MLB/listing_prices. Null enquanto ninguem perguntou.
+  tarifa: null,
   pesoGramas: '',
   linkReferencia: '',
   canal: 'mercadolivre',

@@ -73,10 +73,27 @@ function custoFixoDoPreco(mp, preco, tipoId) {
 /**
  * Custos que dependem do preço de venda, por unidade.
  * Separado da margem de propósito: é reaproveitado pela busca do preço alvo.
+ *
+ * `comissaoMedida` é a percentagem que o próprio Mercado Livre respondeu
+ * para aquela categoria, em /sites/MLB/listing_prices. Quando existe, ela
+ * manda: a tabela daqui é uma média que eu digitei à mão, e comissão varia
+ * de 10% a 19% entre categorias. Errar isso é errar a margem inteira.
+ *
+ * Só a percentagem vem da API. O custo fixo por unidade continua saindo
+ * das faixas daqui porque ele depende do preço, não da categoria — é a
+ * mesma escada para o site todo.
  */
-export function custosDaVenda(mp, preco, tipoId) {
+export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null } = {}) {
   const tipo = (mp.tipos || []).find((t) => t.id === tipoId) || (mp.tipos || [])[0]
-  const bruta = preco * (tipo ? tipo.comissao : 0)
+  // Number(null) e zero e Number.isFinite(0) e verdadeiro: testar so a
+  // finitude faria a comissao virar 0% sempre que nao houvesse medicao.
+  const medida = comissaoMedida === null || comissaoMedida === undefined || comissaoMedida === ''
+    ? null
+    : Number(comissaoMedida)
+  const percentual = medida !== null && Number.isFinite(medida) && medida >= 0
+    ? medida
+    : (tipo ? tipo.comissao : 0)
+  const bruta = preco * percentual
   const comissao = mp.tetoComissao ? Math.min(bruta, mp.tetoComissao) : bruta
   const fixo = custoFixoDoPreco(mp, preco, tipoId)
   const frete = mp.freteGratisAcimaDe

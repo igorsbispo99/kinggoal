@@ -248,6 +248,9 @@ select.entrada-select:focus { border-color: var(--verde); outline: none; box-sha
 .aviso.atencao { background: var(--atencao-fundo); border-color: var(--atencao); color: var(--tinta-2); }
 .aviso.critico { background: var(--negativo-fundo); border-color: var(--negativo); color: var(--tinta-2); }
 .aviso .tenue { opacity: .78; font-size: .79rem; }
+/* Aviso embrulha os filhos num span so: sem isto, dois <span> irmaos
+   viram uma frase grudada na outra. */
+.aviso > span { display: flex; flex-direction: column; gap: 3px; }
 
 /* ---------- botoes ---------- */
 

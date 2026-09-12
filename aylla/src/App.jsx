@@ -99,6 +99,11 @@ export default function App() {
       nome: produto.nome,
       canal: produto.canal || 'mercadolivre',
       precoVenda: String(produto.precoVendaAlvo || ''),
+      // A comissao que o Mercado Livre confirmou para a categoria dele viaja
+      // junto: calcular no produto com um numero e na calculadora com outro
+      // seria dar duas respostas para a mesma pergunta.
+      categoria: produto.categoria || '',
+      comissaoMedida: produto.tarifa ? produto.tarifa.percentual : null,
       produtoUSD: paraCampo(linha.oferta.precoUSD),
       freteUSD: paraCampo(linha.oferta.freteUSD),
       quantidade: String(linha.quantidade),

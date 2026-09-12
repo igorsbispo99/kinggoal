@@ -91,3 +91,34 @@ test('o lucro do lote multiplica pela quantidade', () => {
   assert.ok(perto(v.lucroLote, v.lucroUnitario * 10))
   assert.ok(perto(v.investimentoLote, 1952.8, 0.1))
 })
+
+test('comissão medida na API manda sobre a tabela digitada à mão', () => {
+  const mp = MARKETPLACES.mercadolivre
+  const tabela = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60 })
+  const medida = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, comissaoMedida: 0.185 })
+
+  assert.ok(perto(tabela.custos.comissao, 200 * 0.12), 'sem medição, a tabela vale')
+  assert.ok(perto(medida.custos.comissao, 200 * 0.185), 'com medição, o número do Mercado Livre vale')
+  assert.ok(medida.lucroUnitario < tabela.lucroUnitario, '6,5 pontos de comissão a mais tiram lucro')
+})
+
+test('ausência de medição nunca vira comissão zero', () => {
+  // Number(null) é 0 e Number.isFinite(0) é true: testar só a finitude fazia
+  // a comissão sumir e o produto parecer muito mais lucrativo do que é.
+  const mp = MARKETPLACES.mercadolivre
+  for (const vazio of [null, undefined, '']) {
+    const v = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, comissaoMedida: vazio })
+    assert.ok(perto(v.custos.comissao, 24), `comissaoMedida = ${String(vazio)} tem que cair na tabela`)
+  }
+})
+
+test('o preço para a margem alvo respeita a comissão medida', () => {
+  const mp = MARKETPLACES.mercadolivre
+  const base = { mp, tipoId: 'classico', custoUnitario: 50, margemAlvo: 0.3 }
+  const comTabela = precoParaMargem(base)
+  const comMedida = precoParaMargem({ ...base, comissaoMedida: 0.19 })
+  assert.ok(comMedida > comTabela, 'comissão maior exige preço maior para a mesma margem')
+
+  const conferido = calcularVenda({ ...base, preco: comMedida, comissaoMedida: 0.19 })
+  assert.ok(conferido.margem >= 0.3 - 0.001, 'a bissecção continua entregando a margem pedida')
+})

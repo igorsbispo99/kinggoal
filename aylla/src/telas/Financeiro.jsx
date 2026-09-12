@@ -36,7 +36,14 @@ export default function Financeiro({ config, produtos, fornecedores, lotes, vend
     return <FormularioVenda
       venda={novaVenda} produtos={produtos} estoque={estoque} config={config}
       aoCancelar={() => setNovaVenda(null)}
-      aoSalvar={(v) => { aoMudarVendas(salvarVenda(v, { config, lotes, vendas })); setNovaVenda(null) }}
+      aoSalvar={(v) => {
+        // A comissao medida mora no produto; a venda so a carrega para que
+        // o caixa cobre a mesma taxa que a ficha prometeu.
+        const doProduto = produtos.find((p) => p.id === v.produtoId)
+        const comissaoMedida = doProduto && doProduto.tarifa ? doProduto.tarifa.percentual : null
+        aoMudarVendas(salvarVenda({ ...v, comissaoMedida }, { config, lotes, vendas }))
+        setNovaVenda(null)
+      }}
       aoExcluir={(id) => { aoMudarVendas(excluirVenda(id)); setNovaVenda(null) }}
     />
   }

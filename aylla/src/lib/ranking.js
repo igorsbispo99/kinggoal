@@ -116,8 +116,15 @@ export function pontuarProduto({ produto, fornecedores, config }) {
   const mp = config.marketplaces[produto.canal] || config.marketplaces.mercadolivre
   const tipoId = config.tipos[mp.id] || (mp.tipos[0] && mp.tipos[0].id)
 
+  // A comissao medida na API entra aqui: sem ela o ranking compara produtos
+  // com a comissao media que eu digitei, e ela varia de 10% a 19% entre
+  // categorias — diferenca suficiente para inverter duas posicoes.
+  const comissaoMedida = produto.tarifa ? produto.tarifa.percentual : null
+
   const venda = melhor && preco > 0
-    ? calcularVenda({ mp, tipoId, preco, custoUnitario: melhor.custoUnitario, quantidade: melhor.quantidade })
+    ? calcularVenda({
+      mp, tipoId, preco, custoUnitario: melhor.custoUnitario, quantidade: melhor.quantidade, comissaoMedida,
+    })
     : null
 
   const pesquisa = produto.pesquisa || {}

@@ -9,6 +9,7 @@ import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
 import RadarMercado from '../componentes/Radar.jsx'
 import Categorias from '../componentes/Categorias.jsx'
 import Descobrir from '../componentes/Descobrir.jsx'
+import CategoriaDoProduto from '../componentes/CategoriaDoProduto.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
 const faixaDe = (r) => (r.nota === null ? 'sem' : r.completo ? 'completo' : 'parcial')
@@ -84,6 +85,7 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
         aoEscolher={(cat) => setEditando({
           ...PRODUTO_VAZIO,
           categoria: cat.nome,
+          categoriaId: cat.id,
           observacoes: `${cat.anuncios.toLocaleString('pt-BR')} anúncios concorrentes nesta categoria (${cat.id}).`,
           pesquisa: {
             anunciosConcorrentes: cat.anuncios,
@@ -167,6 +169,8 @@ function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir, radar }) {
         <CampoTexto rotulo="Observações" valor={p.observacoes} aoMudar={trocar('observacoes')} placeholder="pesa pouco, cabe no frete barato" largo />
       </div>
       <p className="dica">O peso importa mais do que parece: produto leve e pequeno é o que sobra margem depois do frete grátis obrigatório.</p>
+
+      <CategoriaDoProduto produto={p} aoMudar={setP} />
 
       <RadarMercado
         estado={radar}

@@ -97,7 +97,11 @@ export function salvarVenda(venda, { config, lotes, vendas }) {
 
   const mp = config.marketplaces[venda.canal] || config.marketplaces.mercadolivre
   const tipoId = config.tipos[mp.id] || (mp.tipos[0] && mp.tipos[0].id)
-  const resultado = calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade })
+  // A taxa gravada na venda tem que ser a mesma que a ficha do produto
+  // mostrou. Se o produto tem comissao medida e aqui usasse a media, o
+  // lucro do caixa nunca bateria com o lucro previsto.
+  const comissaoMedida = venda.comissaoMedida ?? null
+  const resultado = calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida })
 
   if (venda.id) {
     return salvar(CHAVE_VENDAS, lista.map((v) => (v.id === venda.id ? { ...v, ...venda, quantidade } : v)))
