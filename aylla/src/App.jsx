@@ -1,25 +1,34 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Calculadora, { FORMULARIO_VAZIO } from './telas/Calculadora.jsx'
-import Salvos from './telas/Salvos.jsx'
+import Produtos from './telas/Produtos.jsx'
+import Fornecedores from './telas/Fornecedores.jsx'
 import Ajustes from './telas/Ajustes.jsx'
-import { IconeCalcular, IconeSalvos, IconeAjustes, Logotipo } from './componentes/Icones.jsx'
+import { IconeCalcular, IconeProdutos, IconeFornecedores, IconeAjustes, Logotipo } from './componentes/Icones.jsx'
 import { carregarConfig, salvarConfig } from './lib/configuracoes.js'
-import { ler, gravar, novoId } from './lib/armazenamento.js'
-import { reais } from './lib/formato.js'
+import { listarProdutos, listarFornecedores, salvarProduto, converterSimulacoesEmProdutos } from './lib/catalogo.js'
+import { ler, gravar } from './lib/armazenamento.js'
+import { reais, paraCampo } from './lib/formato.js'
 
 const ABAS = [
   { id: 'calcular', nome: 'Calcular', Icone: IconeCalcular },
-  { id: 'salvos', nome: 'Salvos', Icone: IconeSalvos },
+  { id: 'produtos', nome: 'Produtos', Icone: IconeProdutos },
+  { id: 'fornecedores', nome: 'Fornecedores', Icone: IconeFornecedores },
   { id: 'ajustes', nome: 'Ajustes', Icone: IconeAjustes },
 ]
 
 export default function App() {
   const [aba, setAba] = useState('calcular')
   const [config, setConfigBruto] = useState(carregarConfig)
-  const [salvos, setSalvos] = useState(() => ler('simulacoes', []))
   const [tema, setTemaBruto] = useState(() => ler('tema', 'sistema'))
   const [formulario, setFormulario] = useState(FORMULARIO_VAZIO)
   const [instalador, setInstalador] = useState(null)
+
+  // As simulações da fase 1 viram produtos, sem apagar o original.
+  const [produtos, setProdutos] = useState(() => {
+    converterSimulacoesEmProdutos()
+    return listarProdutos()
+  })
+  const [fornecedores, setFornecedores] = useState(listarFornecedores)
 
   const setConfig = (novo) => { setConfigBruto(novo); salvarConfig(novo) }
   const setTema = (novo) => { setTemaBruto(novo); gravar('tema', novo) }
@@ -36,35 +45,43 @@ export default function App() {
     return () => window.removeEventListener('beforeinstallprompt', capturar)
   }, [])
 
-  function salvarSimulacao(dados) {
-    const item = {
-      id: novoId(),
-      nome: dados.formulario.nome.trim(),
-      criadoEm: new Date().toISOString(),
-      formulario: dados.formulario,
-      custoUnitario: dados.custoUnitario,
-      lucroUnitario: dados.lucroUnitario,
-      margem: dados.margem,
-      lucroLote: dados.lucroLote,
-      investimento: dados.investimento,
-      cambio: config.ptax,
-    }
-    const lista = [item, ...salvos]
-    setSalvos(lista)
-    gravar('simulacoes', lista)
-    setAba('salvos')
-  }
-
-  function excluirSimulacao(id) {
-    const lista = salvos.filter((s) => s.id !== id)
-    setSalvos(lista)
-    gravar('simulacoes', lista)
-  }
-
-  function abrirSimulacao(item) {
-    setFormulario({ ...FORMULARIO_VAZIO, ...item.formulario })
-    setAba('calcular')
+  function irPara(novaAba) {
+    setAba(novaAba)
     window.scrollTo({ top: 0 })
+  }
+
+  /** A calculadora salva o estudo como produto, para não se perder. */
+  function salvarComoProduto(dados) {
+    const f = dados.formulario
+    setProdutos(salvarProduto({
+      nome: f.nome.trim(),
+      canal: f.canal,
+      precoVendaAlvo: f.precoVenda,
+      simulacao: f,
+      resumo: {
+        custoUnitario: dados.custoUnitario,
+        lucroUnitario: dados.lucroUnitario,
+        margem: dados.margem,
+        investimento: dados.investimento,
+        cambio: config.ptax,
+      },
+    }))
+    irPara('produtos')
+  }
+
+  /** Vai do produto para a calculadora já com os números do melhor fornecedor. */
+  function calcularComFornecedor(produto, linha) {
+    setFormulario({
+      ...FORMULARIO_VAZIO,
+      ...(produto.simulacao || {}),
+      nome: produto.nome,
+      canal: produto.canal || 'mercadolivre',
+      precoVenda: String(produto.precoVendaAlvo || ''),
+      produtoUSD: paraCampo(linha.oferta.precoUSD),
+      freteUSD: paraCampo(linha.oferta.freteUSD),
+      quantidade: String(linha.quantidade),
+    })
+    irPara('calcular')
   }
 
   const dolarEfetivo = useMemo(
@@ -79,12 +96,7 @@ export default function App() {
           <Logotipo />
           <h1>Aylla Imports</h1>
         </div>
-        <button
-          type="button"
-          className="selo-cambio"
-          onClick={() => setAba('ajustes')}
-          style={{ background: 'none', border: 0, cursor: 'pointer' }}
-        >
+        <button type="button" className="selo-cambio" onClick={() => irPara('ajustes')}>
           <b>{reais(dolarEfetivo)}</b>
           dólar com IOF
         </button>
@@ -94,7 +106,7 @@ export default function App() {
         {instalador ? (
           <div className="aviso info">
             <b>Coloque na tela inicial</b>
-            <span>Fica com icone próprio e abre sem barra de navegador.</span>
+            <span>Fica com ícone próprio e abre sem barra de navegador.</span>
             <button
               type="button"
               className="botao primario"
@@ -112,13 +124,23 @@ export default function App() {
             setConfig={setConfig}
             formulario={formulario}
             setFormulario={setFormulario}
-            aoSalvar={salvarSimulacao}
-            aoAbrirAjustes={() => setAba('ajustes')}
+            aoSalvar={salvarComoProduto}
+            aoAbrirAjustes={() => irPara('ajustes')}
           />
         ) : null}
 
-        {aba === 'salvos' ? (
-          <Salvos itens={salvos} aoAbrir={abrirSimulacao} aoExcluir={excluirSimulacao} />
+        {aba === 'produtos' ? (
+          <Produtos
+            produtos={produtos}
+            fornecedores={fornecedores}
+            config={config}
+            aoMudar={setProdutos}
+            aoCalcular={calcularComFornecedor}
+          />
+        ) : null}
+
+        {aba === 'fornecedores' ? (
+          <Fornecedores fornecedores={fornecedores} aoMudar={setFornecedores} />
         ) : null}
 
         {aba === 'ajustes' ? (
@@ -128,12 +150,7 @@ export default function App() {
 
       <nav className="barra-nav">
         {ABAS.map(({ id, nome, Icone }) => (
-          <button
-            key={id}
-            type="button"
-            aria-current={aba === id ? 'page' : undefined}
-            onClick={() => { setAba(id); window.scrollTo({ top: 0 }) }}
-          >
+          <button key={id} type="button" aria-current={aba === id ? 'page' : undefined} onClick={() => irPara(id)}>
             <Icone />
             {nome}
           </button>

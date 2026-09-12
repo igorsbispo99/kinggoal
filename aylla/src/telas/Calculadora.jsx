@@ -169,6 +169,13 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
           <span className="etapa">Marketplace</span>
         </header>
 
+        {!mp.confirmadoEm ? (
+          <Aviso nivel="atencao" titulo={`A comissão do ${mp.nome} ainda é um palpite meu`}>
+            {porcento(((mp.tipos.find((t) => t.id === tipoId) || mp.tipos[0]).comissao), 0)} é o valor de referência que eu coloquei — a comissão real muda por categoria e por reputação.
+            Confira no painel de vendedor dela e marque como confirmada nos Ajustes. Até lá, trate o lucro aqui como aproximado.
+          </Aviso>
+        ) : null}
+
         <Segmentado
           valor={f.canal}
           aoMudar={mudar('canal')}
@@ -279,7 +286,8 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
 
       {temCompra ? (
         <section className="cartao">
-          <header><h2>Guardar esta conta</h2></header>
+          <header><h2>Guardar como produto</h2></header>
+          <p className="dica">Vira uma ficha na aba Produtos, onde você compara fornecedores e refaz a conta quando o dólar mudar.</p>
           <CampoTexto rotulo="Nome do produto" valor={f.nome} aoMudar={mudar('nome')} placeholder="Fone bluetooth TWS" largo />
           <button
             type="button"
@@ -294,7 +302,7 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
               investimento: importacao.totalBRL,
             })}
           >
-            Salvar simulação
+            Salvar produto
           </button>
         </section>
       ) : null}

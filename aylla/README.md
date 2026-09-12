@@ -26,10 +26,15 @@ de segurança dos dados. O que já funciona:
 - Comparativo dos três canais ao mesmo preço.
 - Limites do MEI: teto de faturamento e o teto menos conhecido, o de 80% em
   custo de mercadoria, que é o que aperta primeiro em operação de margem baixa.
-- Contas salvas, ordenadas por margem.
+- Fornecedores com pedido mínimo, prazo prometido e forma de pagamento.
+- Produtos com os fornecedores comparados pelo **custo desembarcado**, não pelo
+  preço de etiqueta — e um aviso quando a ordem se inverte entre os dois.
+- Histórico de preço por fornecedor.
+- Taxas de marketplace marcadas como referência até ela confirmar no painel
+  de vendedor dela.
 - Backup e restauração em JSON, com cópia fiel do formato de origem.
 - Migração de dados entre versões, com cópia de socorro antes de migrar.
-- 51 testes automatizados sobre as regras de negócio.
+- 59 testes automatizados sobre as regras de negócio.
 
 ## Roadmap
 
@@ -37,7 +42,7 @@ de segurança dos dados. O que já funciona:
 |------|---------|----------|
 | F0 | Aplicativo instalável, offline, tema claro e escuro | pronta |
 | F1 | Calculadora de importação e revenda | pronta |
-| F2 | Produtos e fornecedores | a fazer |
+| F2 | Produtos e fornecedores | pronta |
 | F3 | Ranking de oportunidades | a fazer |
 | F4 | Controle financeiro | a fazer |
 | F5 | Radar de mercado e captura por compartilhamento | a fazer |
@@ -49,7 +54,7 @@ de segurança dos dados. O que já funciona:
 ```
 npm install
 npm run dev      # desenvolvimento
-npm test         # 51 testes, sem dependência externa
+npm test         # 59 testes, sem dependência externa
 npm run build    # roda os testes, gera os ícones e compila
 npm run preview  # serve o que foi gerado
 ```
@@ -69,11 +74,12 @@ src/lib/          regras de negócio, sem React
   marketplaces.js   comissões, taxa fixa e frete de cada canal
   precificacao.js   lucro, margem, preço alvo e ponto de equilíbrio
   mei.js            os dois tetos do MEI
+  catalogo.js       fornecedores, produtos e a comparação de ofertas
   cambio.js         PTAX do Banco Central, com plano B
   armazenamento.js  persistência local e backup
   configuracoes.js  ajustes da operação
 servidor/         o Worker: só a rota /api/ptax
-src/telas/        Calculadora, Salvos, Ajustes
+src/telas/        Calculadora, Produtos, Fornecedores, Ajustes
 src/componentes/  campos, avisos, medidores, ícones
 test/             testes das regras de negócio, com node:test
 ```

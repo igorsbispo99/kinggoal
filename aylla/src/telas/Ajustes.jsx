@@ -185,7 +185,9 @@ export default function Ajustes({ config, setConfig, tema, setTema }) {
           <section className="cartao" key={id}>
             <header>
               <h2>{mp.nome}</h2>
-              {mp.principal ? <span className="etapa">principal</span> : null}
+              {mp.confirmadoEm
+                ? <span className="selo-confirmado">confirmada em {new Date(mp.confirmadoEm).toLocaleDateString('pt-BR')}</span>
+                : <span className="nao-confirmado">valor de referência</span>}
             </header>
             <div className="grade">
               {mp.tipos.map((t) => (
@@ -197,6 +199,20 @@ export default function Ajustes({ config, setConfig, tema, setTema }) {
               ) : null}
             </div>
             <p className="dica">{mp.observacao}</p>
+            {mp.confirmadoEm ? (
+              <button type="button" className="botao discreto" onClick={() => atualizar('confirmadoEm', null)}>
+                Marcar como não confirmada de novo
+              </button>
+            ) : (
+              <>
+                <Aviso nivel="atencao" titulo="Confira no painel de vendedor">
+                  Estes números são referência minha, não os da conta dela. A comissão do {mp.nome} muda por categoria e por reputação — abra o painel, veja a taxa real da categoria que ela vai vender, corrija acima e marque como confirmada.
+                </Aviso>
+                <button type="button" className="botao primario cheio" onClick={() => atualizar('confirmadoEm', new Date().toISOString())}>
+                  Conferi no painel: estes valores estão certos
+                </button>
+              </>
+            )}
           </section>
         )
       })}

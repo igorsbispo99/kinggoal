@@ -336,3 +336,63 @@ details.dobra > div { padding-top: 10px; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+
+/* ---------- catálogo: fornecedores e produtos ---------- */
+
+.lista-cartoes { display: flex; flex-direction: column; gap: 10px; }
+
+.ficha {
+  background: var(--carta); border: 1px solid var(--linha); border-radius: var(--raio);
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
+  text-align: left; width: 100%; cursor: pointer;
+}
+.ficha:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+.ficha .topo-ficha { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.ficha .titulo-ficha { font-weight: 650; font-size: .98rem; line-height: 1.25; }
+.ficha .marca-origem {
+  font-family: var(--mono); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--tinta-3); border: 1px solid var(--linha-forte); padding: .15rem .4rem; border-radius: 4px;
+  flex: none; white-space: nowrap;
+}
+.ficha .dados { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .82rem; color: var(--tinta-3); }
+.ficha .dados b { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* comparativo de ofertas */
+.oferta {
+  display: grid; grid-template-columns: 1fr auto; gap: 3px 12px;
+  padding: 11px 12px; border-radius: 8px;
+  border: 1px solid var(--linha); background: var(--papel);
+  font: inherit; color: inherit; text-align: left; width: 100%; cursor: pointer;
+}
+.oferta:focus-visible { outline: 2px solid var(--verde); outline-offset: 2px; }
+.oferta:active { transform: translateY(1px); }
+.oferta.vencedora { border-color: var(--verde); background: var(--verde-fundo); }
+.oferta .nome-f { font-weight: 650; font-size: .93rem; }
+.oferta .detalhe-f { grid-column: 1; font-size: .75rem; color: var(--tinta-3); font-variant-numeric: tabular-nums; }
+.oferta .custo-f { grid-row: 1 / 3; grid-column: 2; text-align: right; font-variant-numeric: tabular-nums; }
+.oferta .custo-f b { display: block; font-size: 1.02rem; font-weight: 700; }
+.oferta .custo-f span { font-size: .72rem; color: var(--tinta-3); }
+.oferta .posicao {
+  font-family: var(--mono); font-size: .62rem; color: var(--tinta-3);
+  margin-right: 6px; font-weight: 600;
+}
+
+.faixa-historico { display: flex; flex-wrap: wrap; gap: 5px; }
+.faixa-historico span {
+  font-family: var(--mono); font-size: .68rem; color: var(--tinta-3);
+  border: 1px solid var(--linha); border-radius: 4px; padding: .1rem .35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.nao-confirmado {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .72rem; color: var(--atencao); font-weight: 600;
+}
+.selo-confirmado { font-size: .72rem; color: var(--verde); font-weight: 600; }
+
+.voltar {
+  background: none; border: 0; cursor: pointer; padding: 4px 0;
+  color: var(--verde); font-size: .88rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+}

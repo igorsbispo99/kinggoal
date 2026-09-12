@@ -22,6 +22,20 @@ export const IconeAjustes = (p) => (
   </svg>
 )
 
+export const IconeProdutos = (p) => (
+  <svg {...base} {...p}>
+    <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5v-9Z" />
+    <path d="m3.5 7.5 8.5 4.5 8.5-4.5M12 12v9" />
+  </svg>
+)
+
+export const IconeFornecedores = (p) => (
+  <svg {...base} {...p}>
+    <path d="M3 9h18M5 9V6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3M4 9v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" />
+    <path d="M9.5 13h5" />
+  </svg>
+)
+
 export const Logotipo = () => (
   <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
     <rect width="32" height="32" rx="7" fill="var(--verde)" />

@@ -19,6 +19,14 @@ export function paraNumero(texto) {
   return Number.isFinite(n) ? n : 0
 }
 
+/** Número para dentro de um campo de texto, do jeito que ela escreve. */
+export function paraCampo(valor) {
+  if (valor === null || valor === undefined || valor === '') return ''
+  const n = Number(valor)
+  if (!Number.isFinite(n)) return String(valor)
+  return String(n).replace('.', ',')
+}
+
 export function dataCurta(iso) {
   if (!iso) return '-'
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })

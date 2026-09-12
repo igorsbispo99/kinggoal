@@ -26,3 +26,13 @@ test('valores inválidos não vazam NaN para a interface', () => {
   assert.equal(reais(NaN), reais(0))
   assert.equal(porcento(NaN), porcento(0))
 })
+
+test('número volta para o campo do jeito que ela escreve', async () => {
+  const { paraCampo } = await import('../src/lib/formato.js')
+  assert.equal(paraCampo(5.2), '5,2')
+  assert.equal(paraCampo(4), '4')
+  assert.equal(paraCampo(''), '')
+  assert.equal(paraCampo(null), '')
+  // ida e volta com paraNumero não pode perder valor
+  assert.equal(paraNumero(paraCampo(4.6)), 4.6)
+})
