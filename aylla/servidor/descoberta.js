@@ -175,8 +175,36 @@ async function visitasDeAnuncios(ids, token) {
   for (let i = 0; i < ids.length; i += tamanhoDoLote) {
     const lote = ids.slice(i, i + tamanhoDoLote)
     const r = await pegar(`/visits/items?ids=${lote.join(',')}`, token, { cacheSegundos: 3600 })
-    if (r.ok && r.json && typeof r.json === 'object') Object.assign(junto, r.json)
+    if (r.ok && r.json && typeof r.json === 'object') {
+      // A resposta e um mapa id -> visitas. Vem tambem em forma de lista em
+      // alguns casos; os dois formatos entram do mesmo jeito.
+      if (Array.isArray(r.json)) {
+        for (const e of r.json) {
+          const id = e && (e.item_id || e.id)
+          const v = e && (e.total_visits ?? e.visits ?? e.total)
+          if (id && Number.isFinite(Number(v))) junto[id] = Number(v)
+        }
+      } else {
+        for (const [id, v] of Object.entries(r.json)) {
+          if (Number.isFinite(Number(v))) junto[id] = Number(v)
+        }
+      }
+    }
   }
+
+  // Rede: o lote pode voltar vazio, e voltou. O endereco por anuncio esta
+  // medido e funciona — devolveu 3.743 para um anuncio de bolsa no estresse.
+  // Custa uma requisicao por anuncio, entao so os primeiros, e so quando o
+  // lote nao trouxe nada.
+  const faltando = ids.filter((id) => !Number.isFinite(junto[id]))
+  if (faltando.length === ids.length) {
+    for (const id of faltando.slice(0, 3)) {
+      const r = await pegar(`/items/${id}/visits/time_window?last=30&unit=day`, token, { cacheSegundos: 3600 })
+      const total = r.ok && r.json ? Number(r.json.total_visits) : NaN
+      if (Number.isFinite(total)) junto[id] = total
+    }
+  }
+
   return junto
 }
 

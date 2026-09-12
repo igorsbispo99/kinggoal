@@ -212,6 +212,31 @@ export async function depurarFunil(env, { token, termo = null }) {
       }
 
       // Passo 7: o funil de verdade, do jeito que o aplicativo roda.
+      // Por que o lote de visitas volta vazio? Os dois formatos, crus.
+      if (umProduto) {
+        const pi = await fetch(`${API}/products/${umProduto.id}/items?limit=10`, {
+          headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        })
+        const pj = await pi.json().catch(() => null)
+        const idsReais = ((pj && pj.results) || []).map((a) => a.item_id || a.id).filter(Boolean)
+        anotar('ids_para_visitas', { quantos: idsReais.length, primeiros: idsReais.slice(0, 3) })
+
+        for (const [nome, quantos] of [['visitas_um_id', 1], ['visitas_tres_ids', 3]]) {
+          const alvo = idsReais.slice(0, quantos)
+          if (!alvo.length) continue
+          const vi = await fetch(`${API}/visits/items?ids=${alvo.join(',')}`, {
+            headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          })
+          const vtexto = await vi.text()
+          anotar(nome, {
+            ok: vi.ok,
+            status: vi.status,
+            idsPedidos: alvo.length,
+            corpo: vtexto.slice(0, 300),
+          })
+        }
+      }
+
       const achados = await nichosDaCategoria(env, { categoria: catId, token, quantosProdutos: 3 })
       anotar('nichos_da_categoria', {
         ok: Boolean(achados.nichos && achados.nichos.length),
