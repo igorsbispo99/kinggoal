@@ -103,19 +103,12 @@ export default function Sugestoes({ config, aoCadastrar }) {
                   categoria inteira e so contexto: "Bolsas" tem 421 mil
                   anuncios e isso nao diz nada sobre o produto onde dois
                   vendedores brigam. */}
-              {s.visitasPorVendedor !== null && s.visitasPorVendedor !== undefined ? (
+              {s.visitasPorAnuncio !== null && s.visitasPorAnuncio !== undefined ? (
                 <Linha
-                  rotulo="Atenção por concorrente"
-                  detalhe="visitas do produto em 30 dias ÷ quem disputa a ficha"
-                  valor={Math.round(s.visitasPorVendedor).toLocaleString('pt-BR')}
+                  rotulo="Visitas por anúncio"
+                  detalhe={`em 30 dias, medido em ${s.anunciosMedidos} ${s.anunciosMedidos === 1 ? 'anúncio' : 'anúncios'} desta ficha`}
+                  valor={Math.round(s.visitasPorAnuncio).toLocaleString('pt-BR')}
                   destaque
-                />
-              ) : null}
-              {s.visitas !== null && s.visitas !== undefined ? (
-                <Linha
-                  rotulo="Procura deste produto"
-                  detalhe={`visitas em 30 dias, ${s.anunciosMedidos} anúncio${s.anunciosMedidos === 1 ? '' : 's'} medido${s.anunciosMedidos === 1 ? '' : 's'}`}
-                  valor={Math.round(s.visitas).toLocaleString('pt-BR')}
                 />
               ) : null}
               <Linha
@@ -175,7 +168,9 @@ export default function Sugestoes({ config, aoCadastrar }) {
                           key={a.produtoId}
                           rotulo={a.preco ? reais(a.preco) : 'sem preço'}
                           detalhe={`${a.vendedores} disputando`}
-                          valor={a.visitas !== null ? `${Math.round(a.visitas).toLocaleString('pt-BR')} visitas` : '—'}
+                          valor={a.visitasPorAnuncio !== null && a.visitasPorAnuncio !== undefined
+                            ? `${Math.round(a.visitasPorAnuncio).toLocaleString('pt-BR')} visitas/anúncio`
+                            : '—'}
                         />
                       ))}
                     </div>

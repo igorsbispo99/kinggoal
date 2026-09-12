@@ -246,8 +246,8 @@ export async function depurarFunil(env, { token, termo = null }) {
         melhores: (achados.nichos || []).slice(0, 3).map((n) => ({
           produtoId: n.produtoId,
           vendedores: n.vendedores,
-          visitas: n.visitas,
-          visitasPorVendedor: n.visitasPorVendedor === null ? null : Math.round(n.visitasPorVendedor),
+          visitasSomadas: n.visitasSomadas,
+          visitasPorAnuncio: n.visitasPorAnuncio === null ? null : Math.round(n.visitasPorAnuncio),
           precoMediano: n.precoMediano,
           temLojaOficial: n.temLojaOficial,
         })),
@@ -300,18 +300,18 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
     // com dois vendedores e outro com quarenta, e esses dois sao negocios
     // diferentes.
     let achados
-    try { achados = await nichosDaCategoria(env, { categoria: cat.id, token, quantosProdutos: 3 }) } catch (e) {
+    try { achados = await nichosDaCategoria(env, { categoria: cat.id, token, quantosProdutos: 2 }) } catch (e) {
       descartadas.push({ termo: t.termo, categoria: cat.nome, porque: `mais vendidos falhou: ${e.message}` })
       continue
     }
-    const melhor = achados.nichos.find((n) => n.visitasPorVendedor !== null) || achados.nichos[0]
+    const melhor = achados.nichos.find((n) => n.visitasPorAnuncio !== null) || achados.nichos[0]
     if (!melhor) {
       descartadas.push({ termo: t.termo, categoria: cat.nome, porque: 'nenhum produto de catálogo com anúncio ativo' })
       continue
     }
 
     const nota = notaDoNicho({
-      visitasPorVendedor: melhor.visitasPorVendedor,
+      visitasPorAnuncio: melhor.visitasPorAnuncio,
       vendedores: melhor.vendedores,
       temLojaOficial: melhor.temLojaOficial,
     })
@@ -341,8 +341,8 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       // O nicho: um produto especifico, com quem disputa ele.
       produtoId: melhor.produtoId,
       vendedoresNaFicha: melhor.vendedores,
-      visitas: melhor.visitas,
-      visitasPorVendedor: melhor.visitasPorVendedor,
+      visitasSomadas: melhor.visitasSomadas,
+      visitasPorAnuncio: melhor.visitasPorAnuncio,
       anunciosMedidos: melhor.anunciosMedidos,
       temLojaOficial: melhor.temLojaOficial,
       precoMediano: melhor.precoMediano,
@@ -353,16 +353,17 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       nota,
       resumoDoNicho: explicarNicho({
         nota: nota.nota,
-        visitas: melhor.visitas,
+        semProcura: nota.semProcura,
+        visitasPorAnuncio: melhor.visitasPorAnuncio,
+        anunciosMedidos: melhor.anunciosMedidos,
         vendedores: melhor.vendedores,
-        visitasPorVendedor: melhor.visitasPorVendedor,
         temLojaOficial: melhor.temLojaOficial,
       }),
       // Os outros produtos medidos, para ela comparar dentro da categoria.
       alternativas: achados.nichos.slice(1, 3).map((n) => ({
         produtoId: n.produtoId,
         vendedores: n.vendedores,
-        visitas: n.visitas,
+        visitasPorAnuncio: n.visitasPorAnuncio,
         preco: n.precoMediano,
       })),
       tarifa,

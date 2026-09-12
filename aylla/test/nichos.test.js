@@ -98,24 +98,24 @@ test('o nicho é o produto: mesma categoria, negócios opostos', async () => {
   const { notaDoNicho } = await import('../servidor/nichos.js')
   // Os dois moram em "Bolsas", que tem 421.836 anúncios. Medir a categoria
   // dava a mesma nota para ambos — e eles não têm nada a ver um com o outro.
-  const bom = notaDoNicho({ visitasPorVendedor: 1871, vendedores: 2, temLojaOficial: false })
-  const ruim = notaDoNicho({ visitasPorVendedor: 250, vendedores: 40, temLojaOficial: true })
+  const bom = notaDoNicho({ visitasPorAnuncio: 1871, vendedores: 2, temLojaOficial: false })
+  const ruim = notaDoNicho({ visitasPorAnuncio: 250, vendedores: 40, temLojaOficial: true })
   assert.ok(bom.nota >= 85, `dois vendedores dividindo 3.743 visitas: tirou ${bom.nota}`)
   assert.ok(ruim.nota <= 50, `quarenta dividindo dez mil: tirou ${ruim.nota}`)
 })
 
 test('loja oficial na ficha derruba a nota mesmo com atenção boa', async () => {
   const { notaDoNicho } = await import('../servidor/nichos.js')
-  const sem = notaDoNicho({ visitasPorVendedor: 900, vendedores: 3, temLojaOficial: false })
-  const com = notaDoNicho({ visitasPorVendedor: 900, vendedores: 3, temLojaOficial: true })
+  const sem = notaDoNicho({ visitasPorAnuncio: 900, vendedores: 3, temLojaOficial: false })
+  const com = notaDoNicho({ visitasPorAnuncio: 900, vendedores: 3, temLojaOficial: true })
   assert.ok(sem.nota > com.nota, 'marca com loja própria leva a caixa de compra quase sempre')
 })
 
 test('sem visitas medidas, a nota sai parcial e não zerada', async () => {
   const { notaDoNicho } = await import('../servidor/nichos.js')
-  const r = notaDoNicho({ visitasPorVendedor: null, vendedores: 2, temLojaOficial: false })
+  const r = notaDoNicho({ visitasPorAnuncio: null, vendedores: 2, temLojaOficial: false })
   assert.equal(r.completo, false)
-  assert.deepEqual(r.faltando, ['atenção por concorrente'])
+  assert.deepEqual(r.faltando, ['atenção por anúncio'])
   assert.ok(r.nota > 0, 'o que foi medido continua valendo')
 })
 
@@ -125,13 +125,13 @@ test('sem procura medida não se emite veredito', async () => {
   // visitas não medidas. A nota deu 75 e a frase dizia "Esse é um bom lugar
   // para entrar" — sobre um produto cuja demanda ninguém mediu. É o pior
   // conselho possível para quem vai comprar estoque com dinheiro contado.
-  const r = notaDoNicho({ visitasPorVendedor: null, vendedores: 1, temLojaOficial: true })
+  const r = notaDoNicho({ visitasPorAnuncio: null, vendedores: 1, temLojaOficial: true })
   assert.equal(r.semProcura, true)
   assert.ok(r.nota > 0, 'o que foi medido continua valendo')
 
   const frase = explicarNicho({
-    nota: r.nota, semProcura: r.semProcura, visitas: null,
-    vendedores: 1, visitasPorVendedor: null, temLojaOficial: true,
+    nota: r.nota, semProcura: r.semProcura, anunciosMedidos: 0,
+    vendedores: 1, visitasPorAnuncio: null, temLojaOficial: true,
   })
   assert.match(frase, /Não deu para medir a procura/)
   assert.ok(!/bom lugar para entrar/.test(frase), 'nunca convidar a entrar sem medir a procura')
@@ -160,4 +160,30 @@ test('as visitas vão em lotes de vinte', () => {
   assert.equal(lotes.length, 3)
   assert.equal(lotes[0].length, 20)
   assert.equal(lotes[2].length, 7)
+})
+
+test('a média por anúncio medido não subestima quando a amostra é pequena', () => {
+  // Chuveiro: 27 vendedores na ficha, 3 anúncios medidos, 1.500 visitas
+  // somadas. A conta antiga — soma dividida pelo total de vendedores —
+  // daria 56 e diria "aqui a atenção não sobra". A verdade é que cada
+  // anúncio medido recebe 500, e o mercado é bom; o que é duro é a briga
+  // entre 27, e isso já entra na nota por outro sinal.
+  const somaMedida = 1500
+  const anunciosMedidos = 3
+  const vendedores = 27
+
+  const contaAntiga = somaMedida / vendedores
+  const contaCerta = somaMedida / anunciosMedidos
+
+  assert.ok(contaAntiga > 55 && contaAntiga < 56, `a antiga dava ${contaAntiga.toFixed(1)}`)
+  assert.equal(contaCerta, 500)
+  assert.ok(contaCerta > contaAntiga * 8, 'medir parte e dividir pelo todo erra por quase uma ordem de grandeza')
+})
+
+test('/visits/items aceita um id por vez, e isso está registrado', () => {
+  // Pedido com dois ids: {"message":"maximum amount of items to query is 1"}.
+  // O nome do endereço sugere lote e não é lote. Fica aqui para ninguém
+  // "otimizar" de volta para um pedido em lote que devolve 400.
+  const respostaComDoisIds = { message: 'maximum amount of items to query is 1', status: 400 }
+  assert.equal(respostaComDoisIds.status, 400)
 })

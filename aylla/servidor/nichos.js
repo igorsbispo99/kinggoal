@@ -210,18 +210,18 @@ export function explicarEntrada({ nota, anuncios, visitasPorAnuncio, lojasOficia
  *
  * Três sinais, e o primeiro vale mais que os outros dois juntos:
  *
- *   atenção por concorrente ... visitas do produto divididas pelos
- *                              vendedores que o disputam. É o número.
+ *   atenção por anúncio ...... quantas visitas um anúncio típico dessa
+ *                              ficha recebe em 30 dias. É o número.
  *   poucos concorrentes ...... disputar com dois é diferente de disputar
  *                              com quarenta, mesmo com a mesma atenção.
  *   topo sem loja oficial .... marca com loja própria na ficha ganha a
  *                              caixa de compra quase sempre.
  */
-export function notaDoNicho({ visitasPorVendedor, vendedores, temLojaOficial }) {
-  const vpv = numeroOuNulo(visitasPorVendedor)
+export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial }) {
+  const vpv = numeroOuNulo(visitasPorAnuncio)
   const n = numeroOuNulo(vendedores)
 
-  // 50 visitas por vendedor por mês já é sinal; 2.000 é excelente.
+  // 50 visitas por anúncio por mês já é sinal; 2.000 é excelente.
   const porAtencao = vpv === null ? null
     : Math.min(100, (Math.log10(1 + vpv) / Math.log10(1 + 2000)) * 100)
 
@@ -234,7 +234,7 @@ export function notaDoNicho({ visitasPorVendedor, vendedores, temLojaOficial }) 
     : (temLojaOficial ? 25 : 100)
 
   const sinais = [
-    { nome: 'atenção por concorrente', valor: porAtencao, peso: 0.55 },
+    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.55 },
     { nome: 'quantos disputam', valor: porConcorrentes, peso: 0.3 },
     { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.15 },
   ]
@@ -265,16 +265,16 @@ export function notaDoNicho({ visitasPorVendedor, vendedores, temLojaOficial }) 
 }
 
 /** A frase do nicho. Números sem porquê não ensinam ninguém a escolher. */
-export function explicarNicho({ nota, visitas, vendedores, visitasPorVendedor, temLojaOficial, semProcura }) {
+export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, semProcura }) {
   const pedacos = []
-  if (Number.isFinite(visitas) && Number.isFinite(vendedores)) {
-    pedacos.push(`${visitas.toLocaleString('pt-BR')} visitas em 30 dias divididas entre ${vendedores} ${vendedores === 1 ? 'vendedor' : 'vendedores'}`)
+  if (Number.isFinite(visitasPorAnuncio)) {
+    pedacos.push(`${Math.round(visitasPorAnuncio).toLocaleString('pt-BR')} visitas por anúncio em 30 dias`)
+    if (Number.isFinite(anunciosMedidos) && anunciosMedidos > 0) {
+      pedacos.push(`medido em ${anunciosMedidos} ${anunciosMedidos === 1 ? 'anúncio' : 'anúncios'} da ficha`)
+    }
   }
-  if (Number.isFinite(visitasPorVendedor)) {
-    pedacos.push(`${Math.round(visitasPorVendedor).toLocaleString('pt-BR')} por concorrente`)
-  }
-  if (!pedacos.length && Number.isFinite(vendedores)) {
-    pedacos.push(`${vendedores} ${vendedores === 1 ? 'vendedor disputa' : 'vendedores disputam'} esta ficha`)
+  if (Number.isFinite(vendedores)) {
+    pedacos.push(`${vendedores} ${vendedores === 1 ? 'vendedor disputa' : 'vendedores disputam'} ela`)
   }
   if (temLojaOficial) pedacos.push('há loja oficial na ficha, e ela costuma levar a caixa de compra')
 

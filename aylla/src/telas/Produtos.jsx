@@ -102,7 +102,7 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
             vendasDoLiderMes: '',
             precoMin: s.precoMin,
             precoMax: s.precoMax,
-            origem: `"${s.termo}" — ${s.vendedoresNaFicha} vendedores na ficha, ${s.visitas || '?'} visitas/30d`,
+            origem: `"${s.termo}" — ${s.vendedoresNaFicha} vendedores disputam a ficha`,
             medidoEm: new Date().toISOString(),
           },
         })}

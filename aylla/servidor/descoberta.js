@@ -163,49 +163,28 @@ export function ordenarPorAderencia(destinos, termo) {
  *
  * É em lote: uma chamada para todos os anúncios de uma vez.
  */
-async function visitasDeAnuncios(ids, token) {
-  if (!ids.length) return {}
-
-  // Em lotes de vinte. Tres produtos de catalogo com cinquenta anuncios cada
-  // sao cento e cinquenta ids numa URL so — e o Mercado Livre nao devolveu
-  // nada. Era esse o motivo de "faltou: atencao por concorrente" aparecer em
-  // toda sugestao: o pedido inteiro falhava e voltava vazio, sem erro.
-  const tamanhoDoLote = 20
-  const junto = {}
-  for (let i = 0; i < ids.length; i += tamanhoDoLote) {
-    const lote = ids.slice(i, i + tamanhoDoLote)
-    const r = await pegar(`/visits/items?ids=${lote.join(',')}`, token, { cacheSegundos: 3600 })
-    if (r.ok && r.json && typeof r.json === 'object') {
-      // A resposta e um mapa id -> visitas. Vem tambem em forma de lista em
-      // alguns casos; os dois formatos entram do mesmo jeito.
-      if (Array.isArray(r.json)) {
-        for (const e of r.json) {
-          const id = e && (e.item_id || e.id)
-          const v = e && (e.total_visits ?? e.visits ?? e.total)
-          if (id && Number.isFinite(Number(v))) junto[id] = Number(v)
-        }
-      } else {
-        for (const [id, v] of Object.entries(r.json)) {
-          if (Number.isFinite(Number(v))) junto[id] = Number(v)
-        }
-      }
-    }
+async function visitasDeAnuncios(ids, token, limite = 4) {
+  // Uma chamada por anuncio, e nao ha jeito melhor: o Mercado Livre respondeu
+  // "maximum amount of items to query is 1" ao pedido com dois ids. O nome
+  // /visits/items?ids= sugere lote e nao e lote.
+  //
+  // Como cada anuncio custa uma requisicao e o Worker faz cinquenta por
+  // requisicao, mede-se uma amostra. E por isso a conta mudou: somar a
+  // amostra e dividir pelo total de vendedores daria um numero baixo e
+  // falso. O que sai daqui e a MEDIA por anuncio medido — "quanta atencao
+  // um anuncio tipico recebe nesta ficha" —, que e a pergunta certa para
+  // quem esta decidindo se vale colocar o dela no meio.
+  const medidas = {}
+  for (const id of ids.slice(0, limite)) {
+    const r = await pegar(`/visits/items?ids=${id}`, token, { cacheSegundos: 3600 })
+    const valor = r.ok && r.json ? Number(r.json[id]) : NaN
+    if (Number.isFinite(valor)) { medidas[id] = valor; continue }
+    // Segunda via, medida e funcionando: a janela de 30 dias do anuncio.
+    const janela = await pegar(`/items/${id}/visits/time_window?last=30&unit=day`, token, { cacheSegundos: 3600 })
+    const total = janela.ok && janela.json ? Number(janela.json.total_visits) : NaN
+    if (Number.isFinite(total)) medidas[id] = total
   }
-
-  // Rede: o lote pode voltar vazio, e voltou. O endereco por anuncio esta
-  // medido e funciona — devolveu 3.743 para um anuncio de bolsa no estresse.
-  // Custa uma requisicao por anuncio, entao so os primeiros, e so quando o
-  // lote nao trouxe nada.
-  const faltando = ids.filter((id) => !Number.isFinite(junto[id]))
-  if (faltando.length === ids.length) {
-    for (const id of faltando.slice(0, 3)) {
-      const r = await pegar(`/items/${id}/visits/time_window?last=30&unit=day`, token, { cacheSegundos: 3600 })
-      const total = r.ok && r.json ? Number(r.json.total_visits) : NaN
-      if (Number.isFinite(total)) junto[id] = total
-    }
-  }
-
-  return junto
+  return medidas
 }
 
 /**
@@ -362,34 +341,36 @@ export async function nichosDaCategoria(env, { categoria, token, quantosProdutos
   const produtos = await produtosComDisputa(idsDeProduto, token, quantosProdutos)
   if (!produtos.length) return { nichos: [], semProdutos: true }
 
-  // Visitas de todos os anúncios de todos os produtos, numa chamada só.
-  const todosOsIds = produtos.flatMap((p) => p.anuncios.map((a) => a.id)).filter(Boolean)
-  const visitas = await visitasDeAnuncios(todosOsIds, token)
+  // O orçamento de medição fica quase todo no primeiro produto, que é o
+  // campeão de vendas da categoria. Nos outros basta um anúncio para saber
+  // a ordem de grandeza — eles existem para ela comparar, não para decidir.
+  const nichos = []
+  for (let i = 0; i < produtos.length; i += 1) {
+    const p = produtos[i]
+    const limite = i === 0 ? 3 : 1
+    const visitas = await visitasDeAnuncios(p.anuncios.map((a) => a.id).filter(Boolean), token, limite)
 
-  const nichos = produtos.map((p) => {
-    const somaDeVisitas = p.anuncios
-      .map((a) => visitas[a.id])
-      .filter((v) => Number.isFinite(v))
-      .reduce((t, v) => t + v, 0)
-    const medidos = p.anuncios.filter((a) => Number.isFinite(visitas[a.id])).length
+    const medidas = p.anuncios.map((a) => visitas[a.id]).filter((v) => Number.isFinite(v))
+    const soma = medidas.reduce((t, v) => t + v, 0)
 
-    return {
+    nichos.push({
       produtoId: p.produtoId,
       vendedores: p.vendedores,
-      visitas: medidos ? somaDeVisitas : null,
-      anunciosMedidos: medidos,
-      // O número do nicho: atenção disponível por concorrente. Dois
-      // vendedores dividindo 3.743 visitas é um negócio; quarenta
-      // dividindo dez mil é uma briga de centavo.
-      visitasPorVendedor: medidos && p.vendedores > 0 ? somaDeVisitas / p.vendedores : null,
+      visitasSomadas: medidas.length ? soma : null,
+      anunciosMedidos: medidas.length,
+      // Média por anúncio medido. Somar a amostra e dividir pelo total de
+      // vendedores daria um número baixo e falso: com 27 vendedores e 3
+      // anúncios medidos, a conta antiga diria que cada um recebe um décimo
+      // do que recebe de verdade — e um mercado bom passaria por ruim.
+      visitasPorAnuncio: medidas.length ? soma / medidas.length : null,
       precoMin: p.precos.length ? Math.min(...p.precos) : null,
       precoMediano: medianaDe(p.precos),
       temLojaOficial: p.temLojaOficial,
       anuncios: p.anuncios,
-    }
-  })
+    })
+  }
 
-  nichos.sort((a, b) => (b.visitasPorVendedor ?? -1) - (a.visitasPorVendedor ?? -1))
+  nichos.sort((a, b) => (b.visitasPorAnuncio ?? -1) - (a.visitasPorAnuncio ?? -1))
   return { nichos, semProdutos: false }
 }
 
