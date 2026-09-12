@@ -48,3 +48,33 @@ test('disputa média não recebe nem elogio nem alarme', () => {
   assert.equal(leitura.tom, null)
   assert.match(leitura.rotulo, /disputa grande/)
 })
+
+// --- o que a sonda mediu em producao, virado em teste ---
+
+test('highlights mistura três tipos e só um serve para /items', () => {
+  // Medido em 12/09/2026 na categoria MLB7022 (Bolsas): posições 1 e 2
+  // eram PRODUCT, a 3 era USER_PRODUCT, e /items respondeu 404 nas três.
+  // O filtro antigo pegava tudo e o multiget devolvia 404 em bloco.
+  const conteudo = [
+    { id: 'MLB65124496', position: 1, type: 'PRODUCT' },
+    { id: 'MLB47069053', position: 2, type: 'PRODUCT' },
+    { id: 'MLBU3736799720', position: 3, type: 'USER_PRODUCT' },
+    { id: 'MLB3300000001', position: 4, type: 'ITEM' },
+  ]
+  const deAnuncio = conteudo.filter((c) => c.id && (c.type === 'ITEM' || !c.type)).map((c) => c.id)
+  const deProduto = conteudo.filter((c) => c.id && c.type === 'PRODUCT').map((c) => c.id)
+
+  assert.deepEqual(deAnuncio, ['MLB3300000001'], 'só o ITEM vai direto para o multiget')
+  assert.equal(deProduto.length, 2, 'os PRODUCT precisam virar anúncio pelo buy_box_winner')
+  assert.ok(!deAnuncio.includes('MLBU3736799720'), 'USER_PRODUCT não tem endereço público conhecido')
+})
+
+test('products/search não devolve category_id — foi o que zerou o funil', () => {
+  // Campos reais devolvidos em producao. Nenhum category_id: o codigo que
+  // dependia dele descartava todo termo em silencio.
+  const camposReais = ['id', 'catalog_product_id', 'domain_id', 'name', 'parent_id', 'settings',
+    'children_ids', 'attributes', 'tags', 'status', 'short_description', 'pictures',
+    'authority_types', 'date_created', 'last_updated', 'quality_type', 'product_standard', 'search_type']
+  assert.ok(!camposReais.includes('category_id'), 'status 200 não prova que o campo existe')
+  assert.ok(camposReais.includes('domain_id'), 'o que existe é o domínio')
+})

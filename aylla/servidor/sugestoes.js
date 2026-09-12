@@ -151,7 +151,10 @@ export async function depurarFunil(env, { token, termo = null }) {
   return { termo: alvo, passos }
 }
 
-export async function montarSugestoes(env, { token, quantas = 6 }) {
+// Cinco sugestoes, nao seis. O pior caso por sugestao agora e oito
+// subrequisicoes (dominio, categoria, campeoes, tres produtos de catalogo,
+// multiget, tarifa), e o teto do Worker gratuito e 50 por requisicao.
+export async function montarSugestoes(env, { token, quantas = 5 }) {
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
   const descartadas = []
@@ -185,6 +188,7 @@ export async function montarSugestoes(env, { token, quantas = 6 }) {
     try {
       campeoes = await maisVendidos(env, {
         categoria: destino.categoriaId, token, quantos: 12, totalDaCategoria: cat.anuncios,
+        orcamentoDeProdutos: 3,
       })
     } catch (e) {
       descartadas.push({ termo: t.termo, porque: `mais vendidos falhou: ${e.message}` })
@@ -197,7 +201,7 @@ export async function montarSugestoes(env, { token, quantas = 6 }) {
         termo: t.termo,
         categoria: cat.nome,
         porque: 'sem campeões para medir',
-        tiposVistos: campeoes.tiposVistos || null,
+        porTipo: campeoes.porTipo || null,
         codigosDoMultiget: campeoes.codigosDoMultiget || null,
         erroNoMultiget: campeoes.erroNoMultiget || null,
       })

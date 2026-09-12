@@ -109,7 +109,37 @@ export async function ondeIssoVive(env, { termo, token }) {
  * preço, vendas, data de publicação, se é loja oficial — vêm do multiget
  * de itens, numa chamada só: uma por item queimaria o limite à toa.
  */
-export async function maisVendidos(env, { categoria, token, quantos = 12, totalDaCategoria = null }) {
+/**
+ * Resolve ids de catálogo em ids de anúncio.
+ *
+ * /highlights mistura três tipos, e só um deles serve para /items:
+ *
+ *   ITEM ......... o anúncio em si, e o multiget aceita
+ *   PRODUCT ...... a ficha de catálogo; /items devolve 404. O anúncio real
+ *                  está em buy_box_winner.item_id — quem está ganhando a
+ *                  caixa de compra daquele produto
+ *   USER_PRODUCT . listagem própria do vendedor, sem endereço público
+ *                  conhecido; fica de fora
+ *
+ * Medido em produção: numa categoria de bolsas, as posições 1 e 2 eram
+ * PRODUCT, a 3 era USER_PRODUCT, e o multiget respondeu 404 nas três.
+ *
+ * Custa uma requisição por produto, por isso o limite: o Worker gratuito
+ * faz 50 subrequisições por requisição e isto roda dentro de um laço.
+ */
+async function anunciosDeProdutos(ids, token, limite = 3) {
+  const encontrados = []
+  for (const id of ids.slice(0, limite)) {
+    const r = await pegar(`/products/${id}`, token, { cacheSegundos: 3600 })
+    const ganhador = r.ok && r.json && r.json.buy_box_winner
+    if (ganhador && ganhador.item_id) encontrados.push(ganhador.item_id)
+  }
+  return encontrados
+}
+
+export async function maisVendidos(env, {
+  categoria, token, quantos = 12, totalDaCategoria = null, orcamentoDeProdutos = 3,
+}) {
   const r = await pegar(`/highlights/${SITE}/category/${categoria}`, token, { cacheSegundos: 3600 })
   if (!r.ok) {
     const erro = new Error(`O Mercado Livre respondeu ${r.status} para os mais vendidos.`)
@@ -121,21 +151,38 @@ export async function maisVendidos(env, { categoria, token, quantos = 12, totalD
   // PRODUCT em outras, e descartar o que nao fosse ITEM zerava categorias
   // inteiras em silencio. Os tipos vistos voltam na resposta para a causa
   // aparecer em vez de virar "nenhuma sugestao fechou".
-  const tiposVistos = [...new Set(conteudo.map((c) => c.type || 'sem-type'))]
-  const ids = conteudo.filter((c) => c.id).slice(0, quantos).map((c) => c.id)
+  const porTipo = {}
+  for (const c of conteudo) {
+    const tipo = c.type || 'sem-type'
+    porTipo[tipo] = (porTipo[tipo] || 0) + 1
+  }
 
-  if (!ids.length) return { categoria, itens: [], semItens: true, tiposVistos }
+  const idsDeAnuncio = conteudo.filter((c) => c.id && (c.type === 'ITEM' || !c.type)).map((c) => c.id)
+  const idsDeProduto = conteudo.filter((c) => c.id && c.type === 'PRODUCT').map((c) => c.id)
+
+  // Os anúncios diretos bastam quando há bastante. Quando não há, vale gastar
+  // algumas requisições resolvendo produtos de catálogo — senão categorias
+  // inteiras, onde a disputa é toda por catálogo, ficariam sem leitura.
+  let ids = idsDeAnuncio.slice(0, quantos)
+  let resolvidosDeCatalogo = 0
+  if (ids.length < 4 && idsDeProduto.length && orcamentoDeProdutos > 0) {
+    const extras = await anunciosDeProdutos(idsDeProduto, token, orcamentoDeProdutos)
+    resolvidosDeCatalogo = extras.length
+    ids = [...ids, ...extras].slice(0, quantos)
+  }
+
+  if (!ids.length) return { categoria, itens: [], semItens: true, porTipo, resolvidosDeCatalogo }
 
   const campos = 'id,title,price,sold_quantity,date_created,permalink,seller_id,official_store_id,catalog_listing,shipping'
   const multi = await pegar(`/items?ids=${ids.join(',')}&attributes=${campos}`, token, { cacheSegundos: 1800 })
-  if (!multi.ok) return { categoria, itens: [], ids, tiposVistos, erroNoMultiget: multi.status }
+  if (!multi.ok) return { categoria, itens: [], ids, porTipo, erroNoMultiget: multi.status }
 
   const entradas = Array.isArray(multi.json) ? multi.json : []
   const itens = entradas.filter((e) => e.code === 200 && e.body).map((e) => e.body)
 
   if (!itens.length) {
     return {
-      categoria, itens: [], tiposVistos, semItens: true,
+      categoria, itens: [], porTipo, resolvidosDeCatalogo, semItens: true,
       codigosDoMultiget: [...new Set(entradas.map((e) => e.code))],
     }
   }
@@ -151,7 +198,7 @@ export async function maisVendidos(env, { categoria, token, quantos = 12, totalD
     enriquecidos: itens,
   })
 
-  return { categoria, itens, analise, tiposVistos, doCache: r.doCache }
+  return { categoria, itens, analise, porTipo, resolvidosDeCatalogo, doCache: r.doCache }
 }
 
 /** Busca no catálogo — o que sobrou de busca por texto, e funciona. */
@@ -168,10 +215,13 @@ export async function buscarNoCatalogo(env, { termo, token, limite = 20 }) {
   }
   return {
     total: (r.json && r.json.paging && r.json.paging.total) || 0,
+    // Medido em producao: o resultado NAO traz category_id. Traz domain_id.
+    // Depender do campo que nao existe fazia o funil de sugestoes descartar
+    // tudo em silencio.
     produtos: ((r.json && r.json.results) || []).map((p) => ({
       id: p.id,
       nome: p.name,
-      categoriaId: p.category_id,
+      dominioId: p.domain_id || null,
       link: p.permalink || null,
     })),
   }
