@@ -191,6 +191,51 @@ async function avaliacoesDoAnuncio(id, token) {
 }
 
 /**
+ * Os produtos de catálogo de uma categoria, cada um com quantos vendedores
+ * disputam ele e quanta atenção ele recebe.
+ *
+ * Esta é a correção de um erro meu de conceito. Eu estava procurando o
+ * nicho descendo a árvore de categorias — só que o domain_discovery já
+ * devolve a categoria FOLHA. "Bolsas", com 421 mil anúncios, é o galho mais
+ * fino que existe. Não há para onde descer.
+ *
+ * O nicho não está na árvore. Está no produto.
+ *
+ * Dentro de "Bolsas" há uma bolsa específica com 3.743 visitas em 30 dias e
+ * DOIS vendedores disputando. E há outra com dez mil visitas e quarenta
+ * vendedores. As duas moram na mesma categoria de 421 mil anúncios, e são
+ * negócios completamente diferentes.
+ *
+ * O número que separa as duas é visitas por vendedor — atenção disponível
+ * por concorrente, medida no lugar onde ela de fato vai competir: o anúncio.
+ */
+async function produtosComDisputa(ids, token, limite) {
+  const produtos = []
+  for (const id of ids.slice(0, limite)) {
+    const r = await pegar(`/products/${id}/items?limit=50`, token, { cacheSegundos: 3600 })
+    if (!r.ok || !r.json) continue
+    const anuncios = (r.json.results || []).map((a) => ({
+      id: a.item_id || a.id,
+      price: Number(a.price),
+      seller_id: a.seller_id,
+      official_store_id: a.official_store_id || null,
+      shipping: a.shipping || null,
+      condition: a.condition || null,
+      catalog_listing: true,
+    }))
+    if (!anuncios.length) continue
+    produtos.push({
+      produtoId: id,
+      vendedores: (r.json.paging && r.json.paging.total) || anuncios.length,
+      anuncios,
+      precos: anuncios.map((a) => a.price).filter((p) => Number.isFinite(p) && p > 0),
+      temLojaOficial: anuncios.some((a) => a.official_store_id),
+    })
+  }
+  return produtos
+}
+
+/**
  * Multiget de anúncios. Devolve os códigos junto porque o Mercado Livre
  * responde 200 no envelope e o erro real vem dentro, por entrada.
  */
@@ -255,6 +300,57 @@ async function anunciosDoProduto(id, token) {
       vendedoresNaFicha,
     }
   })
+}
+
+/**
+ * Os nichos de uma categoria: um por produto de catálogo, ordenados pela
+ * atenção que sobra por concorrente.
+ *
+ * Custa uma requisição por produto mais uma para as visitas de todos.
+ */
+export async function nichosDaCategoria(env, { categoria, token, quantosProdutos = 3 }) {
+  const r = await pegar(`/highlights/${SITE}/category/${categoria}`, token, { cacheSegundos: 3600 })
+  if (!r.ok) {
+    const erro = new Error(`O Mercado Livre respondeu ${r.status} para os mais vendidos.`)
+    erro.status = r.status
+    throw erro
+  }
+  const conteudo = (r.json && r.json.content) || []
+  const idsDeProduto = conteudo.filter((c) => c.id && c.type === 'PRODUCT').map((c) => c.id)
+  if (!idsDeProduto.length) return { nichos: [], semProdutos: true }
+
+  const produtos = await produtosComDisputa(idsDeProduto, token, quantosProdutos)
+  if (!produtos.length) return { nichos: [], semProdutos: true }
+
+  // Visitas de todos os anúncios de todos os produtos, numa chamada só.
+  const todosOsIds = produtos.flatMap((p) => p.anuncios.map((a) => a.id)).filter(Boolean)
+  const visitas = await visitasDeAnuncios(todosOsIds, token)
+
+  const nichos = produtos.map((p) => {
+    const somaDeVisitas = p.anuncios
+      .map((a) => visitas[a.id])
+      .filter((v) => Number.isFinite(v))
+      .reduce((t, v) => t + v, 0)
+    const medidos = p.anuncios.filter((a) => Number.isFinite(visitas[a.id])).length
+
+    return {
+      produtoId: p.produtoId,
+      vendedores: p.vendedores,
+      visitas: medidos ? somaDeVisitas : null,
+      anunciosMedidos: medidos,
+      // O número do nicho: atenção disponível por concorrente. Dois
+      // vendedores dividindo 3.743 visitas é um negócio; quarenta
+      // dividindo dez mil é uma briga de centavo.
+      visitasPorVendedor: medidos && p.vendedores > 0 ? somaDeVisitas / p.vendedores : null,
+      precoMin: p.precos.length ? Math.min(...p.precos) : null,
+      precoMediano: medianaDe(p.precos),
+      temLojaOficial: p.temLojaOficial,
+      anuncios: p.anuncios,
+    }
+  })
+
+  nichos.sort((a, b) => (b.visitasPorVendedor ?? -1) - (a.visitasPorVendedor ?? -1))
+  return { nichos, semProdutos: false }
 }
 
 export async function maisVendidos(env, {
@@ -409,6 +505,18 @@ export async function comissaoReal(env, { categoria, preco, token }) {
     return n > 1 ? n / 100 : n
   }
 
+  // percentage_fee nem sempre vem. sale_fee_amount vem sempre — e a tarifa
+  // total naquele preco. Tirar o custo fixo e dividir pelo preco devolve o
+  // percentual de verdade, que e o que falta.
+  const percentualDerivado = (t) => {
+    const total = Number(t.sale_fee_amount)
+    const fixo = Number((t.sale_fee_details || {}).fixed_fee) || 0
+    const p = Number(preco)
+    if (!Number.isFinite(total) || !Number.isFinite(p) || p <= 0) return null
+    const fracao = (total - fixo) / p
+    return fracao > 0 && fracao < 1 ? fracao : null
+  }
+
   const tipos = lista
     .filter((t) => ['gold_special', 'gold_pro'].includes(t.listing_type_id))
     .map((t) => {
@@ -417,7 +525,7 @@ export async function comissaoReal(env, { categoria, preco, token }) {
         tipo: t.listing_type_id,
         nome: t.listing_type_name,
         comissaoTotal: t.sale_fee_amount,
-        percentual: emFracao(detalhes.percentage_fee),
+        percentual: emFracao(detalhes.percentage_fee) ?? percentualDerivado(t),
         custoFixo: detalhes.fixed_fee ?? null,
         exposicao: t.listing_exposure || null,
       }

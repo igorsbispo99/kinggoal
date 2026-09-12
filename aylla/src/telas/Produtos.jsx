@@ -95,11 +95,14 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
             ? `Pagar no máximo US$ ${leitura.cenarios[0].precoMaximoUSD} para ${Math.round(leitura.cenarios[0].margem * 100)}% de margem.`
             : '',
           pesquisa: {
-            anunciosConcorrentes: s.anunciosNaCategoria,
-            vendasDoLiderMes: s.vendasPorMesTopo !== null ? Math.round(s.vendasPorMesTopo) : '',
+            // A concorrencia que importa e quem disputa a ficha, nao o
+            // tamanho da categoria: e com esses que ela briga pela venda.
+            anunciosConcorrentes: s.vendedoresNaFicha,
+            // Visitas nao sao vendas, e o campo e de vendas. Fica vazio.
+            vendasDoLiderMes: '',
             precoMin: s.precoMin,
             precoMax: s.precoMax,
-            origem: `Tendência "${s.termo}" no Mercado Livre`,
+            origem: `"${s.termo}" — ${s.vendedoresNaFicha} vendedores na ficha, ${s.visitas || '?'} visitas/30d`,
             medidoEm: new Date().toISOString(),
           },
         })}

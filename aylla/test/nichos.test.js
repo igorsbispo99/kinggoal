@@ -91,3 +91,30 @@ test('a explicação diz o caminho e o porquê', () => {
   assert.match(frase, /Bolsas › Bolsas Térmicas/)
   assert.match(frase, /atenção sobrando/)
 })
+
+// --- o nicho esta no produto, nao na arvore ---
+
+test('o nicho é o produto: mesma categoria, negócios opostos', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  // Os dois moram em "Bolsas", que tem 421.836 anúncios. Medir a categoria
+  // dava a mesma nota para ambos — e eles não têm nada a ver um com o outro.
+  const bom = notaDoNicho({ visitasPorVendedor: 1871, vendedores: 2, temLojaOficial: false })
+  const ruim = notaDoNicho({ visitasPorVendedor: 250, vendedores: 40, temLojaOficial: true })
+  assert.ok(bom.nota >= 85, `dois vendedores dividindo 3.743 visitas: tirou ${bom.nota}`)
+  assert.ok(ruim.nota <= 50, `quarenta dividindo dez mil: tirou ${ruim.nota}`)
+})
+
+test('loja oficial na ficha derruba a nota mesmo com atenção boa', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  const sem = notaDoNicho({ visitasPorVendedor: 900, vendedores: 3, temLojaOficial: false })
+  const com = notaDoNicho({ visitasPorVendedor: 900, vendedores: 3, temLojaOficial: true })
+  assert.ok(sem.nota > com.nota, 'marca com loja própria leva a caixa de compra quase sempre')
+})
+
+test('sem visitas medidas, a nota sai parcial e não zerada', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  const r = notaDoNicho({ visitasPorVendedor: null, vendedores: 2, temLojaOficial: false })
+  assert.equal(r.completo, false)
+  assert.deepEqual(r.faltando, ['atenção por concorrente'])
+  assert.ok(r.nota > 0, 'o que foi medido continua valendo')
+})

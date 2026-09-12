@@ -65,99 +65,63 @@ export default function Sugestoes({ config, aoCadastrar }) {
         const leitura = lerOportunidade({
           mp, tipoId, precoVenda: s.precoMediano, comissaoMedida, config, quantidade: 10, freteUSD: 0, margens,
         })
-        const aberta = abertaId === s.categoriaId + s.termo
+        const aberta = abertaId === s.produtoId
+        const n = s.nota || {}
         return (
-          <div key={s.termo + s.categoriaId} className="sugestao">
-            <button type="button" className="cabeca-sugestao" onClick={() => setAbertaId(aberta ? null : s.categoriaId + s.termo)}>
+          <div key={s.produtoId || s.termo} className="sugestao">
+            <button type="button" className="cabeca-sugestao" onClick={() => setAbertaId(aberta ? null : s.produtoId)}>
               <span className="titulo-sugestao">
                 <span className="posicao-rank">{s.posicaoNaTendencia}º</span>
                 {s.termo}
               </span>
-              {/* A trilha da descida e a informacao principal aqui: mostra
-                  que o sistema saiu da categoria larga e foi ate o galho
-                  onde da para aparecer. */}
-              <span className="sub-sugestao">
-                {s.trilhaDaDescida && s.trilhaDaDescida.length > 1
-                  ? s.trilhaDaDescida.map((t) => t.nome).join(' › ')
-                  : s.categoria}
-              </span>
-              {s.desceuNiveis > 0 && s.anunciosNaEntrada ? (
-                <span className="sub-sugestao">
-                  desceu de {s.anunciosNaEntrada.toLocaleString('pt-BR')} para{' '}
-                  {s.anunciosNaCategoria.toLocaleString('pt-BR')} anúncios
-                </span>
-              ) : null}
+              <span className="sub-sugestao">{s.categoria}</span>
             </button>
 
-            {s.entrada && s.entrada.nota !== null ? (
-              <div className={`faixa-entrada${s.entrada.nota >= 65 ? ' boa' : s.entrada.nota >= 40 ? ' media' : ' ruim'}`}>
-                <span className="rotulo-entrada">Dá para competir aqui?</span>
-                <span className="nota-entrada">{s.entrada.nota}<small>/100</small></span>
-                <span className="frase-entrada">{s.resumoDaEntrada}</span>
-                {!s.entrada.completo ? (
-                  <span className="frase-entrada tenue">
-                    Nota parcial — faltou: {s.entrada.faltando.join(', ')}.
-                  </span>
+            {n.nota !== null && n.nota !== undefined ? (
+              <div className={`faixa-entrada${n.nota >= 65 ? ' boa' : n.nota >= 40 ? ' media' : ' ruim'}`}>
+                <span className="rotulo-entrada">Dá para competir neste produto?</span>
+                <span className="nota-entrada">{n.nota}<small>/100</small></span>
+                <span className="frase-entrada">{s.resumoDoNicho}</span>
+                {!n.completo ? (
+                  <span className="frase-entrada tenue">Nota parcial — faltou: {n.faltando.join(', ')}.</span>
                 ) : null}
               </div>
             ) : null}
 
             <div className="linhas">
-              {/* Procura. A ordem e deliberada: visita e o numero mais
-                  forte que existe hoje, porque /items fechou e levou
-                  sold_quantity junto. Visita e janela de 30 dias, nao vem
-                  arredondada, e mede a atencao que o anuncio recebe — venda
-                  sem visita nao existe. Se /items reabrir, a velocidade de
-                  venda volta a aparecer na frente, sozinha. */}
-              {s.vendasPorMes !== null && s.vendasPorMes !== undefined ? (
+              {/* O numero do nicho vem primeiro porque e ele que decide. A
+                  categoria inteira e so contexto: "Bolsas" tem 421 mil
+                  anuncios e isso nao diz nada sobre o produto onde dois
+                  vendedores brigam. */}
+              {s.visitasPorVendedor !== null && s.visitasPorVendedor !== undefined ? (
                 <Linha
-                  rotulo="Procura"
-                  detalhe={`vendas por mês, mediana de ${s.itensComData} campeões`}
-                  valor={`${Math.round(s.vendasPorMes)} /mês`}
+                  rotulo="Atenção por concorrente"
+                  detalhe="visitas do produto em 30 dias ÷ quem disputa a ficha"
+                  valor={Math.round(s.visitasPorVendedor).toLocaleString('pt-BR')}
                   destaque
                 />
-              ) : s.visitasMedianas !== null && s.visitasMedianas !== undefined ? (
+              ) : null}
+              {s.visitas !== null && s.visitas !== undefined ? (
                 <Linha
-                  rotulo="Procura"
-                  detalhe={`visitas em 30 dias, mediana de ${s.anunciosMedidos} campeões`}
-                  valor={Math.round(s.visitasMedianas).toLocaleString('pt-BR')}
-                  destaque
-                />
-              ) : (
-                <Linha
-                  rotulo="Procura"
-                  detalhe="o Mercado Livre não abriu visitas nem vendas aqui"
-                  valor={`${s.posicaoNaTendencia}º mais buscado do Brasil`}
-                />
-              )}
-
-              {s.visitasDoTopo ? (
-                <Linha
-                  rotulo="O campeão recebe"
-                  detalhe="visitas em 30 dias"
-                  valor={Math.round(s.visitasDoTopo).toLocaleString('pt-BR')}
+                  rotulo="Procura deste produto"
+                  detalhe={`visitas em 30 dias, ${s.anunciosMedidos} anúncio${s.anunciosMedidos === 1 ? '' : 's'} medido${s.anunciosMedidos === 1 ? '' : 's'}`}
+                  valor={Math.round(s.visitas).toLocaleString('pt-BR')}
                 />
               ) : null}
-
-              {s.avaliacoesDoCampeao && s.avaliacoesDoCampeao.total ? (
-                <Linha
-                  rotulo="Avaliações do campeão"
-                  detalhe={s.avaliacoesDoCampeao.media
-                    ? `nota ${Number(s.avaliacoesDoCampeao.media).toFixed(1)} — é prova de venda, não é a venda`
-                    : 'é prova de venda, não é a venda'}
-                  valor={Number(s.avaliacoesDoCampeao.total).toLocaleString('pt-BR')}
-                />
-              ) : null}
-
               <Linha
-                rotulo="Concorrência"
-                detalhe={`barreira ${s.barreira}/100`}
+                rotulo="Disputam esta ficha"
+                detalhe={s.temLojaOficial ? 'há loja oficial entre eles' : 'nenhuma loja oficial'}
+                valor={`${s.vendedoresNaFicha} ${s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}`}
+                tom={s.vendedoresNaFicha >= 10 || s.temLojaOficial ? 'desconta' : undefined}
+              />
+              <Linha
+                rotulo="Categoria inteira"
+                detalhe="só contexto: o que importa é a ficha acima"
                 valor={`${s.anunciosNaCategoria.toLocaleString('pt-BR')} anúncios`}
-                tom={s.barreira >= 70 ? 'desconta' : undefined}
               />
               <Linha
                 rotulo="Preço de venda"
-                detalhe={s.precoMin && s.precoMax ? `de ${reais(s.precoMin)} a ${reais(s.precoMax)}` : 'mediana dos campeões'}
+                detalhe={s.precoMin && s.precoMax ? `de ${reais(s.precoMin)} a ${reais(s.precoMax)}` : 'mediana dos anúncios da ficha'}
                 valor={s.precoMediano ? reais(s.precoMediano) : '—'}
                 destaque
               />
@@ -192,28 +156,21 @@ export default function Sugestoes({ config, aoCadastrar }) {
 
             {aberta ? (
               <>
-                <Aviso nivel={s.barreira >= 70 ? 'critico' : s.barreira >= 45 ? 'atencao' : 'info'} titulo="Dá para entrar aqui?">
-                  {s.resumoDaBarreira}
-                </Aviso>
-                <div className="linhas">
-                  <Linha rotulo="Lojas oficiais no topo" valor={porcento(s.lojasOficiais, 0)} />
-                  <Linha rotulo="Disputa por catálogo" valor={porcento(s.catalogo, 0)} />
-                  {s.vendedoresNaFicha ? (
-                    <Linha
-                      rotulo="Disputam a mesma ficha"
-                      detalhe="quando é catálogo, só o mais barato aparece"
-                      valor={`${s.vendedoresNaFicha} ${s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}`}
-                      tom={s.vendedoresNaFicha >= 10 ? 'desconta' : undefined}
-                    />
-                  ) : null}
-                  {s.visitasSomadas ? (
-                    <Linha
-                      rotulo="Atenção somada dos campeões"
-                      detalhe="visitas em 30 dias"
-                      valor={Math.round(s.visitasSomadas).toLocaleString('pt-BR')}
-                    />
-                  ) : null}
-                </div>
+                {s.alternativas && s.alternativas.length ? (
+                  <>
+                    <div className="separa-secao"><span>outros produtos desta categoria</span></div>
+                    <div className="linhas">
+                      {s.alternativas.map((a) => (
+                        <Linha
+                          key={a.produtoId}
+                          rotulo={a.preco ? reais(a.preco) : 'sem preço'}
+                          detalhe={`${a.vendedores} disputando`}
+                          valor={a.visitas !== null ? `${Math.round(a.visitas).toLocaleString('pt-BR')} visitas` : '—'}
+                        />
+                      ))}
+                    </div>
+                  </>
+                ) : null}
                 <ul className="lista-categorias">
                   {s.exemplos.map((e) => (
                     <li key={e.link || e.titulo}>

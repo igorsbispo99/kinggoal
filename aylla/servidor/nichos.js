@@ -200,3 +200,74 @@ export function explicarEntrada({ nota, anuncios, visitasPorAnuncio, lojasOficia
 
   return `${veredito}${caminho ? ` em ${caminho}` : ''}: ${pedacos.join('; ')}.`
 }
+
+/**
+ * A nota do nicho — no produto, que é onde ela de fato compete.
+ *
+ * Substitui a nota por categoria, que estava medindo a coisa errada. Uma
+ * categoria de 421 mil anúncios não diz nada sobre o produto específico
+ * onde só dois vendedores brigam.
+ *
+ * Três sinais, e o primeiro vale mais que os outros dois juntos:
+ *
+ *   atenção por concorrente ... visitas do produto divididas pelos
+ *                              vendedores que o disputam. É o número.
+ *   poucos concorrentes ...... disputar com dois é diferente de disputar
+ *                              com quarenta, mesmo com a mesma atenção.
+ *   topo sem loja oficial .... marca com loja própria na ficha ganha a
+ *                              caixa de compra quase sempre.
+ */
+export function notaDoNicho({ visitasPorVendedor, vendedores, temLojaOficial }) {
+  const vpv = numeroOuNulo(visitasPorVendedor)
+  const n = numeroOuNulo(vendedores)
+
+  // 50 visitas por vendedor por mês já é sinal; 2.000 é excelente.
+  const porAtencao = vpv === null ? null
+    : Math.min(100, (Math.log10(1 + vpv) / Math.log10(1 + 2000)) * 100)
+
+  // 2 vendedores é ótimo; 40 é guerra de centavo.
+  const porConcorrentes = n === null ? null
+    : Math.min(100, Math.max(0, (1 - (Math.log10(Math.max(1, n)) / Math.log10(40))) * 100))
+
+  const porMarca = temLojaOficial === null || temLojaOficial === undefined
+    ? null
+    : (temLojaOficial ? 25 : 100)
+
+  const sinais = [
+    { nome: 'atenção por concorrente', valor: porAtencao, peso: 0.55 },
+    { nome: 'quantos disputam', valor: porConcorrentes, peso: 0.3 },
+    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.15 },
+  ]
+  const presentes = sinais.filter((s) => s.valor !== null)
+  const faltando = sinais.filter((s) => s.valor === null).map((s) => s.nome)
+  if (!presentes.length) return { nota: null, completo: false, faltando }
+
+  const soma = presentes.reduce((t, s) => t + s.peso, 0)
+  const nota = presentes.reduce((t, s) => t + s.valor * (s.peso / soma), 0)
+  return {
+    nota: Math.round(Math.min(100, Math.max(0, nota))),
+    completo: faltando.length === 0,
+    cobertura: Math.round(soma * 100) / 100,
+    faltando,
+    motivos: { porAtencao, porConcorrentes, porMarca },
+  }
+}
+
+/** A frase do nicho. Números sem porquê não ensinam ninguém a escolher. */
+export function explicarNicho({ nota, visitas, vendedores, visitasPorVendedor, temLojaOficial }) {
+  const pedacos = []
+  if (Number.isFinite(visitas) && Number.isFinite(vendedores)) {
+    pedacos.push(`${visitas.toLocaleString('pt-BR')} visitas em 30 dias divididas entre ${vendedores} ${vendedores === 1 ? 'vendedor' : 'vendedores'}`)
+  }
+  if (Number.isFinite(visitasPorVendedor)) {
+    pedacos.push(`${Math.round(visitasPorVendedor).toLocaleString('pt-BR')} por concorrente`)
+  }
+  if (temLojaOficial) pedacos.push('mas há loja oficial na ficha, e ela costuma levar a caixa de compra')
+
+  const veredito = nota === null ? 'Sem nota'
+    : nota >= 65 ? 'Esse é um bom lugar para entrar'
+      : nota >= 40 ? 'Dá para tentar, com cuidado'
+        : 'Aqui a atenção não sobra'
+
+  return `${veredito}: ${pedacos.join('; ')}.`
+}

@@ -20,9 +20,9 @@
 // configurações dela (ICMS do estado, dólar do dia, margem alvo). Aqui sai
 // só o que vem do Mercado Livre.
 
-import { maisVendidos, tendencias, comissaoReal, ondeIssoVive } from './descoberta.js'
+import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
-import { descerAteNicho, notaDeEntrada, explicarEntrada } from './nichos.js'
+import { notaDoNicho, explicarNicho } from './nichos.js'
 
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
@@ -115,6 +115,23 @@ export async function depurarFunil(env, { token, termo = null }) {
 
   const catId = porDominio && porDominio[0] ? porDominio[0].categoriaId : null
 
+  // A categoria que o domain_discovery devolve tem filhas? Se nao tiver, ela
+  // e folha — e foi por isso que a descida pela arvore nunca aconteceu.
+  if (catId) {
+    const c = await fetch(`${API}/categories/${catId}`, {
+      headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    })
+    const cj = await c.json().catch(() => null)
+    anotar('categoria_e_folha', {
+      ok: c.ok,
+      id: catId,
+      nome: cj ? cj.name : null,
+      anuncios: cj ? cj.total_items_in_this_category : null,
+      filhas: cj && Array.isArray(cj.children_categories) ? cj.children_categories.length : null,
+      eFolha: cj && Array.isArray(cj.children_categories) ? cj.children_categories.length === 0 : null,
+    })
+  }
+
   // Passo 3: os campeoes vem como ITEM ou como PRODUCT? Muda o multiget.
   if (catId) {
     try {
@@ -195,17 +212,20 @@ export async function depurarFunil(env, { token, termo = null }) {
       }
 
       // Passo 7: o funil de verdade, do jeito que o aplicativo roda.
-      const campeoes = await maisVendidos(env, { categoria: catId, token, quantos: 12, orcamentoDeProdutos: 3 })
-      anotar('mais_vendidos', {
-        ok: Boolean(campeoes.itens && campeoes.itens.length),
-        porTipo: campeoes.porTipo || null,
-        resolvidosDeCatalogo: campeoes.resolvidosDeCatalogo ?? null,
-        quantosItens: (campeoes.itens || []).length,
-        codigosDoMultiget: campeoes.codigosDoMultiget || null,
-        erroNoMultiget: campeoes.erroNoMultiget || null,
-        semItens: campeoes.semItens || false,
-        analiseVazia: campeoes.analise ? campeoes.analise.vazio : 'sem analise',
-        camposDoPrimeiroItem: campeoes.itens && campeoes.itens[0] ? Object.keys(campeoes.itens[0]) : null,
+      const achados = await nichosDaCategoria(env, { categoria: catId, token, quantosProdutos: 3 })
+      anotar('nichos_da_categoria', {
+        ok: Boolean(achados.nichos && achados.nichos.length),
+        semProdutos: achados.semProdutos || false,
+        quantos: (achados.nichos || []).length,
+        // O numero que decide tudo: atencao por concorrente, no produto.
+        melhores: (achados.nichos || []).slice(0, 3).map((n) => ({
+          produtoId: n.produtoId,
+          vendedores: n.vendedores,
+          visitas: n.visitas,
+          visitasPorVendedor: n.visitasPorVendedor === null ? null : Math.round(n.visitasPorVendedor),
+          precoMediano: n.precoMediano,
+          temLojaOficial: n.temLojaOficial,
+        })),
       })
     } catch (e) { anotar('highlights', { ok: false, erro: e.message }) }
   }
@@ -221,6 +241,9 @@ export async function depurarFunil(env, { token, termo = null }) {
 //
 // Menos sugestoes e mais fundo e a troca certa: uma sugestao onde ela
 // consegue competir vale mais que cinco onde ela nao consegue.
+// Quatro sugestoes. Por termo: dominio, categoria, campeoes, tres produtos,
+// visitas em lote e tarifa — oito chamadas. Quatro vezes oito mais as
+// tendencias da trinta e tres, dentro do teto de 50 do Worker gratuito.
 export async function montarSugestoes(env, { token, quantas = 4 }) {
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
@@ -229,166 +252,106 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
   for (const t of termos) {
     if (sugestoes.length >= quantas) break
 
-    // A categoria sai do domain_discovery, nao do catalogo. /products/search
-    // responde 200 mas nao garante category_id no resultado, e depender dele
-    // fazia o funil cortar tudo caladamente. O domain_discovery existe
-    // exatamente para traduzir texto em categoria, e devolve category_id
-    // sempre — foi assim que a sonda o mediu.
     let destinos = []
     try { destinos = await ondeIssoVive(env, { termo: t.termo, token }) } catch (e) {
       descartadas.push({ termo: t.termo, porque: `domain_discovery falhou: ${e.message}` })
       continue
     }
-    // ondeIssoVive ja devolve ordenado por aderencia ao termo.
     const destino = destinos[0]
     if (!destino) {
       descartadas.push({ termo: t.termo, porque: 'nenhuma categoria reconhecida para o termo' })
       continue
     }
 
-    // Descer ate o nicho, em vez de parar na porta da categoria. "Bolsas"
-    // tem 421 mil anuncios e nao e mercado, e parede; dentro dela ha galhos
-    // com alguns milhares onde da para aparecer.
-    let descida
-    try {
-      descida = await descerAteNicho(env, {
-        categoriaId: destino.categoriaId,
-        termo: t.termo,
-        token,
-        maxNiveis: 3,
-        abrir: lerCategoria,
-      })
-    } catch (e) {
+    let cat
+    try { cat = await lerCategoria(env, destino.categoriaId, token) } catch (e) {
       descartadas.push({ termo: t.termo, porque: `categoria ${destino.categoriaId} não abriu` })
       continue
     }
-    const cat = descida.nicho
 
-    let campeoes
-    try {
-      campeoes = await maisVendidos(env, {
-        categoria: cat.id, token, quantos: 12, totalDaCategoria: cat.anuncios,
-        orcamentoDeProdutos: 2,
-      })
-    } catch (e) {
-      descartadas.push({ termo: t.termo, porque: `mais vendidos falhou: ${e.message}` })
+    // O nicho esta no produto, nao na arvore. domain_discovery ja devolve a
+    // categoria folha — "Bolsas", com 421 mil anuncios, e o galho mais fino
+    // que existe, e nao ha para onde descer. Mas dentro dela ha um produto
+    // com dois vendedores e outro com quarenta, e esses dois sao negocios
+    // diferentes.
+    let achados
+    try { achados = await nichosDaCategoria(env, { categoria: cat.id, token, quantosProdutos: 3 }) } catch (e) {
+      descartadas.push({ termo: t.termo, categoria: cat.nome, porque: `mais vendidos falhou: ${e.message}` })
+      continue
+    }
+    const melhor = achados.nichos.find((n) => n.visitasPorVendedor !== null) || achados.nichos[0]
+    if (!melhor) {
+      descartadas.push({ termo: t.termo, categoria: cat.nome, porque: 'nenhum produto de catálogo com anúncio ativo' })
       continue
     }
 
-    const analise = campeoes.analise
-    if (!analise || analise.vazio) {
-      descartadas.push({
-        termo: t.termo,
-        categoria: cat.nome,
-        porque: 'sem campeões para medir',
-        porTipo: campeoes.porTipo || null,
-        codigosDoMultiget: campeoes.codigosDoMultiget || null,
-        erroNoMultiget: campeoes.erroNoMultiget || null,
-      })
-      continue
-    }
+    const nota = notaDoNicho({
+      visitasPorVendedor: melhor.visitasPorVendedor,
+      vendedores: melhor.vendedores,
+      temLojaOficial: melhor.temLojaOficial,
+    })
 
-    const precos = campeoes.itens.map((i) => Number(i.price)).filter((p) => Number.isFinite(p) && p > 0)
-    const precoMedianoDaCategoria = mediana(precos)
-
-    // A comissao real daquela categoria, no preco que ela de fato pratica.
-    // Sem isto o "pague ate" sairia da media que eu digitei, e a media erra
-    // ate sete pontos — o bastante para o teto mentir em reais.
+    // A comissao real da categoria, no preco que esse produto pratica.
     let tarifa = null
-    if (precoMedianoDaCategoria) {
+    if (melhor.precoMediano) {
       try {
-        const t = await comissaoReal(env, {
-          categoria: cat.id,
-          preco: Math.round(precoMedianoDaCategoria),
-          token,
-        })
-        const classico = t.tipos.find((x) => x.tipo === 'gold_special') || t.tipos[0]
-        if (classico) tarifa = { percentual: classico.percentual, custoFixo: classico.custoFixo, tipo: classico.nome }
+        const r = await comissaoReal(env, { categoria: cat.id, preco: Math.round(melhor.precoMediano), token })
+        const classico = r.tipos.find((x) => x.tipo === 'gold_special') || r.tipos[0]
+        if (classico && classico.percentual !== null) {
+          tarifa = { percentual: classico.percentual, custoFixo: classico.custoFixo, tipo: classico.nome }
+        }
       } catch { /* a sugestao vale sem a tarifa; a tela diz que e estimada */ }
     }
 
-    // A folga de preco: quanto do preco de venda sobra depois da comissao
-    // real e do frete. Entra na nota de entrada como "espaco no preco".
-    const comissao = tarifa ? tarifa.percentual : null
-    const folgaDePreco = precoMedianoDaCategoria && comissao !== null
-      ? Math.max(0, 1 - comissao - ((tarifa.custoFixo || 0) / precoMedianoDaCategoria))
-      : null
-
-    const entrada = notaDeEntrada({
-      visitasDoTopo: campeoes.procura.visitasDoTopo,
-      anuncios: cat.anuncios,
-      lojasOficiais: analise.concorrencia.lojasOficiais,
-      catalogo: analise.concorrencia.catalogo,
-      folgaDePreco,
-    })
-
     sugestoes.push({
       termo: t.termo,
-      entrada,
-      resumoDaEntrada: explicarEntrada({
-        nota: entrada.nota,
-        anuncios: cat.anuncios,
-        visitasPorAnuncio: entrada.motivos.visitasPorAnuncio,
-        lojasOficiais: analise.concorrencia.lojasOficiais,
-        trilha: descida.trilha,
-      }),
       posicaoNaTendencia: t.posicao,
       linkDaBusca: t.link,
-      // Anúncio de catálogo não traz título; então pega o primeiro que tiver,
-      // e se nenhum tiver, o próprio termo da tendência serve de nome.
-      produtoExemplo: (campeoes.itens.find((i) => i.title) || {}).title || t.termo,
       categoria: cat.nome,
       categoriaId: cat.id,
-      outrasCategorias: destinos.slice(1, 3).map((d) => d.categoria),
       caminho: cat.caminho.map((c) => c.nome),
-      trilhaDaDescida: descida.trilha,
-      desceuNiveis: descida.desceu,
-      parouPorque: descida.parouPorque,
-      // O tamanho de onde a busca caiu antes de descer: sem isso nao da
-      // para ver que o sistema fez o trabalho de sair da parede.
-      categoriaDeEntrada: descida.trilha[0] ? descida.trilha[0].nome : null,
-      anunciosNaEntrada: descida.trilha[0] ? descida.trilha[0].anuncios : null,
-      // concorrência
       anunciosNaCategoria: cat.anuncios,
-      barreira: analise.barreira.nota,
-      resumoDaBarreira: analise.resumo,
-      // Procura, medida em visitas de 30 dias. sold_quantity morreu com o
-      // fechamento de /items; visita e melhor de qualquer jeito — janela
-      // fechada em vez de total desde sempre, e sem o arredondamento que o
-      // Mercado Livre aplicava nas vendas.
-      visitasMedianas: campeoes.procura.visitasMedianas,
-      visitasDoTopo: campeoes.procura.visitasDoTopo,
-      visitasSomadas: campeoes.procura.visitasSomadas,
-      anunciosMedidos: campeoes.procura.anunciosMedidos,
-      avaliacoesDoCampeao: campeoes.procura.avaliacoesDoCampeao,
-      vendedoresNaFicha: campeoes.procura.vendedoresNaFicha,
-      // Continua saindo quando houver: se o Mercado Livre reabrir /items,
-      // volta sozinho.
-      vendasPorMes: analise.demanda.velocidadeMediana,
-      vendasPorMesTopo: analise.demanda.velocidadeMaxima,
-      itensComData: analise.demanda.itensComData,
-      // preço de venda praticado
-      precoMediano: precoMedianoDaCategoria,
+      outrasCategorias: destinos.slice(1, 3).map((d) => d.categoria),
+
+      // O nicho: um produto especifico, com quem disputa ele.
+      produtoId: melhor.produtoId,
+      vendedoresNaFicha: melhor.vendedores,
+      visitas: melhor.visitas,
+      visitasPorVendedor: melhor.visitasPorVendedor,
+      anunciosMedidos: melhor.anunciosMedidos,
+      temLojaOficial: melhor.temLojaOficial,
+      precoMediano: melhor.precoMediano,
+      precoMin: melhor.precoMin,
+      precoMax: melhor.anuncios.length
+        ? Math.max(...melhor.anuncios.map((a) => a.price).filter((x) => Number.isFinite(x)))
+        : null,
+      nota,
+      resumoDoNicho: explicarNicho({
+        nota: nota.nota,
+        visitas: melhor.visitas,
+        vendedores: melhor.vendedores,
+        visitasPorVendedor: melhor.visitasPorVendedor,
+        temLojaOficial: melhor.temLojaOficial,
+      }),
+      // Os outros produtos medidos, para ela comparar dentro da categoria.
+      alternativas: achados.nichos.slice(1, 3).map((n) => ({
+        produtoId: n.produtoId,
+        vendedores: n.vendedores,
+        visitas: n.visitas,
+        preco: n.precoMediano,
+      })),
       tarifa,
-      precoMin: precos.length ? Math.min(...precos) : null,
-      precoMax: precos.length ? Math.max(...precos) : null,
-      // quem já está lá
-      lojasOficiais: analise.concorrencia.lojasOficiais,
-      catalogo: analise.concorrencia.catalogo,
-      exemplos: campeoes.itens.slice(0, 3).map((i) => ({
-        titulo: i.title || 'Anúncio de catálogo', preco: i.price, link: i.permalink,
+      exemplos: melhor.anuncios.slice(0, 3).map((a) => ({
+        titulo: 'Anúncio de catálogo',
+        preco: a.price,
+        link: a.id ? `https://produto.mercadolivre.com.br/${String(a.id).replace(/^MLB/, 'MLB-')}` : null,
       })),
     })
   }
 
-  // Ordena pela chance de competir, nao pela posicao na tendencia. O que
-  // esta em primeiro lugar nas buscas costuma ser exatamente onde ninguem
-  // que esta comecando consegue entrar.
-  sugestoes.sort((a, b) => {
-    const na = a.entrada.nota === null ? -1 : a.entrada.nota
-    const nb = b.entrada.nota === null ? -1 : b.entrada.nota
-    return nb - na
-  })
+  // Ordena pela chance de competir, nao pela posicao na tendencia. O termo
+  // mais buscado do Brasil costuma ser exatamente onde ela nao entra.
+  sugestoes.sort((a, b) => (b.nota.nota ?? -1) - (a.nota.nota ?? -1))
 
   const resultado = { sugestoes, descartadas, termosLidos: termos.length }
   await guardar(env, 'semana', resultado)
