@@ -23,6 +23,13 @@ import { analisarBusca } from './analise.js'
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
 
+const medianaDe = (lista) => {
+  if (!lista.length) return null
+  const o = [...lista].sort((a, b) => a - b)
+  const m = Math.floor(o.length / 2)
+  return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2
+}
+
 async function pegar(caminho, token, { cacheSegundos = 0 } = {}) {
   const url = `${API}${caminho}`
   const cache = caches.default
@@ -139,6 +146,51 @@ export function ordenarPorAderencia(destinos, termo) {
  * de itens, numa chamada só: uma por item queimaria o limite à toa.
  */
 /**
+ * Visitas dos anúncios nos últimos 30 dias.
+ *
+ * Esta é a procura, e ela é melhor do que o número que ela pediu.
+ *
+ * /items está fechado com 403 — testado com id do /highlights e com
+ * item_id que sabidamente existe, os dois recusados —, então
+ * sold_quantity e date_created não existem mais para aplicativos. Mas
+ * /visits/items responde 200 e devolve um mapa id → visitas.
+ *
+ * E visita é um sinal melhor que venda acumulada por três motivos: é
+ * janela de 30 dias em vez de total desde sempre, não vem arredondada
+ * pelo Mercado Livre como sold_quantity vinha, e mede a atenção que o
+ * anúncio recebe — que é o que ela precisa saber antes de comprar
+ * estoque, porque venda sem visita não existe.
+ *
+ * É em lote: uma chamada para todos os anúncios de uma vez.
+ */
+async function visitasDeAnuncios(ids, token) {
+  if (!ids.length) return {}
+  const r = await pegar(`/visits/items?ids=${ids.join(',')}`, token, { cacheSegundos: 3600 })
+  if (!r.ok || !r.json || typeof r.json !== 'object') return {}
+  return r.json
+}
+
+/**
+ * Avaliações de um anúncio: quantas e que nota.
+ *
+ * Não é venda, e não vai ser apresentada como se fosse. É prova social
+ * acumulada — 1.698 avaliações num anúncio querem dizer que muita gente
+ * comprou e voltou para falar. Serve para separar categoria que vende de
+ * categoria que só tem anúncio parado.
+ *
+ * Só funciona com id de ANÚNCIO. Com id de produto de catálogo o Mercado
+ * Livre responde 404, medido.
+ */
+async function avaliacoesDoAnuncio(id, token) {
+  const r = await pegar(`/reviews/item/${id}`, token, { cacheSegundos: 86400 })
+  if (!r.ok || !r.json) return null
+  return {
+    total: (r.json.paging && r.json.paging.total) || 0,
+    media: r.json.rating_average ?? null,
+  }
+}
+
+/**
  * Multiget de anúncios. Devolve os códigos junto porque o Mercado Livre
  * responde 200 no envelope e o erro real vem dentro, por entrada.
  */
@@ -174,8 +226,11 @@ async function multigetDeAnuncios(ids, token) {
  * isso fica null em vez de virar estimativa.
  */
 async function anunciosDoProduto(id, token) {
-  const r = await pegar(`/products/${id}/items`, token, { cacheSegundos: 3600 })
+  const r = await pegar(`/products/${id}/items?limit=50`, token, { cacheSegundos: 3600 })
   const lista = (r.ok && r.json && r.json.results) || []
+  // Quantos vendedores disputam a MESMA ficha. Dois é briga; quarenta é
+  // guerra de centavo, e o preço vai para o chão.
+  const vendedoresNaFicha = (r.ok && r.json && r.json.paging && r.json.paging.total) || lista.length
   return lista.map((a) => {
     const anuncioId = a.item_id || a.id
     return {
@@ -193,9 +248,11 @@ async function anunciosDoProduto(id, token) {
       // É um anúncio de catálogo por construção: foi daí que ele saiu.
       catalog_listing: true,
       // sold_quantity e date_created não existem neste endereço, então a
-      // velocidade de venda sai null — nunca estimada.
+      // velocidade de venda sai null — nunca estimada. A procura vem das
+      // visitas, medidas em separado.
       sold_quantity: undefined,
       date_created: undefined,
+      vendedoresNaFicha,
     }
   })
 }
@@ -251,15 +308,39 @@ export async function maisVendidos(env, {
     }
   }
 
+  // A procura, em uma chamada para todos os anúncios de uma vez.
+  const visitas = await visitasDeAnuncios(itens.map((i) => i.id).filter(Boolean), token)
+  const comVisitas = itens.map((i) => ({ ...i, visitas: visitas[i.id] ?? null }))
+  const numeros = comVisitas.map((i) => i.visitas).filter((v) => Number.isFinite(v))
+
+  // Prova social do campeão. Uma chamada só, no primeiro, porque cada
+  // anúncio custa uma requisição e o teto do Worker é 50.
+  let avaliacoesDoCampeao = null
+  if (comVisitas[0] && comVisitas[0].id) {
+    avaliacoesDoCampeao = await avaliacoesDoAnuncio(comVisitas[0].id, token)
+  }
+
   const analise = analisarBusca({
-    busca: { results: itens, paging: { total: totalDaCategoria ?? itens.length } },
-    enriquecidos: itens,
+    busca: { results: comVisitas, paging: { total: totalDaCategoria ?? comVisitas.length } },
+    enriquecidos: comVisitas,
   })
 
   return {
     categoria,
-    itens,
+    itens: comVisitas,
     analise,
+    // A procura vive fora da análise porque a análise foi escrita para
+    // sold_quantity, que não existe mais. Visita é outro número e merece
+    // nome próprio em vez de ocupar o lugar de um que sumiu.
+    procura: {
+      visitasMedianas: medianaDe(numeros),
+      visitasDoTopo: numeros.length ? Math.max(...numeros) : null,
+      visitasSomadas: numeros.length ? numeros.reduce((t, v) => t + v, 0) : null,
+      anunciosMedidos: numeros.length,
+      janelaDias: 30,
+      avaliacoesDoCampeao,
+      vendedoresNaFicha: comVisitas.find((i) => i.vendedoresNaFicha)?.vendedoresNaFicha ?? null,
+    },
     porTipo,
     codigosDoMultiget,
     resolvidosDeCatalogo: itensDeCatalogo.length,

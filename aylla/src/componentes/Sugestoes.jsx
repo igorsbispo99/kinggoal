@@ -82,24 +82,52 @@ export default function Sugestoes({ config, aoCadastrar }) {
             </button>
 
             <div className="linhas">
-              {/* Procura tem duas fontes, e a segunda existe porque o
-                  Mercado Livre fechou /items para este aplicativo: sem
-                  sold_quantity e date_created nao ha velocidade de venda.
-                  O que sobra e real e nao e pouco — a posicao do termo na
-                  lista do que o Brasil mais busca agora. */}
-              {s.vendasPorMes !== null ? (
+              {/* Procura. A ordem e deliberada: visita e o numero mais
+                  forte que existe hoje, porque /items fechou e levou
+                  sold_quantity junto. Visita e janela de 30 dias, nao vem
+                  arredondada, e mede a atencao que o anuncio recebe — venda
+                  sem visita nao existe. Se /items reabrir, a velocidade de
+                  venda volta a aparecer na frente, sozinha. */}
+              {s.vendasPorMes !== null && s.vendasPorMes !== undefined ? (
                 <Linha
                   rotulo="Procura"
                   detalhe={`vendas por mês, mediana de ${s.itensComData} campeões`}
                   valor={`${Math.round(s.vendasPorMes)} /mês`}
+                  destaque
+                />
+              ) : s.visitasMedianas !== null && s.visitasMedianas !== undefined ? (
+                <Linha
+                  rotulo="Procura"
+                  detalhe={`visitas em 30 dias, mediana de ${s.anunciosMedidos} campeões`}
+                  valor={Math.round(s.visitasMedianas).toLocaleString('pt-BR')}
+                  destaque
                 />
               ) : (
                 <Linha
                   rotulo="Procura"
-                  detalhe="o Mercado Livre fechou o número de vendas por anúncio"
+                  detalhe="o Mercado Livre não abriu visitas nem vendas aqui"
                   valor={`${s.posicaoNaTendencia}º mais buscado do Brasil`}
                 />
               )}
+
+              {s.visitasDoTopo ? (
+                <Linha
+                  rotulo="O campeão recebe"
+                  detalhe="visitas em 30 dias"
+                  valor={Math.round(s.visitasDoTopo).toLocaleString('pt-BR')}
+                />
+              ) : null}
+
+              {s.avaliacoesDoCampeao && s.avaliacoesDoCampeao.total ? (
+                <Linha
+                  rotulo="Avaliações do campeão"
+                  detalhe={s.avaliacoesDoCampeao.media
+                    ? `nota ${Number(s.avaliacoesDoCampeao.media).toFixed(1)} — é prova de venda, não é a venda`
+                    : 'é prova de venda, não é a venda'}
+                  valor={Number(s.avaliacoesDoCampeao.total).toLocaleString('pt-BR')}
+                />
+              ) : null}
+
               <Linha
                 rotulo="Concorrência"
                 detalhe={`barreira ${s.barreira}/100`}
@@ -149,8 +177,21 @@ export default function Sugestoes({ config, aoCadastrar }) {
                 <div className="linhas">
                   <Linha rotulo="Lojas oficiais no topo" valor={porcento(s.lojasOficiais, 0)} />
                   <Linha rotulo="Disputa por catálogo" valor={porcento(s.catalogo, 0)} />
-                  {s.vendasPorMesTopo !== null
-                    ? <Linha rotulo="O campeão vende" valor={`${Math.round(s.vendasPorMesTopo)} /mês`} /> : null}
+                  {s.vendedoresNaFicha ? (
+                    <Linha
+                      rotulo="Disputam a mesma ficha"
+                      detalhe="quando é catálogo, só o mais barato aparece"
+                      valor={`${s.vendedoresNaFicha} ${s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}`}
+                      tom={s.vendedoresNaFicha >= 10 ? 'desconta' : undefined}
+                    />
+                  ) : null}
+                  {s.visitasSomadas ? (
+                    <Linha
+                      rotulo="Atenção somada dos campeões"
+                      detalhe="visitas em 30 dias"
+                      valor={Math.round(s.visitasSomadas).toLocaleString('pt-BR')}
+                    />
+                  ) : null}
                 </div>
                 <ul className="lista-categorias">
                   {s.exemplos.map((e) => (

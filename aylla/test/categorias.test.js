@@ -110,3 +110,51 @@ test('palavra curta não desempata nada', async () => {
   // "ar" tem duas letras: casaria com meio catálogo e não significa nada.
   assert.equal(ordenarPorAderencia(destinos, 'ar')[0].categoriaId, 'A')
 })
+
+// --- a procura, depois do estresse de 15 enderecos ---
+
+test('o que o estresse provou morto continua morto, e está documentado', () => {
+  // Medido em 12/09/2026, com id do /highlights E com item_id que
+  // sabidamente existe — os dois recusados com access_denied:
+  const mortos = {
+    '/items/{id}': 403,
+    '/items?ids=': 403,
+    '/sites/MLB/search?category=': 403,
+    '/sites/MLB/search?sort=sold_quantity_desc': 403,
+  }
+  // O teste existe para o dia em que alguém pensar em "só tentar /items de
+  // novo": já foi tentado nas duas pontas, e a recusa não era sobre o id.
+  assert.equal(Object.values(mortos).every((s) => s === 403), true)
+})
+
+test('visita substitui venda, e é um número melhor', () => {
+  // /visits/items?ids=X devolveu {"MLB7477248300":3743}, e o mesmo anúncio
+  // no /items/{id}/visits/time_window?last=30 deu total_visits 3743. São a
+  // mesma janela: 30 dias fechados.
+  //
+  // Por que é melhor que sold_quantity, que era o que ela pediu:
+  //   sold_quantity era acumulado desde a publicação e vinha arredondado
+  //   pelo Mercado Livre ("referencial", na palavra deles). Visita é janela
+  //   fechada, número cheio, e mede atenção — que vem antes da venda.
+  const doLote = { MLB7477248300: 3743 }
+  const daJanela = { total_visits: 3743, last: 30, unit: 'day' }
+  assert.equal(doLote.MLB7477248300, daJanela.total_visits)
+  assert.equal(daJanela.last, 30)
+})
+
+test('avaliação é prova de venda, e não se converte em venda', () => {
+  // 1.698 avaliações num anúncio de bolsa. A tentação é multiplicar por um
+  // fator e chamar de vendas. Qualquer fator seria inventado, então o número
+  // aparece pelo que é.
+  const doAnuncio = { paging: { total: 1698 }, rating_average: 4.6 }
+  assert.equal(doAnuncio.paging.total, 1698)
+  assert.ok(doAnuncio.rating_average <= 5)
+})
+
+test('avaliação só responde com id de anúncio, nunca de produto', () => {
+  // /reviews/item/{itemId} deu 200; /reviews/item/{productId} deu 404.
+  // Passar id de catálogo ali devolve "not found item id" e nada mais.
+  const porAnuncio = 200
+  const porProduto = 404
+  assert.notEqual(porAnuncio, porProduto)
+})

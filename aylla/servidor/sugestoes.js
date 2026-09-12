@@ -250,7 +250,7 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
     try {
       campeoes = await maisVendidos(env, {
         categoria: destino.categoriaId, token, quantos: 12, totalDaCategoria: cat.anuncios,
-        orcamentoDeProdutos: 3,
+        orcamentoDeProdutos: 2,
       })
     } catch (e) {
       descartadas.push({ termo: t.termo, porque: `mais vendidos falhou: ${e.message}` })
@@ -304,7 +304,18 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       anunciosNaCategoria: cat.anuncios,
       barreira: analise.barreira.nota,
       resumoDaBarreira: analise.resumo,
-      // procura — medida, não estimada: sold_quantity cruzado com date_created
+      // Procura, medida em visitas de 30 dias. sold_quantity morreu com o
+      // fechamento de /items; visita e melhor de qualquer jeito — janela
+      // fechada em vez de total desde sempre, e sem o arredondamento que o
+      // Mercado Livre aplicava nas vendas.
+      visitasMedianas: campeoes.procura.visitasMedianas,
+      visitasDoTopo: campeoes.procura.visitasDoTopo,
+      visitasSomadas: campeoes.procura.visitasSomadas,
+      anunciosMedidos: campeoes.procura.anunciosMedidos,
+      avaliacoesDoCampeao: campeoes.procura.avaliacoesDoCampeao,
+      vendedoresNaFicha: campeoes.procura.vendedoresNaFicha,
+      // Continua saindo quando houver: se o Mercado Livre reabrir /items,
+      // volta sozinho.
       vendasPorMes: analise.demanda.velocidadeMediana,
       vendasPorMesTopo: analise.demanda.velocidadeMaxima,
       itensComData: analise.demanda.itensComData,
