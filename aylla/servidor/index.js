@@ -184,6 +184,10 @@ export default {
       autorizar.searchParams.set('response_type', 'code')
       autorizar.searchParams.set('client_id', env.ML_CLIENT_ID)
       autorizar.searchParams.set('redirect_uri', enderecoDeRetorno(request))
+      // Marcar o fluxo no formulario do aplicativo apenas permite o escopo.
+      // Sem pedi-lo aqui, o Mercado Livre autoriza e nao devolve refresh
+      // token — e o acesso cai sozinho em seis horas.
+      autorizar.searchParams.set('scope', 'offline_access read')
       autorizar.searchParams.set('state', estado)
       return Response.redirect(autorizar.toString(), 302)
     }
@@ -196,8 +200,9 @@ export default {
         return erro('Autorização não reconhecida. Comece de novo pelo aplicativo.', 403)
       }
       try {
-        await trocarCodigo(env, codigo, enderecoDeRetorno(request))
-        return Response.redirect(`${url.origin}/?ml=conectado`, 302)
+        const resultado = await trocarCodigo(env, codigo, enderecoDeRetorno(request))
+        const aviso = resultado.semRenovacao ? '&aviso=sem-renovacao' : ''
+        return Response.redirect(`${url.origin}/?ml=conectado${aviso}`, 302)
       } catch (falha) {
         // O motivo vai junto: "nao completou" sozinho nao permite consertar
         // nada. Aqui so trafega a mensagem de erro, nunca credencial.

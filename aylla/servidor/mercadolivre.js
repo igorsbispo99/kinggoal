@@ -80,7 +80,7 @@ export async function trocarCodigo(env, codigo, redirectUri) {
     expiraEm: Date.now() + (Number(json.expires_in) || 21600) * 1000,
     usuario: json.user_id,
   })
-  return { usuario: json.user_id }
+  return { usuario: json.user_id, semRenovacao }
 }
 
 /**
