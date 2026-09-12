@@ -29,6 +29,13 @@ async function prepararBanco(env) {
   await env.DB.exec(
     'CREATE TABLE IF NOT EXISTS ml_token (id INTEGER PRIMARY KEY, access TEXT, refresh TEXT, expira_em INTEGER, usuario TEXT, atualizado_em TEXT)',
   )
+  // Guardar o escopo que o Mercado Livre concedeu de fato. Sem isso, quando
+  // o refresh token não vem, não dá para saber se o pedido de offline_access
+  // foi negado ou se veio concedido e mesmo assim não houve renovação — duas
+  // causas diferentes, dois consertos diferentes.
+  // Em banco que já existe, o ALTER falha porque a coluna já está lá: esse é
+  // o caso normal depois da primeira vez, por isso o erro é engolido.
+  try { await env.DB.exec('ALTER TABLE ml_token ADD COLUMN escopos TEXT') } catch { /* já existe */ }
 }
 
 /* ------------------------------------------------------------ token */
@@ -41,11 +48,19 @@ async function lerToken(env) {
 async function gravarToken(env, dados) {
   await prepararBanco(env)
   await env.DB.prepare(
-    `INSERT INTO ml_token (id, access, refresh, expira_em, usuario, atualizado_em)
-     VALUES (1, ?, ?, ?, ?, ?)
+    `INSERT INTO ml_token (id, access, refresh, expira_em, usuario, atualizado_em, escopos)
+     VALUES (1, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO UPDATE SET access = excluded.access, refresh = excluded.refresh,
-       expira_em = excluded.expira_em, usuario = excluded.usuario, atualizado_em = excluded.atualizado_em`,
-  ).bind(dados.access, dados.refresh, dados.expiraEm, String(dados.usuario || ''), new Date().toISOString()).run()
+       expira_em = excluded.expira_em, usuario = excluded.usuario,
+       atualizado_em = excluded.atualizado_em, escopos = excluded.escopos`,
+  ).bind(
+    dados.access,
+    dados.refresh || '',
+    dados.expiraEm,
+    String(dados.usuario || ''),
+    new Date().toISOString(),
+    String(dados.escopos || ''),
+  ).run()
 }
 
 /** Troca o código da autorização pelo primeiro par de tokens. */
@@ -65,22 +80,21 @@ export async function trocarCodigo(env, codigo, redirectUri) {
   if (!resposta.ok || !json.access_token) {
     throw new Error(`Mercado Livre recusou a autorização: ${json.message || json.error || resposta.status}`)
   }
-  // Sem refresh token, o acesso morre em seis horas e ninguém entende por quê.
-  // Isso acontece quando o aplicativo foi criado sem o escopo offline_access.
-  if (!json.refresh_token) {
-    throw new Error(
-      'O Mercado Livre autorizou mas não devolveu refresh token. '
-      + 'Falta o escopo offline_access no aplicativo: ative e autorize de novo, '
-      + 'senão o acesso cai sozinho em seis horas.',
-    )
-  }
+  // Sem refresh token o acesso morre em seis horas. Recusar a conexão inteira
+  // fazia sentido quando a alternativa era ela não saber do problema; agora a
+  // tela avisa com todas as letras. Então guardamos o que veio: o radar
+  // funciona hoje, e a tela diz que será preciso reconectar. Seis horas
+  // funcionando é melhor que zero.
+  const escopos = String(json.scope || '')
+  const semRenovacao = !json.refresh_token
   await gravarToken(env, {
     access: json.access_token,
-    refresh: json.refresh_token,
+    refresh: json.refresh_token || '',
     expiraEm: Date.now() + (Number(json.expires_in) || 21600) * 1000,
     usuario: json.user_id,
+    escopos,
   })
-  return { usuario: json.user_id, semRenovacao }
+  return { usuario: json.user_id, semRenovacao, escopos }
 }
 
 /**
@@ -90,16 +104,20 @@ export async function trocarCodigo(env, codigo, redirectUri) {
 export async function obterToken(env) {
   const guardado = await lerToken(env)
   if (!guardado) return null
-  if (!guardado.refresh) {
-    throw new Error(
-      'A conexão foi feita sem refresh token (falta offline_access no aplicativo). '
-      + 'Reconecte depois de ativar o escopo.',
-    )
-  }
 
   const margem = 5 * 60 * 1000
   if (guardado.access && Number(guardado.expira_em) - margem > Date.now()) {
     return guardado.access
+  }
+
+  // Passou da validade e não há com que renovar: a conexão veio sem
+  // offline_access. Falhar aqui é o certo — mas só aqui, no fim das seis
+  // horas, e não na hora de conectar.
+  if (!guardado.refresh) {
+    throw new Error(
+      'O acesso de seis horas expirou e esta conexão veio sem renovação automática. '
+      + 'Conecte a conta do Mercado Livre de novo em Ajustes.',
+    )
   }
 
   const resposta = await fetch(`${API}/oauth/token`, {
@@ -123,6 +141,7 @@ export async function obterToken(env) {
     refresh: json.refresh_token || guardado.refresh,
     expiraEm: Date.now() + (Number(json.expires_in) || 21600) * 1000,
     usuario: json.user_id || guardado.usuario,
+    escopos: json.scope || guardado.escopos,
   })
   return json.access_token
 }
@@ -275,13 +294,14 @@ export async function diagnosticar(env) {
   if (temBanco(env)) {
     try {
       const guardado = await lerToken(env)
+      const concedido = (guardado && guardado.escopos) || 'não registrado'
       provas.push({
         nome: 'Renovação automática (offline_access)',
         ok: Boolean(guardado && guardado.refresh),
         status: guardado && guardado.refresh ? 200 : 0,
         nota: guardado && guardado.refresh
-          ? 'o acesso se renova sozinho'
-          : 'sem refresh token: o acesso cai em 6 horas — falta offline_access no aplicativo',
+          ? `o acesso se renova sozinho; escopo concedido: ${concedido}`
+          : `sem refresh token: o acesso cai em 6 horas; escopo concedido: ${concedido}`,
       })
     } catch (erro) { /* o banco já foi reportado acima */ }
   }

@@ -30,6 +30,7 @@ export default function App() {
   const [recadoRadar, setRecadoRadar] = useState(() => new URLSearchParams(window.location.search).get('ml'))
   const [motivoRadar] = useState(() => new URLSearchParams(window.location.search).get('motivo'))
   const [avisoRadar] = useState(() => new URLSearchParams(window.location.search).get('aviso'))
+  const [escoposRadar] = useState(() => new URLSearchParams(window.location.search).get('escopos'))
 
   // As simulações da fase 1 viram produtos, sem apagar o original.
   const [produtos, setProdutos] = useState(() => {
@@ -128,8 +129,8 @@ export default function App() {
           avisoRadar === 'sem-renovacao' ? (
             <div className="aviso atencao">
               <b>Conectado, mas sem renovação automática</b>
-              <span>O Mercado Livre não devolveu refresh token: o acesso vale por seis horas e depois é preciso reconectar.</span>
-              <span>O radar funciona normalmente até lá.</span>
+              <span>O radar já funciona. O acesso vale seis horas e depois é preciso conectar de novo aqui em Ajustes.</span>
+              <span className="tenue">Permissões concedidas pelo Mercado Livre: {escoposRadar || 'nenhuma informada'}.</span>
             </div>
           ) : (
             <div className="aviso info"><b>Mercado Livre conectado</b><span>O radar já pode ler o mercado.</span></div>

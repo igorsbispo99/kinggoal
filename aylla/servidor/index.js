@@ -201,7 +201,12 @@ export default {
       }
       try {
         const resultado = await trocarCodigo(env, codigo, enderecoDeRetorno(request))
-        const aviso = resultado.semRenovacao ? '&aviso=sem-renovacao' : ''
+        // O escopo concedido vai junto quando falta renovacao: e ele que diz
+        // se o offline_access foi negado ou concedido em vao. Escopo nao e
+        // credencial — e a lista do que foi permitido.
+        const aviso = resultado.semRenovacao
+          ? `&aviso=sem-renovacao&escopos=${encodeURIComponent(resultado.escopos || 'nenhum')}`
+          : ''
         return Response.redirect(`${url.origin}/?ml=conectado${aviso}`, 302)
       } catch (falha) {
         // O motivo vai junto: "nao completou" sozinho nao permite consertar

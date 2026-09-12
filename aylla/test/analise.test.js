@@ -193,20 +193,94 @@ test('sem credenciais e sem banco, o radar se declara desligado em vez de quebra
   assert.equal(temBanco({ DB: { prepare: () => {} } }), true)
 })
 
-test('conexão sem refresh token é recusada com explicação, não aceita em silêncio', async () => {
+/** Banco de mentira: guarda uma linha só, como o ml_token de verdade. */
+function bancoFalso(linha = null) {
+  const estado = { linha, alterou: false }
+  estado.DB = {
+    async exec(sql) {
+      if (sql.startsWith('ALTER')) {
+        if (estado.alterou) throw new Error('duplicate column name: escopos')
+        estado.alterou = true
+      }
+    },
+    prepare(sql) {
+      return {
+        bind(...valores) {
+          return {
+            async run() {
+              if (sql.includes('INSERT')) {
+                estado.linha = {
+                  access: valores[0], refresh: valores[1], expira_em: valores[2],
+                  usuario: valores[3], atualizado_em: valores[4], escopos: valores[5],
+                }
+              }
+            },
+          }
+        },
+        async first() { return estado.linha },
+      }
+    },
+  }
+  return estado
+}
+
+test('conexão sem renovação é aceita e marcada, não recusada', async () => {
   const { trocarCodigo } = await import('../servidor/mercadolivre.js')
+  const banco = bancoFalso()
   const originalFetch = globalThis.fetch
   globalThis.fetch = async () => ({
     ok: true,
-    json: async () => ({ access_token: 'abc', expires_in: 21600, user_id: 1 }), // sem refresh_token
+    json: async () => ({ access_token: 'abc', expires_in: 21600, user_id: 1, scope: 'read' }),
   })
   try {
-    await assert.rejects(
-      () => trocarCodigo({ ML_CLIENT_ID: 'a', ML_CLIENT_SECRET: 'b' }, 'codigo', 'http://x/callback'),
-      /offline_access/,
-      'aceitar isso daria seis horas de radar e depois um silêncio inexplicável',
+    const r = await trocarCodigo(
+      { ML_CLIENT_ID: 'a', ML_CLIENT_SECRET: 'b', DB: banco.DB }, 'codigo', 'http://x/callback',
     )
+    // Recusar era o certo enquanto ela não soubesse do problema. Agora a tela
+    // avisa, então seis horas de radar funcionando valem mais que zero.
+    assert.equal(r.semRenovacao, true, 'a falta de renovação precisa chegar à tela')
+    assert.equal(r.escopos, 'read', 'o escopo concedido distingue negado de concedido em vão')
+    assert.equal(banco.linha.access, 'abc', 'o acesso que veio é guardado')
+    assert.equal(banco.linha.refresh, '', 'refresh ausente vira vazio, nunca null no bind')
   } finally {
     globalThis.fetch = originalFetch
   }
+})
+
+test('o escopo concedido é guardado junto com o token', async () => {
+  const { trocarCodigo } = await import('../servidor/mercadolivre.js')
+  const banco = bancoFalso()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      access_token: 'abc', refresh_token: 'r1', expires_in: 21600,
+      user_id: 1, scope: 'offline_access read',
+    }),
+  })
+  try {
+    const r = await trocarCodigo(
+      { ML_CLIENT_ID: 'a', ML_CLIENT_SECRET: 'b', DB: banco.DB }, 'codigo', 'http://x/callback',
+    )
+    assert.equal(r.semRenovacao, false)
+    assert.equal(banco.linha.escopos, 'offline_access read')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('sem renovação, o token vale enquanto vale e só falha quando expira', async () => {
+  const { obterToken } = await import('../servidor/mercadolivre.js')
+  const env = (linha) => ({ ML_CLIENT_ID: 'a', ML_CLIENT_SECRET: 'b', DB: bancoFalso(linha).DB })
+
+  const valido = await obterToken(env({
+    access: 'abc', refresh: '', expira_em: Date.now() + 3 * 60 * 60 * 1000, escopos: 'read',
+  }))
+  assert.equal(valido, 'abc', 'dentro das seis horas o radar tem que funcionar')
+
+  await assert.rejects(
+    () => obterToken(env({ access: 'abc', refresh: '', expira_em: Date.now() - 1000 })),
+    /Conecte a conta do Mercado Livre de novo/,
+    'passada a validade, a mensagem precisa dizer o que fazer',
+  )
 })
