@@ -192,3 +192,21 @@ test('sem credenciais e sem banco, o radar se declara desligado em vez de quebra
   assert.equal(temBanco({ DB: {} }), false, 'um objeto qualquer não é um banco')
   assert.equal(temBanco({ DB: { prepare: () => {} } }), true)
 })
+
+test('conexão sem refresh token é recusada com explicação, não aceita em silêncio', async () => {
+  const { trocarCodigo } = await import('../servidor/mercadolivre.js')
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({ access_token: 'abc', expires_in: 21600, user_id: 1 }), // sem refresh_token
+  })
+  try {
+    await assert.rejects(
+      () => trocarCodigo({ ML_CLIENT_ID: 'a', ML_CLIENT_SECRET: 'b' }, 'codigo', 'http://x/callback'),
+      /offline_access/,
+      'aceitar isso daria seis horas de radar e depois um silêncio inexplicável',
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

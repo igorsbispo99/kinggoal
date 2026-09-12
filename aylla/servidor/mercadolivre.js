@@ -65,6 +65,15 @@ export async function trocarCodigo(env, codigo, redirectUri) {
   if (!resposta.ok || !json.access_token) {
     throw new Error(`Mercado Livre recusou a autorização: ${json.message || json.error || resposta.status}`)
   }
+  // Sem refresh token, o acesso morre em seis horas e ninguém entende por quê.
+  // Isso acontece quando o aplicativo foi criado sem o escopo offline_access.
+  if (!json.refresh_token) {
+    throw new Error(
+      'O Mercado Livre autorizou mas não devolveu refresh token. '
+      + 'Falta o escopo offline_access no aplicativo: ative e autorize de novo, '
+      + 'senão o acesso cai sozinho em seis horas.',
+    )
+  }
   await gravarToken(env, {
     access: json.access_token,
     refresh: json.refresh_token,
@@ -80,7 +89,13 @@ export async function trocarCodigo(env, codigo, redirectUri) {
  */
 export async function obterToken(env) {
   const guardado = await lerToken(env)
-  if (!guardado || !guardado.refresh) return null
+  if (!guardado) return null
+  if (!guardado.refresh) {
+    throw new Error(
+      'A conexão foi feita sem refresh token (falta offline_access no aplicativo). '
+      + 'Reconecte depois de ativar o escopo.',
+    )
+  }
 
   const margem = 5 * 60 * 1000
   if (guardado.access && Number(guardado.expira_em) - margem > Date.now()) {
@@ -205,6 +220,20 @@ export async function diagnosticar(env) {
     try { token = await obterToken(env) } catch (erro) { provas.push({ nome: 'Renovação do token', ok: false, status: 0, nota: erro.message }) }
   }
   provas.push({ nome: 'Conta autorizada', ok: Boolean(token), status: token ? 200 : 0, nota: token ? null : 'ainda não conectada' })
+
+  if (temBanco(env)) {
+    try {
+      const guardado = await lerToken(env)
+      provas.push({
+        nome: 'Renovação automática (offline_access)',
+        ok: Boolean(guardado && guardado.refresh),
+        status: guardado && guardado.refresh ? 200 : 0,
+        nota: guardado && guardado.refresh
+          ? 'o acesso se renova sozinho'
+          : 'sem refresh token: o acesso cai em 6 horas — falta offline_access no aplicativo',
+      })
+    } catch (erro) { /* o banco já foi reportado acima */ }
+  }
 
   if (token) {
     const comToken = await chamar(env, `/sites/${SITE}/search?q=fone+bluetooth&limit=5`, { token })
