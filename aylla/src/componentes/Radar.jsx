@@ -47,7 +47,10 @@ export default function Radar({ estado, termoInicial = '', aoUsar }) {
       <section className="cartao">
         <header><h2>Radar de mercado</h2><span className="nao-confirmado">não conectado</span></header>
         {estado.erro ? (
-          <Aviso nivel="atencao" titulo="A conexão não se sustentou">
+          <Aviso
+            nivel="atencao"
+            titulo={estado.precisaReconectar ? 'Precisa conectar de novo' : 'A conta está conectada, mas a leitura foi negada'}
+          >
             {estado.erro}
           </Aviso>
         ) : (
@@ -56,15 +59,19 @@ export default function Radar({ estado, termoInicial = '', aoUsar }) {
             direto da fonte, em vez de você contar anúncios na mão.
           </p>
         )}
-        <a className="botao primario cheio" href="/api/ml/conectar">
-          {estado.erro ? 'Tentar conectar de novo' : 'Conectar minha conta do Mercado Livre'}
-        </a>
-        {estado.erro ? (
+        {/* Oferecer o botao quando reconectar nao conserta nada e pior que
+            nao oferecer: convida a repetir o que ja funcionou e a concluir
+            que o aplicativo esta quebrado. */}
+        {!estado.erro || estado.precisaReconectar ? (
+          <a className="botao primario cheio" href="/api/ml/conectar">
+            {estado.erro ? 'Tentar conectar de novo' : 'Conectar minha conta do Mercado Livre'}
+          </a>
+        ) : (
           <p className="dica">
-            Se continuar voltando para cá, me mande o que aparece em
-            {' '}<code>/api/ml/estado</code> — ali está o motivo exato.
+            Enquanto isso a pesquisa aqui embaixo continua valendo: são as duas perguntas
+            que separam um produto que vende de um que só parece bom na calculadora.
           </p>
-        ) : null}
+        )}
       </section>
     )
   }

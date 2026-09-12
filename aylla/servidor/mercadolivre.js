@@ -307,10 +307,19 @@ export async function enriquecer(env, ids, token) {
  */
 export async function diagnosticar(env) {
   const provas = []
+  // O corpo do erro do Mercado Livre e a informacao mais util de todas: e
+  // ele que diz se 403 significa "token invalido", "app sem permissao" ou
+  // "recurso fora do ar". Sem isso, um numero solto obriga a adivinhar.
+  const motivoDoML = (r) => {
+    if (!r || r.ok || !r.json) return null
+    const j = r.json
+    return String(j.message || j.error || j.cause || j.bruto || '').slice(0, 200) || null
+  }
   const registrar = (nome, r, extra = {}) => provas.push({
     nome,
     status: r && r.status,
     ok: Boolean(r && r.ok),
+    ...(motivoDoML(r) ? { motivoDoML: motivoDoML(r) } : {}),
     ...extra,
   })
 
@@ -344,6 +353,31 @@ export async function diagnosticar(env) {
   }
 
   if (token) {
+    // A prova que separa as duas causas do 403. Se /users/me responde 200,
+    // o token esta bom e o problema e do endereco de busca — o que muda
+    // completamente o conserto.
+    const euMesmo = await chamar(env, '/users/me', { token })
+    registrar('O token vale (users/me)', euMesmo, {
+      nota: euMesmo.ok
+        ? 'o token da conta e aceito: qualquer 403 abaixo e do endereco, nao do token'
+        : 'o proprio token foi recusado',
+    })
+
+    // Caminhos alternativos de leitura de mercado. Se a busca por site
+    // estiver fechada para este aplicativo, e por um destes que o radar
+    // continua existindo.
+    const porProduto = await chamar(env, `/products/search?site_id=${SITE}&q=fone+bluetooth&status=active`, { token })
+    registrar('Busca no catalogo (/products/search)', porProduto, {
+      nota: porProduto.ok
+        ? `${(porProduto.json && porProduto.json.paging && porProduto.json.paging.total) || 0} produtos de catalogo`
+        : 'fechado tambem',
+    })
+
+    const umaCategoria = await chamar(env, '/categories/MLB1051', { token })
+    registrar('Categoria por id', umaCategoria, {
+      nota: umaCategoria.ok ? 'arvore de categorias legivel' : null,
+    })
+
     const comToken = await chamar(env, `/sites/${SITE}/search?q=fone+bluetooth&limit=5`, { token })
     const primeiro = comToken.json && comToken.json.results && comToken.json.results[0]
     registrar('Busca COM token', comToken, {

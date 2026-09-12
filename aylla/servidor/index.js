@@ -195,9 +195,18 @@ export default {
           if (origem === 'aplicativo') {
             motivo = 'A conta ainda não está conectada: o Mercado Livre só deixa pesquisar com uma conta.'
             precisaReconectar = true
-          } else if (prova.status === 401 || prova.status === 403) {
-            motivo = 'O acesso desta conta não vale mais. Conecte de novo — é um toque.'
+          } else if ((prova.status === 401 || prova.status === 403) && detalhe.conexao.vencido) {
+            motivo = 'O acesso desta conta venceu. Conecte de novo — é um toque.'
             precisaReconectar = true
+          } else if (prova.status === 401 || prova.status === 403) {
+            // Token gravado, dentro da validade, e a busca recusada assim
+            // mesmo. Mandar reconectar aqui seria mandar repetir o que ja
+            // funcionou: a conexao esta boa, quem recusa e o Mercado Livre.
+            // Reconectar nao conserta, so cansa.
+            motivo = 'A conta está conectada e válida, mas o Mercado Livre '
+              + 'está recusando a pesquisa para este aplicativo. Reconectar não resolve — '
+              + 'é uma permissão do lado deles.'
+            precisaReconectar = false
           } else {
             motivo = `O Mercado Livre recusou a leitura com ${prova.status}. Isso costuma passar sozinho.`
           }
