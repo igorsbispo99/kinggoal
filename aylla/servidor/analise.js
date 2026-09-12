@@ -76,27 +76,72 @@ export function concentracao(itens) {
  * Barreira de entrada, de 0 a 100. Quanto maior, mais difícil para quem
  * está começando — independentemente de o produto vender bem.
  */
+/**
+ * Barreira de entrada, aceitando resposta ausente.
+ *
+ * A busca da API traz os quatro sinais sempre. A observacao feita a mao
+ * traz o que der para ver na tela do celular — e o que ela nao conseguir
+ * ver vem null, nunca zero. Zero seria uma afirmacao ("nao ha loja oficial
+ * nenhuma") no lugar de uma ignorancia, e mercado dificil passaria por
+ * facil justamente para quem esta comecando e nao tem como perceber.
+ *
+ * Os pesos dos sinais presentes sao renormalizados entre si, e a nota vem
+ * marcada com o que faltou para a tela poder dizer.
+ */
 export function barreiraDeEntrada({ lojasOficiais, catalogo, tresMaiores, anuncios }) {
-  const porMarca = lojasOficiais * 100
-  const porCatalogo = catalogo * 100
-  const porConcentracao = Math.min(100, Math.max(0, (tresMaiores - 0.15) / 0.65) * 100)
-  const porVolume = anuncios > 0 ? Math.min(100, (Math.log10(anuncios) / Math.log10(2000)) * 100) : 0
+  const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v))
 
-  const nota = porMarca * 0.35 + porCatalogo * 0.3 + porConcentracao * 0.2 + porVolume * 0.15
+  const porMarca = num(lojasOficiais) === null ? null : num(lojasOficiais) * 100
+  const porCatalogo = num(catalogo) === null ? null : num(catalogo) * 100
+  const porConcentracao = num(tresMaiores) === null
+    ? null
+    : Math.min(100, Math.max(0, (num(tresMaiores) - 0.15) / 0.65) * 100)
+  const porVolume = num(anuncios) === null
+    ? null
+    : (num(anuncios) > 0 ? Math.min(100, (Math.log10(num(anuncios)) / Math.log10(2000)) * 100) : 0)
+
+  const sinais = [
+    { chave: 'porMarca', nome: 'lojas oficiais no topo', valor: porMarca, peso: 0.35 },
+    { chave: 'porCatalogo', nome: 'disputa por catálogo', valor: porCatalogo, peso: 0.3 },
+    { chave: 'porConcentracao', nome: 'concentração de vendedores', valor: porConcentracao, peso: 0.2 },
+    { chave: 'porVolume', nome: 'quantidade de anúncios', valor: porVolume, peso: 0.15 },
+  ]
+  const presentes = sinais.filter((s) => s.valor !== null)
+  const faltando = sinais.filter((s) => s.valor === null).map((s) => s.nome)
+
+  if (!presentes.length) {
+    return { nota: null, completo: false, faltando, motivos: { porMarca, porCatalogo, porConcentracao, porVolume } }
+  }
+
+  const somaDosPesos = presentes.reduce((t, s) => t + s.peso, 0)
+  const nota = presentes.reduce((t, s) => t + s.valor * (s.peso / somaDosPesos), 0)
+
   return {
     nota: Math.round(Math.min(100, Math.max(0, nota))),
+    completo: faltando.length === 0,
+    faltando,
+    // Quanto da nota veio de resposta de verdade. Uma nota tirada de um
+    // sinal so nao vale o mesmo que uma tirada dos quatro, e a tela precisa
+    // poder dizer isso.
+    // Arredondado porque 0.35+0.3+0.2+0.15 nao da exatamente 1 em ponto
+    // flutuante, e "cobertura 0.9999999999999999" nao quer dizer nada.
+    cobertura: Math.round(somaDosPesos * 100) / 100,
     motivos: { porMarca, porCatalogo, porConcentracao, porVolume },
   }
 }
 
 /** A frase que explica a barreira em português de gente. */
 export function explicarBarreira({ nota, lojasOficiais, catalogo, tresMaiores, vendedoresDistintos, anuncios }) {
+  const tem = (v) => v !== null && v !== undefined && Number.isFinite(Number(v))
   const pedacos = []
-  if (lojasOficiais >= 0.4) pedacos.push(`${Math.round(lojasOficiais * 100)}% do topo são lojas oficiais`)
-  if (catalogo >= 0.4) pedacos.push(`${Math.round(catalogo * 100)}% disputam por catálogo, onde só o mais barato aparece`)
-  if (tresMaiores >= 0.5) pedacos.push(`três vendedores ocupam ${Math.round(tresMaiores * 100)}% do topo`)
-  if (!pedacos.length && vendedoresDistintos >= 10) pedacos.push(`${vendedoresDistintos} vendedores diferentes no topo, mercado pulverizado`)
-  if (!pedacos.length) pedacos.push(`${anuncios} anúncios ativos`)
+  if (tem(lojasOficiais) && lojasOficiais >= 0.4) pedacos.push(`${Math.round(lojasOficiais * 100)}% do topo são lojas oficiais`)
+  if (tem(catalogo) && catalogo >= 0.4) pedacos.push(`${Math.round(catalogo * 100)}% disputam por catálogo, onde só o mais barato aparece`)
+  if (tem(tresMaiores) && tresMaiores >= 0.5) pedacos.push(`três vendedores ocupam ${Math.round(tresMaiores * 100)}% do topo`)
+  if (!pedacos.length && tem(vendedoresDistintos) && vendedoresDistintos >= 10) pedacos.push(`${vendedoresDistintos} vendedores diferentes no topo, mercado pulverizado`)
+  if (!pedacos.length && tem(anuncios)) pedacos.push(`${anuncios} anúncios ativos`)
+  if (!pedacos.length) pedacos.push('nenhum sinal de disputa apareceu nas respostas')
+
+  if (!tem(nota)) return `Sem nota: ${pedacos.join('; ')}.`
 
   const veredito = nota >= 70 ? 'Difícil entrar'
     : nota >= 45 ? 'Dá para entrar com cuidado'

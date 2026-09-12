@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { CampoTexto, Aviso, Linha, Metrica } from './Campos.jsx'
 import { analisarTermo } from '../lib/radar.js'
+import RadarManual from './RadarManual.jsx'
 import { reais, porcento } from '../lib/formato.js'
 
 const tomDaBarreira = (nota) => (nota >= 70 ? 'ruim' : nota >= 45 ? 'atencao' : 'bom')
@@ -27,52 +28,24 @@ export default function Radar({ estado, termoInicial = '', aoUsar }) {
     }
   }
 
-  if (!estado.configurado) {
+  // Sem leitura automatica o radar nao some: troca de fonte. O calculo da
+  // barreira e o mesmo — o que muda e quem olha a tela de resultados.
+  if (!estado.configurado || !estado.conectado) {
     return (
-      <section className="cartao">
-        <header><h2>Radar de mercado</h2><span className="etapa">desligado</span></header>
-        <p className="dica">
-          O radar lê o Mercado Livre e mede concorrência, faixa de preço e o quanto é difícil entrar numa categoria.
-          Ainda não foi configurado — as instruções estão no arquivo RADAR.md do projeto.
-        </p>
-      </section>
-    )
-  }
-
-  if (!estado.conectado) {
-    // Se o servidor sabe por que não conectou, ele diz. Repetir o mesmo
-    // convite depois de uma tentativa que falhou faz a pessoa girar em
-    // círculo sem nunca descobrir o que está errado.
-    return (
-      <section className="cartao">
-        <header><h2>Radar de mercado</h2><span className="nao-confirmado">não conectado</span></header>
-        {estado.erro ? (
-          <Aviso
-            nivel="atencao"
-            titulo={estado.precisaReconectar ? 'Precisa conectar de novo' : 'A conta está conectada, mas a leitura foi negada'}
-          >
-            {estado.erro}
+      <>
+        {estado.erro && !estado.precisaReconectar ? (
+          <Aviso nivel="atencao" titulo="A busca automática está fechada">
+            {estado.erro} Enquanto isso, o radar abaixo faz a mesma leitura com você olhando.
           </Aviso>
-        ) : (
-          <p className="dica">
-            Conecte a conta do Mercado Livre uma vez. O radar passa a medir concorrência e preço praticado
-            direto da fonte, em vez de você contar anúncios na mão.
-          </p>
-        )}
-        {/* Oferecer o botao quando reconectar nao conserta nada e pior que
-            nao oferecer: convida a repetir o que ja funcionou e a concluir
-            que o aplicativo esta quebrado. */}
-        {!estado.erro || estado.precisaReconectar ? (
-          <a className="botao primario cheio" href="/api/ml/conectar">
-            {estado.erro ? 'Tentar conectar de novo' : 'Conectar minha conta do Mercado Livre'}
-          </a>
-        ) : (
-          <p className="dica">
-            Enquanto isso a pesquisa aqui embaixo continua valendo: são as duas perguntas
-            que separam um produto que vende de um que só parece bom na calculadora.
-          </p>
-        )}
-      </section>
+        ) : null}
+        {estado.precisaReconectar ? (
+          <div className="cartao">
+            <p className="dica">A conta do Mercado Livre precisa ser conectada de novo para a busca automática.</p>
+            <a className="botao cheio" href="/api/ml/conectar">Conectar a conta</a>
+          </div>
+        ) : null}
+        <RadarManual termoInicial={termoInicial} aoUsar={aoUsar} />
+      </>
     )
   }
 

@@ -170,7 +170,7 @@ function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir, radar }) {
           <p className="dica" style={{ marginBottom: 10 }}>
             {(p.pesquisa || {}).origem
               ? `Preenchido pelo radar em ${new Date(p.pesquisa.medidoEm).toLocaleDateString('pt-BR')}. Pode ajustar à mão se quiser.`
-              : 'Se o radar estiver desligado, abra o Mercado Livre e responda à mão. São estas duas perguntas que separam um produto que vende de um que só parece bom na calculadora.'}
+              : 'Estes números entram no ranking. O radar acima preenche os que ele mede — o resto você completa aqui, e o que não souber fica em branco mesmo.'}
           </p>
           <div className="grade">
             <Campo
