@@ -530,3 +530,22 @@ details.dobra > div { padding-top: 10px; }
 
 .botoes { display: flex; gap: 8px; }
 .botoes > * { flex: 1; }
+
+/* ---------- nota de entrada ---------- */
+
+.faixa-entrada {
+  border-radius: 8px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+  border-left: 3px solid;
+}
+.faixa-entrada.boa { background: var(--verde-fundo); border-color: var(--verde); }
+.faixa-entrada.media { background: var(--atencao-fundo); border-color: var(--atencao); }
+.faixa-entrada.ruim { background: var(--negativo-fundo); border-color: var(--negativo); }
+.rotulo-entrada {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--tinta-3); font-weight: 700;
+}
+.nota-entrada { font-size: 1.6rem; font-weight: 700; line-height: 1.05; color: var(--tinta); }
+.nota-entrada small { font-size: .85rem; font-weight: 500; color: var(--tinta-3); }
+.frase-entrada { font-size: .8rem; line-height: 1.4; color: var(--tinta-2); }
+.frase-entrada.tenue { opacity: .8; font-size: .74rem; }

@@ -73,13 +73,34 @@ export default function Sugestoes({ config, aoCadastrar }) {
                 <span className="posicao-rank">{s.posicaoNaTendencia}º</span>
                 {s.termo}
               </span>
+              {/* A trilha da descida e a informacao principal aqui: mostra
+                  que o sistema saiu da categoria larga e foi ate o galho
+                  onde da para aparecer. */}
               <span className="sub-sugestao">
-                {s.categoria}
-                {s.outrasCategorias && s.outrasCategorias.length
-                  ? ` · também aparece em ${s.outrasCategorias.join(', ')}`
-                  : ''}
+                {s.trilhaDaDescida && s.trilhaDaDescida.length > 1
+                  ? s.trilhaDaDescida.map((t) => t.nome).join(' › ')
+                  : s.categoria}
               </span>
+              {s.desceuNiveis > 0 && s.anunciosNaEntrada ? (
+                <span className="sub-sugestao">
+                  desceu de {s.anunciosNaEntrada.toLocaleString('pt-BR')} para{' '}
+                  {s.anunciosNaCategoria.toLocaleString('pt-BR')} anúncios
+                </span>
+              ) : null}
             </button>
+
+            {s.entrada && s.entrada.nota !== null ? (
+              <div className={`faixa-entrada${s.entrada.nota >= 65 ? ' boa' : s.entrada.nota >= 40 ? ' media' : ' ruim'}`}>
+                <span className="rotulo-entrada">Dá para competir aqui?</span>
+                <span className="nota-entrada">{s.entrada.nota}<small>/100</small></span>
+                <span className="frase-entrada">{s.resumoDaEntrada}</span>
+                {!s.entrada.completo ? (
+                  <span className="frase-entrada tenue">
+                    Nota parcial — faltou: {s.entrada.faltando.join(', ')}.
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="linhas">
               {/* Procura. A ordem e deliberada: visita e o numero mais

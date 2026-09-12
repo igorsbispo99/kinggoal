@@ -22,6 +22,7 @@
 
 import { maisVendidos, tendencias, comissaoReal, ondeIssoVive } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
+import { descerAteNicho, notaDeEntrada, explicarEntrada } from './nichos.js'
 
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
@@ -212,10 +213,15 @@ export async function depurarFunil(env, { token, termo = null }) {
   return { termo: alvo, passos }
 }
 
-// Cinco sugestoes, nao seis. O pior caso por sugestao agora e oito
-// subrequisicoes (dominio, categoria, campeoes, tres produtos de catalogo,
-// multiget, tarifa), e o teto do Worker gratuito e 50 por requisicao.
-export async function montarSugestoes(env, { token, quantas = 5 }) {
+// Quatro sugestoes. A descida ate o nicho custa ate tres chamadas a mais
+// por termo, entao o pior caso virou onze (dominio, tres niveis de descida,
+// campeoes, dois produtos de catalogo, multiget, visitas, avaliacoes,
+// tarifa). Quatro vezes onze mais as tendencias da quarenta e cinco, e o
+// teto do Worker gratuito e cinquenta por requisicao.
+//
+// Menos sugestoes e mais fundo e a troca certa: uma sugestao onde ela
+// consegue competir vale mais que cinco onde ela nao consegue.
+export async function montarSugestoes(env, { token, quantas = 4 }) {
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
   const descartadas = []
@@ -240,16 +246,28 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       continue
     }
 
-    let cat
-    try { cat = await lerCategoria(env, destino.categoriaId, token) } catch (e) {
+    // Descer ate o nicho, em vez de parar na porta da categoria. "Bolsas"
+    // tem 421 mil anuncios e nao e mercado, e parede; dentro dela ha galhos
+    // com alguns milhares onde da para aparecer.
+    let descida
+    try {
+      descida = await descerAteNicho(env, {
+        categoriaId: destino.categoriaId,
+        termo: t.termo,
+        token,
+        maxNiveis: 3,
+        abrir: lerCategoria,
+      })
+    } catch (e) {
       descartadas.push({ termo: t.termo, porque: `categoria ${destino.categoriaId} não abriu` })
       continue
     }
+    const cat = descida.nicho
 
     let campeoes
     try {
       campeoes = await maisVendidos(env, {
-        categoria: destino.categoriaId, token, quantos: 12, totalDaCategoria: cat.anuncios,
+        categoria: cat.id, token, quantos: 12, totalDaCategoria: cat.anuncios,
         orcamentoDeProdutos: 2,
       })
     } catch (e) {
@@ -280,7 +298,7 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
     if (precoMedianoDaCategoria) {
       try {
         const t = await comissaoReal(env, {
-          categoria: destino.categoriaId,
+          categoria: cat.id,
           preco: Math.round(precoMedianoDaCategoria),
           token,
         })
@@ -289,8 +307,31 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       } catch { /* a sugestao vale sem a tarifa; a tela diz que e estimada */ }
     }
 
+    // A folga de preco: quanto do preco de venda sobra depois da comissao
+    // real e do frete. Entra na nota de entrada como "espaco no preco".
+    const comissao = tarifa ? tarifa.percentual : null
+    const folgaDePreco = precoMedianoDaCategoria && comissao !== null
+      ? Math.max(0, 1 - comissao - ((tarifa.custoFixo || 0) / precoMedianoDaCategoria))
+      : null
+
+    const entrada = notaDeEntrada({
+      visitasDoTopo: campeoes.procura.visitasDoTopo,
+      anuncios: cat.anuncios,
+      lojasOficiais: analise.concorrencia.lojasOficiais,
+      catalogo: analise.concorrencia.catalogo,
+      folgaDePreco,
+    })
+
     sugestoes.push({
       termo: t.termo,
+      entrada,
+      resumoDaEntrada: explicarEntrada({
+        nota: entrada.nota,
+        anuncios: cat.anuncios,
+        visitasPorAnuncio: entrada.motivos.visitasPorAnuncio,
+        lojasOficiais: analise.concorrencia.lojasOficiais,
+        trilha: descida.trilha,
+      }),
       posicaoNaTendencia: t.posicao,
       linkDaBusca: t.link,
       // Anúncio de catálogo não traz título; então pega o primeiro que tiver,
@@ -300,6 +341,13 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       categoriaId: cat.id,
       outrasCategorias: destinos.slice(1, 3).map((d) => d.categoria),
       caminho: cat.caminho.map((c) => c.nome),
+      trilhaDaDescida: descida.trilha,
+      desceuNiveis: descida.desceu,
+      parouPorque: descida.parouPorque,
+      // O tamanho de onde a busca caiu antes de descer: sem isso nao da
+      // para ver que o sistema fez o trabalho de sair da parede.
+      categoriaDeEntrada: descida.trilha[0] ? descida.trilha[0].nome : null,
+      anunciosNaEntrada: descida.trilha[0] ? descida.trilha[0].anuncios : null,
       // concorrência
       anunciosNaCategoria: cat.anuncios,
       barreira: analise.barreira.nota,
@@ -332,6 +380,15 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       })),
     })
   }
+
+  // Ordena pela chance de competir, nao pela posicao na tendencia. O que
+  // esta em primeiro lugar nas buscas costuma ser exatamente onde ninguem
+  // que esta comecando consegue entrar.
+  sugestoes.sort((a, b) => {
+    const na = a.entrada.nota === null ? -1 : a.entrada.nota
+    const nb = b.entrada.nota === null ? -1 : b.entrada.nota
+    return nb - na
+  })
 
   const resultado = { sugestoes, descartadas, termosLidos: termos.length }
   await guardar(env, 'semana', resultado)
