@@ -136,12 +136,26 @@ export default {
     }
 
     if (caminho === '/api/ml/estado') {
+      // O detalhe existe para nao ter que adivinhar qual metade falta.
+      // Nomes das chaves e presenca do banco nao sao segredo; os valores,
+      // que sao, nunca saem daqui.
+      const detalhe = {
+        clientId: Boolean(env && env.ML_CLIENT_ID),
+        clientSecret: Boolean(env && env.ML_CLIENT_SECRET),
+        banco: temBanco(env),
+        variaveisVisiveis: Object.keys(env || {}).filter((chave) => {
+          const valor = env[chave]
+          return typeof valor === 'string' || typeof valor === 'number'
+        }),
+      }
+
       if (!temCredenciais(env) || !temBanco(env)) {
-        return Response.json({ configurado: false, conectado: false })
+        return Response.json({ configurado: false, conectado: false, detalhe })
       }
       let conectado = false
-      try { conectado = Boolean(await obterToken(env)) } catch (falha) { conectado = false }
-      return Response.json({ configurado: true, conectado })
+      let erro = null
+      try { conectado = Boolean(await obterToken(env)) } catch (falha) { erro = falha.message }
+      return Response.json({ configurado: true, conectado, erro, detalhe })
     }
 
     if (caminho === '/api/ml/conectar') {
