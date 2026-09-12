@@ -40,6 +40,13 @@ seguintes chegarem no celular dela sem ninguém mexer em nada.
 5. **Repetir implantação**. O log deve terminar em verde, e sai um endereço
    terminado em `.workers.dev`.
 
+### Não crie um `_redirects` aqui
+
+O Workers recusa a regra `/*  /index.html  200` com *"infinite loop detected"*,
+porque `/index.html` casa com `/*` e a regra se chamaria de novo. Quem cuida
+disso é o `not_found_handling` do `wrangler.jsonc`, de forma nativa. O arquivo
+existia por engano, sobra do plano de usar Pages, e foi removido.
+
 ### O que o `wrangler.jsonc` resolve
 
 Este diretório tem um `wrangler.jsonc` declarando que o projeto é um Worker só
