@@ -122,3 +122,14 @@ test('o preço para a margem alvo respeita a comissão medida', () => {
   const conferido = calcularVenda({ ...base, preco: comMedida, comissaoMedida: 0.19 })
   assert.ok(conferido.margem >= 0.3 - 0.001, 'a bissecção continua entregando a margem pedida')
 })
+
+test('comissão em pontos percentuais não vira comissão de 1400%', () => {
+  // O Mercado Livre devolve percentage_fee como 14, não 0.14. Passar isso
+  // adiante fazia a comissão virar catorze vezes o preço, e TODO produto
+  // aparecia como "não fecha nem de graça" — inclusive um de R$ 616.
+  const mp = MARKETPLACES.mercadolivre
+  const certo = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, comissaoMedida: 0.14 })
+  const emPontos = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, comissaoMedida: 14 })
+  assert.ok(perto(emPontos.custos.comissao, certo.custos.comissao), '14 e 0,14 têm que dar na mesma comissão')
+  assert.ok(emPontos.lucroUnitario > 0, 'e o produto continua viável')
+})

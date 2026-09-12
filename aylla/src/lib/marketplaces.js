@@ -90,8 +90,12 @@ export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null } = {})
   const medida = comissaoMedida === null || comissaoMedida === undefined || comissaoMedida === ''
     ? null
     : Number(comissaoMedida)
+  // Ultima defesa contra ponto percentual chegando como fracao. A conversao
+  // certa acontece na origem, mas uma comissao acima de 1 aqui so pode ser
+  // engano de unidade — e o estrago (todo produto virando inviavel) e grande
+  // demais para depender de um lugar so.
   const percentual = medida !== null && Number.isFinite(medida) && medida >= 0
-    ? medida
+    ? (medida > 1 ? medida / 100 : medida)
     : (tipo ? tipo.comissao : 0)
   const bruta = preco * percentual
   const comissao = mp.tetoComissao ? Math.min(bruta, mp.tetoComissao) : bruta

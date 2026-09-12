@@ -78,3 +78,35 @@ test('products/search não devolve category_id — foi o que zerou o funil', () 
   assert.ok(!camposReais.includes('category_id'), 'status 200 não prova que o campo existe')
   assert.ok(camposReais.includes('domain_id'), 'o que existe é o domínio')
 })
+
+test('a categoria que tem a ver com o termo vai para a frente', async () => {
+  const { ordenarPorAderencia } = await import('../servidor/descoberta.js')
+  // Medido em produção: "chuveiro" voltou com uma categoria de águas
+  // minerais na frente, e a sugestão saiu com preço mediano de R$ 616 numa
+  // categoria que não era a dela.
+  const destinos = [
+    { categoriaId: 'A', categoria: 'Águas Minerais', dominio: 'Água Mineral' },
+    { categoriaId: 'B', categoria: 'Chuveiros', dominio: 'Chuveiros Elétricos' },
+  ]
+  assert.equal(ordenarPorAderencia(destinos, 'chuveiro')[0].categoriaId, 'B')
+})
+
+test('sem palavra em comum, a ordem do Mercado Livre é mantida', async () => {
+  const { ordenarPorAderencia } = await import('../servidor/descoberta.js')
+  const destinos = [
+    { categoriaId: 'A', categoria: 'Águas Minerais', dominio: 'Água Mineral' },
+    { categoriaId: 'B', categoria: 'Chuveiros', dominio: 'Chuveiros' },
+  ]
+  // "ofertas" não casa com nada: não é papel do desempate inventar preferência.
+  assert.equal(ordenarPorAderencia(destinos, 'ofertas')[0].categoriaId, 'A')
+})
+
+test('palavra curta não desempata nada', async () => {
+  const { ordenarPorAderencia } = await import('../servidor/descoberta.js')
+  const destinos = [
+    { categoriaId: 'A', categoria: 'Ar Condicionado', dominio: 'Ar' },
+    { categoriaId: 'B', categoria: 'Bolsas', dominio: 'Bolsas' },
+  ]
+  // "ar" tem duas letras: casaria com meio catálogo e não significa nada.
+  assert.equal(ordenarPorAderencia(destinos, 'ar')[0].categoriaId, 'A')
+})

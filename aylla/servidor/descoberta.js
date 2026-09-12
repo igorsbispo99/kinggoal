@@ -95,11 +95,40 @@ export async function ondeIssoVive(env, { termo, token }) {
     throw erro
   }
   const lista = Array.isArray(r.json) ? r.json : []
-  return lista.map((d) => ({
+  const destinos = lista.map((d) => ({
     categoriaId: d.category_id,
     categoria: d.category_name,
     dominio: d.domain_name || d.domain_id,
   })).filter((d) => d.categoriaId)
+
+  return ordenarPorAderencia(destinos, termo)
+}
+
+const semAcento = (texto) => String(texto || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+
+/**
+ * Põe na frente o destino que tem a ver com o que ela escreveu.
+ *
+ * A ordem que o Mercado Livre devolve nem sempre acerta: "chuveiro" veio com
+ * "Águas Minerais" em primeiro, e a sugestão saiu com preço mediano de
+ * R$ 616 numa categoria que não é a dela. Palavra em comum entre o termo e o
+ * nome da categoria é um desempate barato e que não inventa nada — quando
+ * não há nenhuma, a ordem original do Mercado Livre fica de pé.
+ */
+export function ordenarPorAderencia(destinos, termo) {
+  const palavras = semAcento(termo).split(/\s+/).filter((p) => p.length >= 4)
+  if (!palavras.length || destinos.length < 2) return destinos
+
+  const nota = (d) => {
+    const alvo = `${semAcento(d.categoria)} ${semAcento(d.dominio)}`
+    return palavras.filter((p) => alvo.includes(p.replace(/s$/, ''))).length
+  }
+
+  return destinos
+    .map((d, i) => ({ d, i, nota: nota(d) }))
+    .sort((a, b) => (b.nota - a.nota) || (a.i - b.i))
+    .map((x) => x.d)
 }
 
 /**
@@ -286,6 +315,19 @@ export async function comissaoReal(env, { categoria, preco, token }) {
   const lista = Array.isArray(r.json) ? r.json : []
   // "gold_special" e o anuncio classico; "gold_pro" e o premium. Sao os
   // dois que uma pessoa fisica revendendo de fato usa.
+  // O Mercado Livre devolve percentage_fee em PONTOS PERCENTUAIS (14 para
+  // 14%), e o resto do sistema trabalha com fracao (0.14). Passar 14 adiante
+  // fazia a comissao virar quatorze vezes o preco de venda, e com isso TODO
+  // produto aparecia como "nao fecha nem de graca" — inclusive um de R$ 616.
+  // A normalizacao olha a grandeza em vez de confiar na unidade: acima de 1
+  // so pode ser ponto percentual, porque comissao de 100% nao existe aqui.
+  const emFracao = (valor) => {
+    if (valor === null || valor === undefined) return null
+    const n = Number(valor)
+    if (!Number.isFinite(n) || n < 0) return null
+    return n > 1 ? n / 100 : n
+  }
+
   const tipos = lista
     .filter((t) => ['gold_special', 'gold_pro'].includes(t.listing_type_id))
     .map((t) => {
@@ -294,7 +336,7 @@ export async function comissaoReal(env, { categoria, preco, token }) {
         tipo: t.listing_type_id,
         nome: t.listing_type_name,
         comissaoTotal: t.sale_fee_amount,
-        percentual: detalhes.percentage_fee ?? null,
+        percentual: emFracao(detalhes.percentage_fee),
         custoFixo: detalhes.fixed_fee ?? null,
         exposicao: t.listing_exposure || null,
       }

@@ -233,6 +233,7 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       descartadas.push({ termo: t.termo, porque: `domain_discovery falhou: ${e.message}` })
       continue
     }
+    // ondeIssoVive ja devolve ordenado por aderencia ao termo.
     const destino = destinos[0]
     if (!destino) {
       descartadas.push({ termo: t.termo, porque: 'nenhuma categoria reconhecida para o termo' })
@@ -297,6 +298,7 @@ export async function montarSugestoes(env, { token, quantas = 5 }) {
       produtoExemplo: (campeoes.itens.find((i) => i.title) || {}).title || t.termo,
       categoria: cat.nome,
       categoriaId: cat.id,
+      outrasCategorias: destinos.slice(1, 3).map((d) => d.categoria),
       caminho: cat.caminho.map((c) => c.nome),
       // concorrência
       anunciosNaCategoria: cat.anuncios,

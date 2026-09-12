@@ -73,15 +73,33 @@ export default function Sugestoes({ config, aoCadastrar }) {
                 <span className="posicao-rank">{s.posicaoNaTendencia}º</span>
                 {s.termo}
               </span>
-              <span className="sub-sugestao">{s.categoria}</span>
+              <span className="sub-sugestao">
+                {s.categoria}
+                {s.outrasCategorias && s.outrasCategorias.length
+                  ? ` · também aparece em ${s.outrasCategorias.join(', ')}`
+                  : ''}
+              </span>
             </button>
 
             <div className="linhas">
-              <Linha
-                rotulo="Procura"
-                detalhe={s.itensComData ? `mediana de ${s.itensComData} campeões` : 'sem data de publicação'}
-                valor={s.vendasPorMes !== null ? `${Math.round(s.vendasPorMes)} /mês` : '—'}
-              />
+              {/* Procura tem duas fontes, e a segunda existe porque o
+                  Mercado Livre fechou /items para este aplicativo: sem
+                  sold_quantity e date_created nao ha velocidade de venda.
+                  O que sobra e real e nao e pouco — a posicao do termo na
+                  lista do que o Brasil mais busca agora. */}
+              {s.vendasPorMes !== null ? (
+                <Linha
+                  rotulo="Procura"
+                  detalhe={`vendas por mês, mediana de ${s.itensComData} campeões`}
+                  valor={`${Math.round(s.vendasPorMes)} /mês`}
+                />
+              ) : (
+                <Linha
+                  rotulo="Procura"
+                  detalhe="o Mercado Livre fechou o número de vendas por anúncio"
+                  valor={`${s.posicaoNaTendencia}º mais buscado do Brasil`}
+                />
+              )}
               <Linha
                 rotulo="Concorrência"
                 detalhe={`barreira ${s.barreira}/100`}
