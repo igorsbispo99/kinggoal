@@ -9,7 +9,7 @@ não depende de servidor nenhum: os dados ficam no próprio aparelho.
 
 ## Estado atual
 
-**Fase 1 de 8.** O que já funciona:
+**Fase 1 de 8, mais a base de segurança dos dados.** O que já funciona:
 
 - Cálculo de importação com a regra vigente desde 12/05/2026 (MP 1.357/2026):
   isenção de Imposto de Importação até US$ 50, 60% com desconto de US$ 30
@@ -25,7 +25,9 @@ não depende de servidor nenhum: os dados ficam no próprio aparelho.
 - Limites do MEI: teto de faturamento e o teto menos conhecido, o de 80% em
   custo de mercadoria, que é o que aperta primeiro em operação de margem baixa.
 - Contas salvas, ordenadas por margem.
-- Backup e restauração em JSON.
+- Backup e restauração em JSON, com cópia fiel do formato de origem.
+- Migração de dados entre versões, com cópia de socorro antes de migrar.
+- 46 testes automatizados sobre as regras de negócio.
 
 ## Roadmap
 
@@ -45,9 +47,14 @@ não depende de servidor nenhum: os dados ficam no próprio aparelho.
 ```
 npm install
 npm run dev      # desenvolvimento
-npm run build    # gera dist/ e os ícones
+npm test         # 46 testes, sem dependência externa
+npm run build    # roda os testes, gera os ícones e compila
 npm run preview  # serve o que foi gerado
 ```
+
+`npm run build` roda a suíte antes de compilar de propósito: numa ferramenta
+cuja única função é acertar uma conta, publicar com o cálculo quebrado é pior
+do que não publicar.
 
 Não há dependência de imagem: `npm run icones` desenha os PNGs do aplicativo a
 partir do mesmo traçado do logotipo, em Node puro.
@@ -65,11 +72,20 @@ src/lib/          regras de negócio, sem React
   configuracoes.js  ajustes da operação
 src/telas/        Calculadora, Salvos, Ajustes
 src/componentes/  campos, avisos, medidores, ícones
+test/             testes das regras de negócio, com node:test
 ```
 
 As regras de negócio são funções puras e ficam fora do React de propósito: são
 elas que precisam de teste, e são elas que vão continuar iguais quando a F5
 trocar o armazenamento local por sincronização entre aparelhos.
+
+## Sobre mudar o formato dos dados
+
+Ao mudar a estrutura de qualquer coisa gravada, suba `VERSAO` em
+`src/lib/armazenamento.js` e registre a migração correspondente em `MIGRACOES`.
+Sem a migração registrada, o dado antigo é devolvido como está — nunca
+descartado. Há teste cobrindo os quatro caminhos: com migração, sem migração,
+com migração quebrada e com dado de uma versão futura.
 
 ## Sobre este diretório
 
