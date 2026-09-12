@@ -314,6 +314,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       visitasPorAnuncio: melhor.visitasPorAnuncio,
       vendedores: melhor.vendedores,
       temLojaOficial: melhor.temLojaOficial,
+      fracaoOficial: melhor.fracaoOficial,
     })
 
     // A comissao real da categoria, no preco que esse produto pratica.
@@ -345,6 +346,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       visitasPorAnuncio: melhor.visitasPorAnuncio,
       anunciosMedidos: melhor.anunciosMedidos,
       temLojaOficial: melhor.temLojaOficial,
+      fracaoOficial: melhor.fracaoOficial,
       precoMediano: melhor.precoMediano,
       precoMin: melhor.precoMin,
       precoMax: melhor.anuncios.length
@@ -358,6 +360,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
         anunciosMedidos: melhor.anunciosMedidos,
         vendedores: melhor.vendedores,
         temLojaOficial: melhor.temLojaOficial,
+        fichaDeMarca: nota.fichaDeMarca,
       }),
       // Os outros produtos medidos, para ela comparar dentro da categoria.
       alternativas: achados.nichos.slice(1, 3).map((n) => ({

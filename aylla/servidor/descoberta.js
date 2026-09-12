@@ -243,12 +243,19 @@ async function produtosComDisputa(ids, token, limite) {
       catalog_listing: true,
     }))
     if (!anuncios.length) continue
+    const oficiais = anuncios.filter((a) => a.official_store_id).length
     produtos.push({
       produtoId: id,
       vendedores: (r.json.paging && r.json.paging.total) || anuncios.length,
       anuncios,
       precos: anuncios.map((a) => a.price).filter((p) => Number.isFinite(p) && p > 0),
-      temLojaOficial: anuncios.some((a) => a.official_store_id),
+      temLojaOficial: oficiais > 0,
+      // Quanto da ficha e de loja oficial. "Tem loja oficial" nao bastava:
+      // uma loja oficial entre vinte vendedores e concorrencia; uma loja
+      // oficial sendo o unico vendedor e a marca sendo dona do produto.
+      anunciosOficiais: oficiais,
+      anunciosVistos: anuncios.length,
+      fracaoOficial: anuncios.length ? oficiais / anuncios.length : null,
     })
   }
   return produtos
@@ -366,6 +373,7 @@ export async function nichosDaCategoria(env, { categoria, token, quantosProdutos
       precoMin: p.precos.length ? Math.min(...p.precos) : null,
       precoMediano: medianaDe(p.precos),
       temLojaOficial: p.temLojaOficial,
+      fracaoOficial: p.fracaoOficial,
       anuncios: p.anuncios,
     })
   }

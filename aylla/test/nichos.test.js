@@ -187,3 +187,38 @@ test('/visits/items aceita um id por vez, e isso está registrado', () => {
   const respostaComDoisIds = { message: 'maximum amount of items to query is 1', status: 400 }
   assert.equal(respostaComDoisIds.status, 400)
 })
+
+test('ficha da própria marca não é oportunidade, por melhor que seja a atenção', async () => {
+  const { notaDoNicho, explicarNicho } = await import('../servidor/nichos.js')
+  // Caso real: "capacete feminino", 39.869 visitas por anúncio, UM vendedor,
+  // e esse vendedor é a loja oficial. A nota antiga deu 89 — "um vendedor
+  // só" era lido como o melhor cenário possível. É o pior: ela estaria
+  // criando um anúncio para disputar com a marca dona do produto.
+  const daMarca = notaDoNicho({ visitasPorAnuncio: 39869, vendedores: 1, temLojaOficial: true, fracaoOficial: 1 })
+  assert.equal(daMarca.fichaDeMarca, true)
+  assert.ok(daMarca.nota <= 30, `tirou ${daMarca.nota}`)
+
+  const frase = explicarNicho({
+    nota: daMarca.nota, fichaDeMarca: true, visitasPorAnuncio: 39869,
+    anunciosMedidos: 1, vendedores: 1, temLojaOficial: true,
+  })
+  assert.match(frase, /Não é lugar para entrar/)
+  assert.match(frase, /disputar com a própria marca/)
+})
+
+test('loja oficial entre muitos vendedores é concorrência, não bloqueio', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  // Uma oficial entre cinco é outra coisa: incomoda, não impede.
+  const mista = notaDoNicho({ visitasPorAnuncio: 18488, vendedores: 27, temLojaOficial: true, fracaoOficial: 0.2 })
+  assert.equal(mista.fichaDeMarca, false)
+  assert.ok(mista.nota > 50, `tirou ${mista.nota}`)
+})
+
+test('a ordem das notas bate com o que um humano escolheria', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  const bolsa = notaDoNicho({ visitasPorAnuncio: 16882, vendedores: 2, temLojaOficial: false, fracaoOficial: 0 })
+  const chuveiro = notaDoNicho({ visitasPorAnuncio: 18488, vendedores: 27, temLojaOficial: true, fracaoOficial: 0.2 })
+  const capacete = notaDoNicho({ visitasPorAnuncio: 39869, vendedores: 1, temLojaOficial: true, fracaoOficial: 1 })
+  assert.ok(bolsa.nota > chuveiro.nota, 'dois vendedores livres ganham de vinte e sete')
+  assert.ok(chuveiro.nota > capacete.nota, 'briga difícil ainda é melhor que ficha fechada da marca')
+})

@@ -217,7 +217,7 @@ export function explicarEntrada({ nota, anuncios, visitasPorAnuncio, lojasOficia
  *   topo sem loja oficial .... marca com loja própria na ficha ganha a
  *                              caixa de compra quase sempre.
  */
-export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial }) {
+export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fracaoOficial }) {
   const vpv = numeroOuNulo(visitasPorAnuncio)
   const n = numeroOuNulo(vendedores)
 
@@ -229,14 +229,25 @@ export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial }) {
   const porConcorrentes = n === null ? null
     : Math.min(100, Math.max(0, (1 - (Math.log10(Math.max(1, n)) / Math.log10(40))) * 100))
 
-  const porMarca = temLojaOficial === null || temLojaOficial === undefined
-    ? null
-    : (temLojaOficial ? 25 : 100)
+  // Quanto da ficha e de loja oficial, e nao apenas se ha alguma. Uma loja
+  // oficial entre vinte vendedores e concorrencia. Uma loja oficial sendo o
+  // unico vendedor e a marca dona do produto — e ai nao ha o que disputar.
+  const fo = numeroOuNulo(fracaoOficial)
+  const porMarca = fo !== null
+    ? Math.max(0, (1 - fo) * 100)
+    : (temLojaOficial === null || temLojaOficial === undefined ? null : (temLojaOficial ? 25 : 100))
+
+  // A ficha e da marca: todos os vendedores vistos sao loja oficial. Aqui
+  // "poucos concorrentes" deixa de ser boa noticia e vira o contrario —
+  // ninguem mais vende porque ninguem mais consegue. Sem este limite,
+  // "capacete feminino" com um vendedor oficial e muita visita tirava 89 e
+  // aparecia como o melhor negocio da tela.
+  const fichaDeMarca = fo !== null && fo >= 1
 
   const sinais = [
-    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.55 },
-    { nome: 'quantos disputam', valor: porConcorrentes, peso: 0.3 },
-    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.15 },
+    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.5 },
+    { nome: 'quantos disputam', valor: fichaDeMarca ? null : porConcorrentes, peso: 0.25 },
+    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.25 },
   ]
   const presentes = sinais.filter((s) => s.valor !== null)
   const faltando = sinais.filter((s) => s.valor === null).map((s) => s.nome)
@@ -254,10 +265,14 @@ export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial }) {
   // le sabe que falta o principal, e a ordenacao poe essas atras.
   const semProcura = porAtencao === null
 
+  // Teto de 30: por melhor que seja a atencao, entrar numa ficha que e da
+  // marca nao e oportunidade para quem esta comecando.
+  const bruta = Math.round(Math.min(100, Math.max(0, nota)))
   return {
-    nota: Math.round(Math.min(100, Math.max(0, nota))),
+    nota: fichaDeMarca ? Math.min(30, bruta) : bruta,
+    fichaDeMarca,
     semProcura,
-    completo: faltando.length === 0,
+    completo: faltando.length === 0 && !fichaDeMarca,
     cobertura: Math.round(soma * 100) / 100,
     faltando,
     motivos: { porAtencao, porConcorrentes, porMarca },
@@ -265,7 +280,7 @@ export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial }) {
 }
 
 /** A frase do nicho. Números sem porquê não ensinam ninguém a escolher. */
-export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, semProcura }) {
+export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, fichaDeMarca, semProcura }) {
   const pedacos = []
   if (Number.isFinite(visitasPorAnuncio)) {
     pedacos.push(`${Math.round(visitasPorAnuncio).toLocaleString('pt-BR')} visitas por anúncio em 30 dias`)
@@ -276,13 +291,21 @@ export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vended
   if (Number.isFinite(vendedores)) {
     pedacos.push(`${vendedores} ${vendedores === 1 ? 'vendedor disputa' : 'vendedores disputam'} ela`)
   }
-  if (temLojaOficial) pedacos.push('há loja oficial na ficha, e ela costuma levar a caixa de compra')
+  if (fichaDeMarca) {
+    pedacos.push('e todos são loja oficial: a ficha é da marca dona do produto')
+  } else if (temLojaOficial) {
+    pedacos.push('há loja oficial entre eles, e ela costuma levar a caixa de compra')
+  }
 
   // Sem procura medida nao se emite veredito. Dizer "bom lugar para entrar"
   // sobre um produto cuja demanda ninguem mediu e o pior conselho possivel
   // para quem vai comprar estoque com dinheiro contado.
   if (semProcura || nota === null) {
     return `Não deu para medir a procura deste produto — ${pedacos.join('; ') || 'sem sinal suficiente'}.`
+  }
+
+  if (fichaDeMarca) {
+    return `Não é lugar para entrar — ${pedacos.join('; ')}. Você estaria criando um anúncio para disputar com a própria marca.`
   }
 
   const veredito = nota >= 65 ? 'Esse é um bom lugar para entrar'
