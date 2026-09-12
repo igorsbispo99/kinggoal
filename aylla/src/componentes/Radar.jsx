@@ -40,14 +40,31 @@ export default function Radar({ estado, termoInicial = '', aoUsar }) {
   }
 
   if (!estado.conectado) {
+    // Se o servidor sabe por que não conectou, ele diz. Repetir o mesmo
+    // convite depois de uma tentativa que falhou faz a pessoa girar em
+    // círculo sem nunca descobrir o que está errado.
     return (
       <section className="cartao">
         <header><h2>Radar de mercado</h2><span className="nao-confirmado">não conectado</span></header>
-        <p className="dica">
-          Conecte a conta do Mercado Livre uma vez. O radar passa a medir concorrência e preço praticado
-          direto da fonte, em vez de você contar anúncios na mão.
-        </p>
-        <a className="botao primario cheio" href="/api/ml/conectar">Conectar minha conta do Mercado Livre</a>
+        {estado.erro ? (
+          <Aviso nivel="atencao" titulo="A conexão não se sustentou">
+            {estado.erro}
+          </Aviso>
+        ) : (
+          <p className="dica">
+            Conecte a conta do Mercado Livre uma vez. O radar passa a medir concorrência e preço praticado
+            direto da fonte, em vez de você contar anúncios na mão.
+          </p>
+        )}
+        <a className="botao primario cheio" href="/api/ml/conectar">
+          {estado.erro ? 'Tentar conectar de novo' : 'Conectar minha conta do Mercado Livre'}
+        </a>
+        {estado.erro ? (
+          <p className="dica">
+            Se continuar voltando para cá, me mande o que aparece em
+            {' '}<code>/api/ml/estado</code> — ali está o motivo exato.
+          </p>
+        ) : null}
       </section>
     )
   }

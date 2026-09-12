@@ -8,7 +8,7 @@
 import { analisarBusca, paraPesquisa } from './analise.js'
 import {
   temCredenciais, temBanco, trocarCodigo, obterTokenParaLeitura,
-  buscar, enriquecer, diagnosticar,
+  buscar, enriquecer, diagnosticar, resumoDaConexao,
 } from './mercadolivre.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
@@ -179,16 +179,36 @@ export default {
       // e aceito pelo Mercado Livre e recusado na busca com 403. Entao o
       // estado faz uma busca minima e responde pelo que realmente funciona.
       let conectado = false
-      let erro = null
+      let motivo = null
       let origem = null
+      let precisaReconectar = false
+      detalhe.conexao = await resumoDaConexao(env)
       try {
         const obtido = await obterTokenParaLeitura(env)
         origem = obtido.origem
         const prova = await buscar(env, { termo: 'teste', limite: 1, token: obtido.token })
         conectado = prova.ok
-        if (!prova.ok) erro = `O Mercado Livre recusou a leitura com ${prova.status}.`
-      } catch (falha) { erro = falha.message }
-      return Response.json({ configurado: true, conectado, origem, erro, detalhe })
+        if (!prova.ok) {
+          detalhe.provaStatus = prova.status
+          // Dizer so "recusou com 403" manda ela adivinhar. As duas causas
+          // possiveis pedem acoes opostas: reconectar, ou esperar.
+          if (origem === 'aplicativo') {
+            motivo = 'A conta ainda não está conectada: o Mercado Livre só deixa pesquisar com uma conta.'
+            precisaReconectar = true
+          } else if (prova.status === 401 || prova.status === 403) {
+            motivo = 'O acesso desta conta não vale mais. Conecte de novo — é um toque.'
+            precisaReconectar = true
+          } else {
+            motivo = `O Mercado Livre recusou a leitura com ${prova.status}. Isso costuma passar sozinho.`
+          }
+        }
+      } catch (falha) {
+        motivo = falha.message
+        precisaReconectar = Boolean(falha.precisaReconectar)
+      }
+      return Response.json({
+        configurado: true, conectado, origem, erro: motivo, precisaReconectar, detalhe,
+      })
     }
 
     if (caminho === '/api/ml/conectar') {

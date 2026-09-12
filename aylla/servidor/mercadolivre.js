@@ -205,6 +205,35 @@ export async function obterTokenParaLeitura(env) {
   return { token: doApp, origem: 'aplicativo' }
 }
 
+/**
+ * O que esta guardado da conexao, sem nada que seja segredo.
+ *
+ * Existe porque "nao conectado" sozinho nao distingue as tres causas:
+ * nada foi gravado, foi gravado e venceu, ou esta valendo e o Mercado
+ * Livre recusa mesmo assim. Cada uma pede um conserto diferente.
+ */
+export async function resumoDaConexao(env) {
+  if (!temBanco(env)) return { temBanco: false }
+  try {
+    const guardado = await lerToken(env)
+    if (!guardado) return { temBanco: true, gravado: false }
+    const validoAte = Number(guardado.expira_em) || 0
+    return {
+      temBanco: true,
+      gravado: true,
+      temAccess: Boolean(guardado.access),
+      temRefresh: Boolean(guardado.refresh),
+      escopos: guardado.escopos || null,
+      usuario: guardado.usuario || null,
+      expiraEm: validoAte ? new Date(validoAte).toISOString() : null,
+      vencido: validoAte > 0 && validoAte <= Date.now(),
+      minutosRestantes: validoAte ? Math.round((validoAte - Date.now()) / 60000) : null,
+    }
+  } catch (falha) {
+    return { temBanco: true, erroAoLer: falha.message }
+  }
+}
+
 /* ------------------------------------------------------- chamadas */
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
