@@ -32,9 +32,12 @@ de segurança dos dados. O que já funciona:
 - Histórico de preço por fornecedor.
 - Taxas de marketplace marcadas como referência até ela confirmar no painel
   de vendedor dela.
+- Ranking de oportunidades com nota de 0 a 100, pesos ajustáveis e a
+  explicação em uma frase de cada posição. Nota incompleta fica num grupo
+  separado, abaixo das completas, mesmo quando o número é maior.
 - Backup e restauração em JSON, com cópia fiel do formato de origem.
 - Migração de dados entre versões, com cópia de socorro antes de migrar.
-- 59 testes automatizados sobre as regras de negócio.
+- 75 testes automatizados sobre as regras de negócio.
 
 ## Roadmap
 
@@ -43,7 +46,7 @@ de segurança dos dados. O que já funciona:
 | F0 | Aplicativo instalável, offline, tema claro e escuro | pronta |
 | F1 | Calculadora de importação e revenda | pronta |
 | F2 | Produtos e fornecedores | pronta |
-| F3 | Ranking de oportunidades | a fazer |
+| F3 | Ranking de oportunidades | pronta |
 | F4 | Controle financeiro | a fazer |
 | F5 | Radar de mercado e captura por compartilhamento | a fazer |
 | F6 | Camada de inteligência | a fazer |
@@ -54,7 +57,7 @@ de segurança dos dados. O que já funciona:
 ```
 npm install
 npm run dev      # desenvolvimento
-npm test         # 59 testes, sem dependência externa
+npm test         # 75 testes, sem dependência externa
 npm run build    # roda os testes, gera os ícones e compila
 npm run preview  # serve o que foi gerado
 ```
@@ -75,6 +78,7 @@ src/lib/          regras de negócio, sem React
   precificacao.js   lucro, margem, preço alvo e ponto de equilíbrio
   mei.js            os dois tetos do MEI
   catalogo.js       fornecedores, produtos e a comparação de ofertas
+  ranking.js        a nota de oportunidade e a frase que a explica
   cambio.js         PTAX do Banco Central, com plano B
   armazenamento.js  persistência local e backup
   configuracoes.js  ajustes da operação
@@ -87,6 +91,14 @@ test/             testes das regras de negócio, com node:test
 As regras de negócio são funções puras e ficam fora do React de propósito: são
 elas que precisam de teste, e são elas que vão continuar iguais quando a F5
 trocar o armazenamento local por sincronização entre aparelhos.
+
+## Sobre dado que falta
+
+Em `ranking.js`, um componente sem dado vale `null`, nunca zero. Zero é um
+juízo ("não vende nada"); ausência não é juízo nenhum. E tirar o ausente da
+média também engana, só que para o outro lado: o produto passa a ser julgado
+apenas pelos pontos fortes dele. Por isso a nota parcial existe, é marcada com
+asterisco e nunca compete com uma nota completa.
 
 ## Sobre mudar o formato dos dados
 

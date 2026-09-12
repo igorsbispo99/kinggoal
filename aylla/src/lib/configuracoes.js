@@ -1,6 +1,7 @@
 import { MARKETPLACES } from './marketplaces.js'
 import { REGIME_PADRAO, ICMS_POR_ESTADO } from './tributos.js'
 import { REGRAS_MEI } from './mei.js'
+import { PESOS_PADRAO } from './ranking.js'
 import { ler, gravar } from './armazenamento.js'
 
 const CHAVE = 'configuracoes'
@@ -23,6 +24,8 @@ export const CONFIG_PADRAO = {
   regrasMEI: REGRAS_MEI,
   meiFaturamentoAno: 0,
   meiCustoMercadoriaAno: 0,
+  capitalDisponivel: 0,
+  pesosRanking: PESOS_PADRAO,
 }
 
 /** Mescla raso o suficiente para nao perder campo novo em versao futura. */
@@ -36,6 +39,7 @@ export function carregarConfig() {
     marketplaces: mesclarMarketplaces(salvo.marketplaces),
     regimeRemessa: { ...REGIME_PADRAO, ...(salvo.regimeRemessa || {}) },
     regrasMEI: { ...REGRAS_MEI, ...(salvo.regrasMEI || {}) },
+    pesosRanking: { ...PESOS_PADRAO, ...(salvo.pesosRanking || {}) },
   }
 }
 

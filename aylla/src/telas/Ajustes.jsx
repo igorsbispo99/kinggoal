@@ -3,6 +3,7 @@ import { Campo, Selecao, Segmentado, Linha, Aviso, Medidor } from '../componente
 import { ICMS_POR_ESTADO } from '../lib/tributos.js'
 import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { situacaoMEI } from '../lib/mei.js'
+import { PESOS_PADRAO, NOMES_PESOS } from '../lib/ranking.js'
 import { buscarCotacao, estaVelha } from '../lib/cambio.js'
 import { exportarTudo, importarTudo } from '../lib/armazenamento.js'
 import { vigenciaVencida } from '../lib/configuracoes.js'
@@ -159,13 +160,44 @@ export default function Ajustes({ config, setConfig, tema, setTema }) {
 
       <section className="cartao">
         <header>
-          <h2>Metas</h2>
+          <h2>Metas e capital</h2>
         </header>
         <div className="grade">
           <Campo rotulo="Margem alvo" ajuda="mínimo aceitável" sufixo="%" valor={pct(config.margemAlvo)} aoMudar={trocarPct('margemAlvo')} />
           <Campo rotulo="Reserva de caixa" ajuda="não reinveste" sufixo="%" valor={pct(config.reservaCaixa)} aoMudar={trocarPct('reservaCaixa')} />
+          <Campo rotulo="Capital disponível" ajuda="para comprar hoje" prefixo="R$" valor={String(config.capitalDisponivel).replace('.', ',')} aoMudar={(t) => trocar('capitalDisponivel', paraNumero(t))} largo />
         </div>
-        <p className="dica">A margem alvo alimenta o botão de preço sugerido. A reserva de caixa entra na fase financeira, para o sistema nunca mandar reinvestir tudo.</p>
+        <p className="dica">
+          A margem alvo alimenta o botão de preço sugerido. O capital disponível entra no ranking:
+          um lote que consome tudo o que ela tem perde pontos, por melhor que seja a margem.
+        </p>
+      </section>
+
+      <section className="cartao">
+        <header>
+          <h2>Pesos do ranking</h2>
+          <span className="etapa">o que mais importa</span>
+        </header>
+        <div className="grade">
+          {Object.keys(PESOS_PADRAO).map((chave) => (
+            <Campo
+              key={chave}
+              rotulo={NOMES_PESOS[chave]}
+              valor={String(config.pesosRanking[chave] ?? PESOS_PADRAO[chave])}
+              aoMudar={(t) => setConfig({ ...config, pesosRanking: { ...config.pesosRanking, [chave]: paraNumero(t) } })}
+            />
+          ))}
+        </div>
+        <div className="linhas">
+          <Linha rotulo="Soma dos pesos" detalhe="não precisa dar 100; o que vale é a proporção" valor={String(Object.values(config.pesosRanking).reduce((a, b) => a + (Number(b) || 0), 0))} />
+        </div>
+        <p className="dica">
+          Pouco caixa pede mais peso em capital exigido. Pressa por girar estoque pede mais peso em prazo.
+          Quem quer disputar menos pede mais peso em concorrência.
+        </p>
+        <button type="button" className="botao discreto" onClick={() => setConfig({ ...config, pesosRanking: { ...PESOS_PADRAO } })}>
+          Voltar aos pesos iniciais
+        </button>
       </section>
 
       {ORDEM_MARKETPLACES.map((id) => {

@@ -5,11 +5,18 @@ import {
   registrarOferta, removerOferta, compararOfertas,
 } from '../lib/catalogo.js'
 import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
+import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
+
+const faixaDe = (r) => (r.nota === null ? 'sem' : r.completo ? 'completo' : 'parcial')
 
 export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCalcular }) {
   const [aberto, setAberto] = useState(null)      // produto em detalhe
   const [editando, setEditando] = useState(null)  // produto em formulário
+  const ranqueados = useMemo(
+    () => ranquear({ produtos, fornecedores, config }),
+    [produtos, fornecedores, config],
+  )
 
   const atualizar = (lista) => { aoMudar(lista); return lista }
 
@@ -40,9 +47,14 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
       <section className="cartao">
         <header>
           <h2>Produtos</h2>
-          <span className="etapa">{produtos.length || 'nenhum'}</span>
+          <span className="etapa">{produtos.length ? `${produtos.length} em estudo` : 'nenhum'}</span>
         </header>
-        {produtos.length ? <p className="dica">Cada produto guarda os fornecedores que você encontrou e compara o custo real de cada um.</p> : null}
+        {produtos.length ? (
+          <p className="dica">
+            Em ordem de oportunidade. A nota combina margem, demanda, concorrência, capital exigido e prazo —
+            e cada linha diz em uma frase por que está nessa posição.
+          </p>
+        ) : null}
         <button type="button" className="botao primario cheio" onClick={() => setEditando({ ...PRODUTO_VAZIO })}>
           Cadastrar produto
         </button>
@@ -59,24 +71,51 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
       ) : null}
 
       <div className="lista-cartoes">
-        {produtos.map((p) => {
-          const r = compararOfertas({ produto: p, fornecedores, config })
-          const melhor = r.linhas[0]
+        {ranqueados.map((r, i) => {
+          const anterior = ranqueados[i - 1]
+          const grupo = faixaDe(r)
+          const mostraDivisor = !anterior || faixaDe(anterior) !== grupo
           return (
-            <button key={p.id} type="button" className="ficha" onClick={() => setAberto(p)}>
-              <span className="topo-ficha">
-                <span className="titulo-ficha">{p.nome}</span>
-                {p.categoria ? <span className="marca-origem">{p.categoria}</span> : null}
-              </span>
-              <span className="dados">
-                <span>{(p.ofertas || []).length} {(p.ofertas || []).length === 1 ? 'fornecedor' : 'fornecedores'}</span>
-                {melhor ? <span>melhor custo <b>{reais(melhor.custoUnitario)}</b></span> : <span>sem custo calculado</span>}
-                {p.precoVendaAlvo ? <span>venda <b>{reais(paraNumero(p.precoVendaAlvo))}</b></span> : null}
-              </span>
-            </button>
+            <React.Fragment key={r.produto.id}>
+              {mostraDivisor && grupo !== 'completo' ? (
+                <span className="divisor-grupo">
+                  {grupo === 'parcial' ? 'Pesquisa incompleta — não dá para comparar com as de cima' : 'Sem dados para pontuar'}
+                </span>
+              ) : null}
+              <button type="button" className="ficha" onClick={() => setAberto(r.produto)}>
+                <span className="cabeca">
+                  <span className="corpo-ficha">
+                    <span className="topo-ficha">
+                      <span className="titulo-ficha">
+                        {grupo === 'completo' ? <span className="posicao-rank">{i + 1}º</span> : null}
+                        {r.produto.nome}
+                      </span>
+                      {r.produto.categoria ? <span className="marca-origem">{r.produto.categoria}</span> : null}
+                    </span>
+                    <span className="porque">{r.resumo}</span>
+                    <span className="dados">
+                      {r.melhor ? <span>custo <b>{reais(r.melhor.custoUnitario)}</b></span> : <span>sem fornecedor</span>}
+                      {r.venda ? <span>lucro <b>{reais(r.venda.lucroUnitario)}</b></span> : null}
+                      {r.melhor ? <span>investe <b>{reais(r.melhor.investimento)}</b></span> : null}
+                    </span>
+                  </span>
+                  <span className={`nota${r.nota === null ? ' sem' : r.completo ? '' : ' parcial'}`}>
+                    <b>{r.nota === null ? '—' : r.nota}</b>
+                    <small>nota</small>
+                  </span>
+                </span>
+              </button>
+            </React.Fragment>
           )
         })}
       </div>
+
+      {ranqueados.some((r) => !r.completo) ? (
+        <Aviso nivel="info" titulo="Por que o asterisco">
+          Nota com asterisco foi calculada só com parte dos dados — e por isso fica abaixo das completas, mesmo quando o número é maior.
+          Um produto que ninguém pesquisou é julgado só pelos pontos fortes dele, o que o faria parecer melhor do que é.
+        </Aviso>
+      ) : null}
     </>
   )
 }
@@ -84,6 +123,7 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
 function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir }) {
   const [p, setP] = useState(produto)
   const trocar = (campo) => (valor) => setP({ ...p, [campo]: valor })
+  const trocarPesquisa = (campo) => (valor) => setP({ ...p, pesquisa: { ...(p.pesquisa || {}), [campo]: valor } })
 
   return (
     <section className="cartao">
@@ -104,6 +144,51 @@ function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir }) {
         <CampoTexto rotulo="Observações" valor={p.observacoes} aoMudar={trocar('observacoes')} placeholder="pesa pouco, cabe no frete barato" largo />
       </div>
       <p className="dica">O peso importa mais do que parece: produto leve e pequeno é o que sobra margem depois do frete grátis obrigatório.</p>
+
+      <details className="dobra" open>
+        <summary>Pesquisa de mercado</summary>
+        <div>
+          <p className="dica" style={{ marginBottom: 10 }}>
+            Abra o Mercado Livre, busque o produto e responda estas duas perguntas. São elas que separam
+            um produto que vende de um produto que só parece bom na calculadora.
+          </p>
+          <div className="grade">
+            <Campo
+              rotulo="Anúncios concorrentes"
+              ajuda="quantos achou"
+              valor={String((p.pesquisa || {}).anunciosConcorrentes ?? '')}
+              aoMudar={trocarPesquisa('anunciosConcorrentes')}
+              placeholder="12"
+            />
+            <Campo
+              rotulo="Vendas do líder"
+              ajuda="no mês"
+              valor={String((p.pesquisa || {}).vendasDoLiderMes ?? '')}
+              aoMudar={trocarPesquisa('vendasDoLiderMes')}
+              placeholder="80"
+            />
+            <Campo
+              rotulo="Mais barato dos outros"
+              prefixo="R$"
+              valor={String((p.pesquisa || {}).precoMin ?? '')}
+              aoMudar={trocarPesquisa('precoMin')}
+              placeholder="0,00"
+            />
+            <Campo
+              rotulo="Mais caro dos outros"
+              prefixo="R$"
+              valor={String((p.pesquisa || {}).precoMax ?? '')}
+              aoMudar={trocarPesquisa('precoMax')}
+              placeholder="0,00"
+            />
+          </div>
+          <p className="dica" style={{ marginTop: 10 }}>
+            Deixar em branco não é neutro: sem esses números a nota sai incompleta e o produto fica
+            abaixo dos pesquisados, por mais promissor que ele pareça.
+          </p>
+        </div>
+      </details>
+
       <div className="acoes">
         <button type="button" className="botao primario" disabled={!p.nome.trim()} onClick={() => aoSalvar(p)}>Salvar produto</button>
         {p.id ? <button type="button" className="botao perigo" onClick={() => aoExcluir(p.id)}>Excluir</button> : null}
@@ -114,10 +199,11 @@ function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir }) {
 
 function Detalhe({ produto, fornecedores, config, aoVoltar, aoEditar, aoMudarProduto, aoCalcular }) {
   const [novaOferta, setNovaOferta] = useState(null)
-  const comparacao = useMemo(
-    () => compararOfertas({ produto, fornecedores, config }),
+  const pontuacao = useMemo(
+    () => pontuarProduto({ produto, fornecedores, config }),
     [produto, fornecedores, config],
   )
+  const comparacao = pontuacao.comparacao
   const semFornecedor = !fornecedores.length
   const jaOfertados = new Set((produto.ofertas || []).map((o) => o.fornecedorId))
   const disponiveis = fornecedores.filter((f) => !jaOfertados.has(f.id) || (novaOferta && novaOferta.fornecedorId === f.id))
@@ -147,6 +233,32 @@ function Detalhe({ produto, fornecedores, config, aoVoltar, aoEditar, aoMudarPro
         </span>
         {produto.observacoes ? <p className="dica">{produto.observacoes}</p> : null}
       </section>
+
+      {pontuacao.nota !== null ? (
+        <section className="cartao">
+          <header>
+            <h2>Nota {pontuacao.nota}{pontuacao.completo ? '' : '*'}</h2>
+            <span className="etapa">{pontuacao.completo ? 'completa' : `${Math.round(pontuacao.cobertura * 100)}% dos dados`}</span>
+          </header>
+          <p className="dica">{pontuacao.resumo}</p>
+          <div className="componentes">
+            {pontuacao.componentes.map((c) => (
+              <div key={c.chave} className={`componente${c.nota === null ? ' ausente' : ''}`}>
+                <span className="cn">{c.nome}</span>
+                <span className="barra"><i style={{ width: `${c.nota === null ? 0 : c.nota}%` }} /></span>
+                <span className="cv">{c.nota === null ? '—' : Math.round(c.nota)}</span>
+              </div>
+            ))}
+          </div>
+          {pontuacao.faltando.length ? (
+            <Aviso nivel="atencao" titulo="Nota incompleta">
+              Falta {pontuacao.faltando.map((f) => NOMES_PESOS[f].toLowerCase()).join(' e ')}.
+              Toque em Editar e preencha a pesquisa de mercado — é rápido e muda a posição.
+            </Aviso>
+          ) : null}
+          <p className="dica">O peso de cada item é ajustável nos Ajustes. Pouco caixa pede mais peso em capital; pressa pede mais peso em prazo.</p>
+        </section>
+      ) : null}
 
       <section className="cartao">
         <header>
