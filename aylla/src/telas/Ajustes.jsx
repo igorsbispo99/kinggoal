@@ -5,14 +5,15 @@ import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { situacaoMEI } from '../lib/mei.js'
 import { PESOS_PADRAO, NOMES_PESOS } from '../lib/ranking.js'
 import { buscarCotacao, estaVelha } from '../lib/cambio.js'
-import { diagnosticarRadar } from '../lib/radar.js'
+import { diagnosticarRadar, estadoDoRadar } from '../lib/radar.js'
 import { exportarTudo, importarTudo } from '../lib/armazenamento.js'
 import { vigenciaVencida } from '../lib/configuracoes.js'
 import { reais, porcento, paraNumero } from '../lib/formato.js'
 
 const pct = (v) => String((v * 100).toFixed(2)).replace('.', ',').replace(/,00$/, '')
 
-export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, radar = { configurado: false, conectado: false } }) {
+export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, radar: radarInicial = { configurado: false, conectado: false } }) {
+  const [radar, setEstadoRadar] = useState(radarInicial)
   const [buscando, setBuscando] = useState(false)
   const [diagnostico, setDiagnostico] = useState(null)
   const [diagnosticando, setDiagnosticando] = useState(false)
@@ -290,7 +291,12 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
           disabled={diagnosticando}
           onClick={async () => {
             setDiagnosticando(true)
-            try { setDiagnostico(await diagnosticarRadar()) } catch (e) { setDiagnostico({ erro: e.message }) }
+            try {
+              setDiagnostico(await diagnosticarRadar())
+              // O cabecalho pode estar mostrando um estado consultado antes de
+              // as credenciais existirem. Reconsulta para nao mentir na tela.
+              setEstadoRadar(await estadoDoRadar())
+            } catch (e) { setDiagnostico({ erro: e.message }) }
             setDiagnosticando(false)
           }}
         >

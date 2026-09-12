@@ -7,7 +7,7 @@
 
 import { analisarBusca, paraPesquisa } from './analise.js'
 import {
-  temCredenciais, temBanco, trocarCodigo, obterToken,
+  temCredenciais, temBanco, trocarCodigo, obterToken, obterTokenParaLeitura,
   buscar, enriquecer, diagnosticar,
 } from './mercadolivre.js'
 
@@ -81,13 +81,20 @@ async function rotaRadar(request, env, url) {
     return erro('O radar ainda não foi configurado. Veja RADAR.md.', 503)
   }
 
+  // A conta dela quando existe; o token do proprio aplicativo quando nao.
   let token
+  let origemDoToken
   try {
-    token = await obterToken(env)
+    const obtido = await obterTokenParaLeitura(env)
+    token = obtido.token
+    origemDoToken = obtido.origem
   } catch (falha) {
-    return Response.json({ erro: falha.message, precisaReconectar: true }, { status: 401 })
+    return Response.json({
+      erro: 'Nenhum acesso ao Mercado Livre. Conecte a conta nos Ajustes.',
+      precisaConectar: true,
+      detalhe: falha.message,
+    }, { status: 401 })
   }
-  if (!token) return Response.json({ erro: 'Conta do Mercado Livre ainda não conectada.', precisaConectar: true }, { status: 401 })
 
   const busca = await buscar(env, { termo, limite: 25, token })
   if (!busca.ok) {
@@ -105,6 +112,7 @@ async function rotaRadar(request, env, url) {
   const analise = analisarBusca({ busca: busca.json, enriquecidos })
   return Response.json({
     termo,
+    origemDoToken,
     analise,
     pesquisa: paraPesquisa(analise),
     doCache: busca.doCache,
@@ -154,8 +162,13 @@ export default {
       }
       let conectado = false
       let erro = null
-      try { conectado = Boolean(await obterToken(env)) } catch (falha) { erro = falha.message }
-      return Response.json({ configurado: true, conectado, erro, detalhe })
+      let origem = null
+      try {
+        const obtido = await obterTokenParaLeitura(env)
+        conectado = Boolean(obtido.token)
+        origem = obtido.origem
+      } catch (falha) { erro = falha.message }
+      return Response.json({ configurado: true, conectado, origem, erro, detalhe })
     }
 
     if (caminho === '/api/ml/conectar') {

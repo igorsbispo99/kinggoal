@@ -127,6 +127,57 @@ export async function obterToken(env) {
   return json.access_token
 }
 
+/**
+ * Token do proprio aplicativo, sem usuario (client_credentials).
+ *
+ * Se funcionar, o radar le o mercado sem depender de a Aylla autorizar nada
+ * e sem a complexidade do refresh de uso unico. A documentacao publica nao
+ * descreve esse fluxo para o Mercado Livre, mas a caixa existe no formulario
+ * de criacao do aplicativo — entao a pergunta se responde tentando.
+ */
+let tokenDoApp = null
+
+export async function obterTokenDoApp(env) {
+  if (tokenDoApp && tokenDoApp.expiraEm - 5 * 60 * 1000 > Date.now()) {
+    return tokenDoApp.access
+  }
+  const resposta = await fetch(`${API}/oauth/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: env.ML_CLIENT_ID,
+      client_secret: env.ML_CLIENT_SECRET,
+    }),
+  })
+  const json = await resposta.json().catch(() => null)
+  if (!resposta.ok || !json || !json.access_token) {
+    const motivo = (json && (json.message || json.error)) || resposta.status
+    const falha = new Error(`client_credentials recusado: ${motivo}`)
+    falha.semSuporte = true
+    throw falha
+  }
+  tokenDoApp = {
+    access: json.access_token,
+    expiraEm: Date.now() + (Number(json.expires_in) || 21600) * 1000,
+  }
+  return tokenDoApp.access
+}
+
+/**
+ * O token que o radar usa: o da conta dela quando existe, o do aplicativo
+ * quando nao existe. Assim o radar funciona antes de qualquer autorizacao,
+ * e melhora quando ela autoriza.
+ */
+export async function obterTokenParaLeitura(env) {
+  try {
+    const doUsuario = await obterToken(env)
+    if (doUsuario) return { token: doUsuario, origem: 'conta' }
+  } catch (falha) { /* segue para o token do aplicativo */ }
+  const doApp = await obterTokenDoApp(env)
+  return { token: doApp, origem: 'aplicativo' }
+}
+
 /* ------------------------------------------------------- chamadas */
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -270,6 +321,35 @@ export async function diagnosticar(env) {
     registrar('Mais vendidos (/highlights)', destaques, {
       nota: destaques.ok ? 'disponível' : 'indisponível',
     })
+  }
+
+  if (temCredenciais(env)) {
+    try {
+      const doApp = await obterTokenDoApp(env)
+      provas.push({ nome: 'Token do aplicativo (client_credentials)', ok: true, status: 200, nota: 'funciona — o radar dispensa autorizacao' })
+      const buscaApp = await chamar(env, `/sites/${SITE}/search?q=fone+bluetooth&limit=5`, { token: doApp })
+      const item = buscaApp.json && buscaApp.json.results && buscaApp.json.results[0]
+      registrar('Busca com token do aplicativo', buscaApp, {
+        nota: item ? `${buscaApp.json.paging.total} anuncios` : 'sem resultados',
+        campos: item ? {
+          sold_quantity: item.sold_quantity !== undefined,
+          official_store_id: 'official_store_id' in item,
+          catalog_listing: 'catalog_listing' in item,
+          date_created: item.date_created !== undefined,
+        } : null,
+      })
+      if (item) {
+        const detalhes = await enriquecer(env, [item.id], doApp)
+        provas.push({
+          nome: 'Multiget com token do aplicativo',
+          ok: detalhes.length > 0 && Boolean(detalhes[0].date_created),
+          status: detalhes.length ? 200 : 0,
+          nota: detalhes[0] && detalhes[0].date_created ? `publicado em ${String(detalhes[0].date_created).slice(0, 10)}` : 'sem date_created',
+        })
+      }
+    } catch (falha) {
+      provas.push({ nome: 'Token do aplicativo (client_credentials)', ok: false, status: 0, nota: falha.message })
+    }
   }
 
   const categorias = await chamar(env, `/sites/${SITE}/categories`)
