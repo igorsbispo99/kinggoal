@@ -8,7 +8,7 @@
 // A versao sobe a cada mudanca que precisa chegar em quem ja instalou: o
 // activate apaga todo cache que nao seja este, entao sobrar versao velha
 // deixa de ser possivel.
-const CACHE = 'aylla-v3'
+const CACHE = 'aylla-v4'
 
 self.addEventListener('install', (evento) => {
   self.skipWaiting()

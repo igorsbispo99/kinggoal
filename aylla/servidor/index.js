@@ -14,6 +14,7 @@ import { explorar, mapearRaizes } from './explorador.js'
 import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
 import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
+import { estressar } from './estresse.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -287,6 +288,20 @@ export default {
     // As sugestoes prontas. Ler vem do banco — quem abre o aplicativo nao
     // espera cinquenta chamadas a API. Montar so acontece quando nao ha nada
     // gravado ou quando o cron da madrugada roda.
+    // Estresse: todo caminho possivel para medir procura, de uma vez.
+    if (caminho === '/api/ml/estresse') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      try {
+        const { token } = await obterTokenParaLeitura(env)
+        return Response.json(await estressar(env, {
+          token,
+          categoria: url.searchParams.get('categoria') || 'MLB7022',
+        }))
+      } catch (falha) {
+        return Response.json({ erro: falha.message }, { status: 502 })
+      }
+    }
+
     // Onde o funil corta. "Nenhuma sugestao fechou" nao diz nada, e eu nao
     // alcanco a API daqui para descobrir.
     if (caminho === '/api/ml/sugestoes/depurar') {
@@ -406,6 +421,24 @@ export default {
       }
     }
 
-    return env.ASSETS.fetch(request)
+    // A casca do aplicativo nao pode ficar guardada no navegador.
+    //
+    // Os arquivos de codigo tem hash no nome, entao versao nova nunca e
+    // confundida com velha. O index.html nao tem: se ele ficar em cache, o
+    // navegador continua pedindo o codigo antigo para sempre, e foi isso
+    // que aconteceu — a tela mostrou texto de duas versoes atras enquanto o
+    // servidor ja respondia o novo. Entao a casca vai com no-cache: o
+    // navegador pergunta toda vez, e o resto continua com cache longo.
+    const resposta = await env.ASSETS.fetch(request)
+    const tipo = resposta.headers.get('content-type') || ''
+    if (!tipo.includes('text/html')) return resposta
+
+    const cabecalhos = new Headers(resposta.headers)
+    cabecalhos.set('cache-control', 'no-cache, must-revalidate')
+    return new Response(resposta.body, {
+      status: resposta.status,
+      statusText: resposta.statusText,
+      headers: cabecalhos,
+    })
   },
 }
