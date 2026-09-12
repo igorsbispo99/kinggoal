@@ -10,13 +10,12 @@
   "name": "aylla-imports",
   "main": "servidor/index.js",
   "compatibility_date": "2026-09-01",
-  // Para ligar o radar, descomente e preencha o database_id do banco criado
-  // no painel da Cloudflare (veja RADAR.md). Um id inválido derruba o deploy,
-  // então a linha fica fora até o banco existir de verdade.
-  //
-  // "d1_databases": [
-  //   { "binding": "DB", "database_name": "aylla", "database_id": "..." }
-  // ],
+  // O banco guarda o token do Mercado Livre, que precisa sobreviver entre
+  // requisições, e mais adiante a sincronização entre os dois celulares.
+  // Sem ele o radar se declara desligado e o resto do app funciona igual.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "aylla", "database_id": "edc1aedf-8507-4242-81ce-04858f7442c6" }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
