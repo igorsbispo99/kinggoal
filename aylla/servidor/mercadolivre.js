@@ -114,10 +114,12 @@ export async function obterToken(env) {
   // offline_access. Falhar aqui é o certo — mas só aqui, no fim das seis
   // horas, e não na hora de conectar.
   if (!guardado.refresh) {
-    throw new Error(
+    const falha = new Error(
       'O acesso de seis horas expirou e esta conexão veio sem renovação automática. '
-      + 'Conecte a conta do Mercado Livre de novo em Ajustes.',
+      + 'Conecte a conta do Mercado Livre de novo — é um toque.',
     )
+    falha.precisaReconectar = true
+    throw falha
   }
 
   const resposta = await fetch(`${API}/oauth/token`, {
@@ -192,7 +194,13 @@ export async function obterTokenParaLeitura(env) {
   try {
     const doUsuario = await obterToken(env)
     if (doUsuario) return { token: doUsuario, origem: 'conta' }
-  } catch (falha) { /* segue para o token do aplicativo */ }
+  } catch (falha) {
+    // Expirou uma conexao que existia: cair no token do aplicativo seria
+    // trocar uma mensagem que resolve ("reconecte") por um 403 mudo — ja
+    // sabemos, medido em producao, que a busca recusa o token do aplicativo.
+    if (falha.precisaReconectar) throw falha
+    // Qualquer outra falha: ainda vale tentar o aplicativo.
+  }
   const doApp = await obterTokenDoApp(env)
   return { token: doApp, origem: 'aplicativo' }
 }

@@ -77,10 +77,20 @@ export default function Radar({ estado, termoInicial = '', aoUsar }) {
       </button>
 
       {falha ? (
-        <Aviso nivel={falha.precisaConectar || falha.precisaReconectar ? 'atencao' : 'critico'} titulo="O radar não respondeu">
-          {falha.message}
-          {falha.precisaReconectar ? ' Reconecte a conta nos Ajustes.' : ''}
-        </Aviso>
+        <>
+          <Aviso
+            nivel={falha.precisaConectar || falha.precisaReconectar ? 'atencao' : 'critico'}
+            titulo={falha.precisaReconectar ? 'Precisa conectar de novo' : 'O radar não respondeu'}
+          >
+            {falha.message}
+          </Aviso>
+          {/* Enquanto o Mercado Livre não devolver renovação automática, isto
+              acontece uma vez por dia. Mandar ela procurar o botão nos Ajustes
+              transformaria um toque em uma caçada. */}
+          {falha.precisaConectar || falha.precisaReconectar ? (
+            <a className="botao primario cheio" href="/api/ml/conectar">Conectar a conta de novo</a>
+          ) : null}
+        </>
       ) : null}
 
       {a && a.vazio ? <Aviso nivel="atencao" titulo="Nada encontrado">{a.resumo}</Aviso> : null}

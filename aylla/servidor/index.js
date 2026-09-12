@@ -89,19 +89,34 @@ async function rotaRadar(request, env, url) {
     token = obtido.token
     origemDoToken = obtido.origem
   } catch (falha) {
+    // Duas situacoes diferentes com o mesmo desfecho na tela: um botao.
+    // "Expirou" nao e erro nenhum — e o dia seguinte.
     return Response.json({
-      erro: 'Nenhum acesso ao Mercado Livre. Conecte a conta nos Ajustes.',
+      erro: falha.precisaReconectar
+        ? falha.message
+        : 'Nenhum acesso ao Mercado Livre. Conecte a conta nos Ajustes.',
       precisaConectar: true,
+      precisaReconectar: Boolean(falha.precisaReconectar),
       detalhe: falha.message,
     }, { status: 401 })
   }
 
   const busca = await buscar(env, { termo, limite: 25, token })
   if (!busca.ok) {
+    // 403 com o token do proprio aplicativo nao e mistério: medimos em
+    // producao que o Mercado Livre so aceita busca com token de conta.
+    const semConta = busca.status === 403 && origemDoToken === 'aplicativo'
     const mensagem = busca.status === 429
       ? 'O Mercado Livre pediu para esperar um pouco. Tente de novo em um minuto.'
-      : `O Mercado Livre respondeu ${busca.status}.`
-    return Response.json({ erro: mensagem, status: busca.status }, { status: 502 })
+      : semConta
+        ? 'O Mercado Livre só deixa pesquisar com uma conta conectada.'
+        : `O Mercado Livre respondeu ${busca.status}.`
+    return Response.json({
+      erro: mensagem,
+      status: busca.status,
+      precisaConectar: semConta,
+      precisaReconectar: semConta,
+    }, { status: semConta ? 401 : 502 })
   }
 
   const resultados = (busca.json && busca.json.results) || []

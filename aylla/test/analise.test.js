@@ -284,3 +284,24 @@ test('sem renovação, o token vale enquanto vale e só falha quando expira', as
     'passada a validade, a mensagem precisa dizer o que fazer',
   )
 })
+
+test('token expirado sem renovação não cai no token do aplicativo', async () => {
+  const { obterTokenParaLeitura } = await import('../servidor/mercadolivre.js')
+  const banco = bancoFalso({ access: 'velho', refresh: '', expira_em: Date.now() - 1000 })
+  const originalFetch = globalThis.fetch
+  let pediuTokenDoApp = false
+  globalThis.fetch = async () => {
+    pediuTokenDoApp = true
+    return { ok: true, json: async () => ({ access_token: 'doApp', expires_in: 21600 }) }
+  }
+  try {
+    await assert.rejects(
+      () => obterTokenParaLeitura({ ML_CLIENT_ID: 'a', ML_CLIENT_SECRET: 'b', DB: banco.DB }),
+      (erro) => erro.precisaReconectar === true,
+      'a busca recusa o token do aplicativo: cair nele troca "reconecte" por um 403 mudo',
+    )
+    assert.equal(pediuTokenDoApp, false, 'nem chega a pedir o token que já sabemos que não serve')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
