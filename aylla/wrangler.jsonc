@@ -2,15 +2,21 @@
   // Configuração explícita de publicação na Cloudflare.
   //
   // Sem este arquivo, o Workers Builds tenta adivinhar o projeto e exige o
-  // plugin oficial de Vite, que por sua vez exige Vite 6+. Declarando aqui,
-  // não há adivinhação: é um Worker só de arquivos estáticos, servindo a
-  // pasta dist que o Vite gera.
+  // plugin oficial de Vite. Declarando aqui, não há adivinhação.
+  //
+  // O site é estático; o Worker existe só para a rota /api/ptax, que busca a
+  // cotação oficial do lado do servidor, onde o bloqueio de origem do Banco
+  // Central não se aplica.
   "name": "aylla-imports",
+  "main": "servidor/index.js",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     // Qualquer caminho desconhecido devolve o index.html: o aplicativo é uma
     // página só, e a navegação acontece dentro dela.
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+    // ...menos /api/*, que precisa chegar ao Worker antes dos arquivos.
+    "run_worker_first": ["/api/*"]
   }
 }

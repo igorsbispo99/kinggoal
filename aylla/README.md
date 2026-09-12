@@ -9,13 +9,15 @@ não depende de servidor nenhum: os dados ficam no próprio aparelho.
 
 ## Estado atual
 
-**Fase 1 de 8, mais a base de segurança dos dados.** O que já funciona:
+**No ar em `aylla-imports.igorsilva1971.workers.dev`.** Fase 1 de 8, mais a base
+de segurança dos dados. O que já funciona:
 
 - Cálculo de importação com a regra vigente desde 12/05/2026 (MP 1.357/2026):
   isenção de Imposto de Importação até US$ 50, 60% com desconto de US$ 30
   acima disso, e ICMS estadual calculado por dentro.
-- Cotação do dólar pelo Banco Central (PTAX), com fonte alternativa e valor
-  manual — o sistema nunca trava por causa de câmbio.
+- Cotação do dólar pelo Banco Central (PTAX), buscada pelo Worker em `/api/ptax`
+  porque o Banco Central não autoriza chamadas vindas do navegador. Cai para a
+  AwesomeAPI e depois para o valor manual — o sistema nunca trava por câmbio.
 - Custo desembarcado por unidade e do lote inteiro, com memória de cálculo.
 - Lucro, margem e retorno em cada marketplace, com comissão, taxa fixa por item
   e frete grátis obrigatório acima de R$ 79.
@@ -27,7 +29,7 @@ não depende de servidor nenhum: os dados ficam no próprio aparelho.
 - Contas salvas, ordenadas por margem.
 - Backup e restauração em JSON, com cópia fiel do formato de origem.
 - Migração de dados entre versões, com cópia de socorro antes de migrar.
-- 46 testes automatizados sobre as regras de negócio.
+- 51 testes automatizados sobre as regras de negócio.
 
 ## Roadmap
 
@@ -47,7 +49,7 @@ não depende de servidor nenhum: os dados ficam no próprio aparelho.
 ```
 npm install
 npm run dev      # desenvolvimento
-npm test         # 46 testes, sem dependência externa
+npm test         # 51 testes, sem dependência externa
 npm run build    # roda os testes, gera os ícones e compila
 npm run preview  # serve o que foi gerado
 ```
@@ -70,6 +72,7 @@ src/lib/          regras de negócio, sem React
   cambio.js         PTAX do Banco Central, com plano B
   armazenamento.js  persistência local e backup
   configuracoes.js  ajustes da operação
+servidor/         o Worker: só a rota /api/ptax
 src/telas/        Calculadora, Salvos, Ajustes
 src/componentes/  campos, avisos, medidores, ícones
 test/             testes das regras de negócio, com node:test
