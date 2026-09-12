@@ -5,14 +5,17 @@ import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { situacaoMEI } from '../lib/mei.js'
 import { PESOS_PADRAO, NOMES_PESOS } from '../lib/ranking.js'
 import { buscarCotacao, estaVelha } from '../lib/cambio.js'
+import { diagnosticarRadar } from '../lib/radar.js'
 import { exportarTudo, importarTudo } from '../lib/armazenamento.js'
 import { vigenciaVencida } from '../lib/configuracoes.js'
 import { reais, porcento, paraNumero } from '../lib/formato.js'
 
 const pct = (v) => String((v * 100).toFixed(2)).replace('.', ',').replace(/,00$/, '')
 
-export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI }) {
+export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, radar = { configurado: false, conectado: false } }) {
   const [buscando, setBuscando] = useState(false)
+  const [diagnostico, setDiagnostico] = useState(null)
+  const [diagnosticando, setDiagnosticando] = useState(false)
   const [recado, setRecado] = useState(null)
 
   const trocar = (campo, valor) => setConfig({ ...config, [campo]: valor })
@@ -252,6 +255,71 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI })
           </section>
         )
       })}
+
+      <section className="cartao">
+        <header>
+          <h2>Radar de mercado</h2>
+          {radar.conectado
+            ? <span className="selo-confirmado">conectado</span>
+            : <span className="nao-confirmado">{radar.configurado ? 'não conectado' : 'desligado'}</span>}
+        </header>
+
+        {!radar.configurado ? (
+          <p className="dica">
+            O radar lê o Mercado Livre pelo servidor e mede concorrência, faixa de preço e a dificuldade
+            de entrar numa categoria. Ainda falta configurar as credenciais — o passo a passo está no
+            arquivo RADAR.md do projeto.
+          </p>
+        ) : radar.conectado ? (
+          <p className="dica">
+            A conta está conectada e o token se renova sozinho. Se o radar parar de responder, reconecte por aqui.
+          </p>
+        ) : (
+          <p className="dica">Falta autorizar uma vez com a conta do Mercado Livre dela.</p>
+        )}
+
+        {radar.configurado ? (
+          <a className={`botao cheio${radar.conectado ? '' : ' primario'}`} href="/api/ml/conectar">
+            {radar.conectado ? 'Reconectar conta' : 'Conectar conta do Mercado Livre'}
+          </a>
+        ) : null}
+
+        <button
+          type="button"
+          className="botao discreto"
+          disabled={diagnosticando}
+          onClick={async () => {
+            setDiagnosticando(true)
+            try { setDiagnostico(await diagnosticarRadar()) } catch (e) { setDiagnostico({ erro: e.message }) }
+            setDiagnosticando(false)
+          }}
+        >
+          {diagnosticando ? 'Perguntando à API...' : 'Diagnosticar a API'}
+        </button>
+
+        {diagnostico ? (
+          diagnostico.erro ? <Aviso nivel="critico">{diagnostico.erro}</Aviso> : (
+            <>
+              <div className="linhas">
+                {(diagnostico.provas || []).map((prova, i) => (
+                  <Linha
+                    key={i}
+                    rotulo={prova.nome}
+                    detalhe={prova.nota || undefined}
+                    valor={prova.ok ? 'ok' : (prova.status ? String(prova.status) : 'falhou')}
+                    tom={prova.ok ? 'isento' : 'desconta'}
+                  />
+                ))}
+              </div>
+              <p className="dica">
+                Esta tela existe porque a documentação do Mercado Livre não responde com segurança o que a
+                API libera hoje. Em vez de adivinhar, o sistema pergunta a ela e mostra a resposta. Se algo
+                aparecer vermelho aqui, me mande esta lista.
+              </p>
+            </>
+          )
+        ) : null}
+      </section>
 
       <section className="cartao">
         <header><h2>Aparência</h2></header>

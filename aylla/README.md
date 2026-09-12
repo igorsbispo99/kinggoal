@@ -40,9 +40,12 @@ de segurança dos dados. O que já funciona:
   ponderado, caixa, quanto dá para reinvestir, curva ABC, cobertura de estoque
   e o prazo real de cada fornecedor contra o prometido.
 - Os medidores do MEI se alimentam sozinhos das compras e vendas do ano.
+- Radar de mercado: lê o Mercado Livre e mede concorrência, faixa de preço,
+  concentração de vendedores e **barreira de entrada** — o sinal que separa
+  uma categoria acessível de uma parede. Configuração em `RADAR.md`.
 - Backup e restauração em JSON, com cópia fiel do formato de origem.
 - Migração de dados entre versões, com cópia de socorro antes de migrar.
-- 90 testes automatizados sobre as regras de negócio.
+- 104 testes automatizados sobre as regras de negócio.
 
 ## Roadmap
 
@@ -53,7 +56,7 @@ de segurança dos dados. O que já funciona:
 | F2 | Produtos e fornecedores | pronta |
 | F3 | Ranking de oportunidades | pronta |
 | F4 | Controle financeiro | pronta |
-| F5 | Radar de mercado e captura por compartilhamento | a fazer |
+| F5 | Radar de mercado | parcial: radar pronto, sincronização a fazer |
 | F6 | Camada de inteligência | a fazer |
 | F7 | Acabamento: câmera, notificações, checklist fiscal | a fazer |
 
@@ -62,7 +65,7 @@ de segurança dos dados. O que já funciona:
 ```
 npm install
 npm run dev      # desenvolvimento
-npm test         # 90 testes, sem dependência externa
+npm test         # 104 testes, sem dependência externa
 npm run build    # roda os testes, gera os ícones e compila
 npm run preview  # serve o que foi gerado
 ```
@@ -88,7 +91,9 @@ src/lib/          regras de negócio, sem React
   cambio.js         PTAX do Banco Central, com plano B
   armazenamento.js  persistência local e backup
   configuracoes.js  ajustes da operação
-servidor/         o Worker: só a rota /api/ptax
+servidor/         o Worker
+  analise.js        leitura de mercado a partir de uma busca do Mercado Livre
+  mercadolivre.js   token, busca, enriquecimento e o diagnóstico da API
 src/telas/        Calculadora, Produtos, Fornecedores, Ajustes
 src/componentes/  campos, avisos, medidores, ícones
 test/             testes das regras de negócio, com node:test
@@ -97,6 +102,14 @@ test/             testes das regras de negócio, com node:test
 As regras de negócio são funções puras e ficam fora do React de propósito: são
 elas que precisam de teste, e são elas que vão continuar iguais quando a F5
 trocar o armazenamento local por sincronização entre aparelhos.
+
+## Sobre medido e estimado
+
+O radar nunca mistura os dois. Anúncios, preços e composição do topo vêm
+medidos da API. Vendas por mês é estimativa: o `sold_quantity` do Mercado
+Livre é referencial por decisão dele, e é acumulado, não mensal — por isso é
+cruzado com a data de publicação e mostrado com `~`. A tela diz qual é qual,
+porque quem está começando não tem como saber a diferença sozinha.
 
 ## Sobre lucro e caixa
 

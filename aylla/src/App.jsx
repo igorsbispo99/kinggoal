@@ -9,6 +9,7 @@ import { carregarConfig, salvarConfig } from './lib/configuracoes.js'
 import { listarProdutos, listarFornecedores, salvarProduto, converterSimulacoesEmProdutos } from './lib/catalogo.js'
 import { listarLotes, listarVendas, totaisDoAno } from './lib/financeiro.js'
 import { ler, gravar } from './lib/armazenamento.js'
+import { estadoDoRadar } from './lib/radar.js'
 import { reais, paraCampo } from './lib/formato.js'
 
 const ABAS = [
@@ -25,6 +26,8 @@ export default function App() {
   const [tema, setTemaBruto] = useState(() => ler('tema', 'sistema'))
   const [formulario, setFormulario] = useState(FORMULARIO_VAZIO)
   const [instalador, setInstalador] = useState(null)
+  const [radar, setRadar] = useState({ configurado: false, conectado: false })
+  const [recadoRadar, setRecadoRadar] = useState(() => new URLSearchParams(window.location.search).get('ml'))
 
   // As simulações da fase 1 viram produtos, sem apagar o original.
   const [produtos, setProdutos] = useState(() => {
@@ -46,6 +49,14 @@ export default function App() {
     if (tema === 'sistema') raiz.removeAttribute('data-tema')
     else raiz.setAttribute('data-tema', tema)
   }, [tema])
+
+  useEffect(() => {
+    estadoDoRadar().then(setRadar)
+    if (recadoRadar) {
+      // Limpa o endereço para o aviso não voltar a cada recarga.
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   useEffect(() => {
     const capturar = (e) => { e.preventDefault(); setInstalador(e) }
@@ -111,6 +122,13 @@ export default function App() {
       </div>
 
       <main className="conteudo">
+        {recadoRadar === 'conectado' ? (
+          <div className="aviso info"><b>Mercado Livre conectado</b><span>O radar já pode ler o mercado.</span></div>
+        ) : null}
+        {recadoRadar === 'erro' ? (
+          <div className="aviso critico"><b>A conexão não completou</b><span>Tente de novo pelos Ajustes.</span></div>
+        ) : null}
+
         {instalador ? (
           <div className="aviso info">
             <b>Coloque na tela inicial</b>
@@ -144,6 +162,7 @@ export default function App() {
             config={config}
             aoMudar={setProdutos}
             aoCalcular={calcularComFornecedor}
+            radar={radar}
           />
         ) : null}
 
@@ -164,7 +183,7 @@ export default function App() {
         ) : null}
 
         {aba === 'ajustes' ? (
-          <Ajustes config={config} setConfig={setConfig} tema={tema} setTema={setTema} totaisMEI={totaisMEI} />
+          <Ajustes config={config} setConfig={setConfig} tema={tema} setTema={setTema} totaisMEI={totaisMEI} radar={radar} />
         ) : null}
       </main>
 

@@ -10,6 +10,13 @@
   "name": "aylla-imports",
   "main": "servidor/index.js",
   "compatibility_date": "2026-09-01",
+  // Para ligar o radar, descomente e preencha o database_id do banco criado
+  // no painel da Cloudflare (veja RADAR.md). Um id inválido derruba o deploy,
+  // então a linha fica fora até o banco existir de verdade.
+  //
+  // "d1_databases": [
+  //   { "binding": "DB", "database_name": "aylla", "database_id": "..." }
+  // ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",

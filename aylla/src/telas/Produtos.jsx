@@ -6,11 +6,12 @@ import {
 } from '../lib/catalogo.js'
 import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
+import RadarMercado from '../componentes/Radar.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
 const faixaDe = (r) => (r.nota === null ? 'sem' : r.completo ? 'completo' : 'parcial')
 
-export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCalcular }) {
+export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCalcular, radar = { configurado: false, conectado: false } }) {
   const [aberto, setAberto] = useState(null)      // produto em detalhe
   const [editando, setEditando] = useState(null)  // produto em formulário
   const ranqueados = useMemo(
@@ -22,6 +23,7 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
 
   if (editando) {
     return <Formulario
+      radar={radar}
       produto={editando}
       aoCancelar={() => setEditando(null)}
       aoSalvar={(p) => { atualizar(salvarProduto(p)); setEditando(null); setAberto(null) }}
@@ -120,7 +122,7 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
   )
 }
 
-function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir }) {
+function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir, radar }) {
   const [p, setP] = useState(produto)
   const trocar = (campo) => (valor) => setP({ ...p, [campo]: valor })
   const trocarPesquisa = (campo) => (valor) => setP({ ...p, pesquisa: { ...(p.pesquisa || {}), [campo]: valor } })
@@ -145,12 +147,30 @@ function Formulario({ produto, aoSalvar, aoCancelar, aoExcluir }) {
       </div>
       <p className="dica">O peso importa mais do que parece: produto leve e pequeno é o que sobra margem depois do frete grátis obrigatório.</p>
 
+      <RadarMercado
+        estado={radar}
+        termoInicial={p.nome}
+        aoUsar={(dados) => setP({
+          ...p,
+          pesquisa: {
+            ...(p.pesquisa || {}),
+            anunciosConcorrentes: dados.pesquisa.anunciosConcorrentes,
+            vendasDoLiderMes: dados.pesquisa.vendasDoLiderMes,
+            precoMin: dados.pesquisa.precoMin,
+            precoMax: dados.pesquisa.precoMax,
+            origem: dados.pesquisa.origem,
+            medidoEm: dados.pesquisa.medidoEm,
+          },
+        })}
+      />
+
       <details className="dobra" open>
         <summary>Pesquisa de mercado</summary>
         <div>
           <p className="dica" style={{ marginBottom: 10 }}>
-            Abra o Mercado Livre, busque o produto e responda estas duas perguntas. São elas que separam
-            um produto que vende de um produto que só parece bom na calculadora.
+            {(p.pesquisa || {}).origem
+              ? `Preenchido pelo radar em ${new Date(p.pesquisa.medidoEm).toLocaleDateString('pt-BR')}. Pode ajustar à mão se quiser.`
+              : 'Se o radar estiver desligado, abra o Mercado Livre e responda à mão. São estas duas perguntas que separam um produto que vende de um que só parece bom na calculadora.'}
           </p>
           <div className="grade">
             <Campo

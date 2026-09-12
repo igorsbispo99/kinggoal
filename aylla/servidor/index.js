@@ -1,13 +1,20 @@
 // Worker do Aylla Imports.
 //
-// Existe por um motivo só: o Banco Central não autoriza chamadas vindas do
-// navegador (sem cabeçalho de origem, o navegador recusa a resposta). Aqui,
-// do lado do servidor, essa restrição não existe — quem chama é a Cloudflare,
-// não o celular dela. O resto do site continua sendo arquivo estático.
+// O site é estático; o servidor existe para o que o navegador não pode fazer:
+// falar com o Banco Central e com o Mercado Livre, que não autorizam chamadas
+// vindas de uma página. Aqui não há bloqueio de origem, e o segredo do
+// aplicativo nunca sai daqui.
+
+import { analisarBusca, paraPesquisa } from './analise.js'
+import {
+  temCredenciais, temBanco, trocarCodigo, obterToken,
+  buscar, enriquecer, diagnosticar,
+} from './mercadolivre.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
-/** O Olinda espera a data no formato americano, entre aspas simples. */
+/* --------------------------------------------------------- cotação */
+
 export function dataParaOlinda(data) {
   const mm = String(data.getUTCMonth() + 1).padStart(2, '0')
   const dd = String(data.getUTCDate()).padStart(2, '0')
@@ -19,7 +26,6 @@ export function urlCotacao(data) {
     + `?@dataCotacao='${dataParaOlinda(data)}'&$top=1&$format=json`
 }
 
-/** Dias a andar para trás a partir de hoje, em ordem. */
 export function diasParaTentar(hoje, quantos = 8) {
   return Array.from({ length: quantos }, (_, i) => {
     const dia = new Date(hoje)
@@ -45,23 +51,133 @@ async function buscarPtax(hoje = new Date()) {
   return null
 }
 
+/* ------------------------------------------------------------ radar */
+
+const erro = (mensagem, status = 400) => Response.json({ erro: mensagem }, { status })
+
+function enderecoDeRetorno(request) {
+  return `${new URL(request.url).origin}/api/ml/callback`
+}
+
+async function guardarEstado(env, estado) {
+  await env.DB.exec('CREATE TABLE IF NOT EXISTS ml_estado (valor TEXT PRIMARY KEY, criado_em INTEGER)')
+  await env.DB.prepare('INSERT OR REPLACE INTO ml_estado (valor, criado_em) VALUES (?, ?)').bind(estado, Date.now()).run()
+}
+
+async function consumirEstado(env, estado) {
+  try {
+    const achado = await env.DB.prepare('SELECT criado_em FROM ml_estado WHERE valor = ?').bind(estado).first()
+    await env.DB.prepare('DELETE FROM ml_estado WHERE valor = ? OR criado_em < ?').bind(estado, Date.now() - 15 * 60 * 1000).run()
+    return Boolean(achado)
+  } catch (falha) {
+    return false
+  }
+}
+
+async function rotaRadar(request, env, url) {
+  const termo = (url.searchParams.get('q') || '').trim()
+  if (!termo) return erro('Diga o que procurar.')
+  if (!temCredenciais(env) || !temBanco(env)) {
+    return erro('O radar ainda não foi configurado. Veja RADAR.md.', 503)
+  }
+
+  let token
+  try {
+    token = await obterToken(env)
+  } catch (falha) {
+    return Response.json({ erro: falha.message, precisaReconectar: true }, { status: 401 })
+  }
+  if (!token) return Response.json({ erro: 'Conta do Mercado Livre ainda não conectada.', precisaConectar: true }, { status: 401 })
+
+  const busca = await buscar(env, { termo, limite: 25, token })
+  if (!busca.ok) {
+    const mensagem = busca.status === 429
+      ? 'O Mercado Livre pediu para esperar um pouco. Tente de novo em um minuto.'
+      : `O Mercado Livre respondeu ${busca.status}.`
+    return Response.json({ erro: mensagem, status: busca.status }, { status: 502 })
+  }
+
+  const resultados = (busca.json && busca.json.results) || []
+  // Enriquecer só os mais relevantes: é onde a velocidade importa e onde o
+  // limite de requisições dói menos.
+  const enriquecidos = await enriquecer(env, resultados.slice(0, 10).map((i) => i.id), token)
+
+  const analise = analisarBusca({ busca: busca.json, enriquecidos })
+  return Response.json({
+    termo,
+    analise,
+    pesquisa: paraPesquisa(analise),
+    doCache: busca.doCache,
+    exemplos: resultados.slice(0, 5).map((i) => ({
+      titulo: i.title,
+      preco: i.price,
+      link: i.permalink,
+      lojaOficial: Boolean(i.official_store_id),
+      catalogo: Boolean(i.catalog_listing),
+    })),
+  }, { headers: { 'cache-control': 'private, max-age=300' } })
+}
+
+/* ------------------------------------------------------------ worker */
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
+    const caminho = url.pathname
 
-    if (url.pathname === '/api/ptax') {
+    if (caminho === '/api/ptax') {
       try {
         const cotacao = await buscarPtax()
-        if (!cotacao) {
-          return Response.json({ erro: 'Banco Central sem cotação nos últimos 8 dias' }, { status: 502 })
-        }
-        return Response.json(cotacao, {
-          // Meia hora de cache: a PTAX é publicada uma vez por dia útil, e
-          // isso evita bater no Banco Central a cada abertura do aplicativo.
-          headers: { 'cache-control': 'public, max-age=1800' },
-        })
-      } catch (erro) {
-        return Response.json({ erro: 'Falha ao consultar o Banco Central' }, { status: 502 })
+        if (!cotacao) return erro('Banco Central sem cotação nos últimos 8 dias', 502)
+        return Response.json(cotacao, { headers: { 'cache-control': 'public, max-age=1800' } })
+      } catch (falha) {
+        return erro('Falha ao consultar o Banco Central', 502)
+      }
+    }
+
+    if (caminho === '/api/ml/estado') {
+      if (!temCredenciais(env) || !temBanco(env)) {
+        return Response.json({ configurado: false, conectado: false })
+      }
+      let conectado = false
+      try { conectado = Boolean(await obterToken(env)) } catch (falha) { conectado = false }
+      return Response.json({ configurado: true, conectado })
+    }
+
+    if (caminho === '/api/ml/conectar') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado. Veja RADAR.md.', 503)
+      const estado = crypto.randomUUID()
+      await guardarEstado(env, estado)
+      const autorizar = new URL('https://auth.mercadolivre.com.br/authorization')
+      autorizar.searchParams.set('response_type', 'code')
+      autorizar.searchParams.set('client_id', env.ML_CLIENT_ID)
+      autorizar.searchParams.set('redirect_uri', enderecoDeRetorno(request))
+      autorizar.searchParams.set('state', estado)
+      return Response.redirect(autorizar.toString(), 302)
+    }
+
+    if (caminho === '/api/ml/callback') {
+      const codigo = url.searchParams.get('code')
+      const estado = url.searchParams.get('state')
+      if (!codigo) return erro('O Mercado Livre não devolveu o código de autorização.')
+      if (!estado || !(await consumirEstado(env, estado))) {
+        return erro('Autorização não reconhecida. Comece de novo pelo aplicativo.', 403)
+      }
+      try {
+        await trocarCodigo(env, codigo, enderecoDeRetorno(request))
+        return Response.redirect(`${url.origin}/?ml=conectado`, 302)
+      } catch (falha) {
+        return Response.redirect(`${url.origin}/?ml=erro`, 302)
+      }
+    }
+
+    if (caminho === '/api/ml/analisar') return rotaRadar(request, env, url)
+
+    if (caminho === '/api/ml/diagnostico') {
+      try {
+        return Response.json(await diagnosticar(env))
+      } catch (falha) {
+        return Response.json({ erro: falha.message, verificadoEm: new Date().toISOString() }, { status: 500 })
       }
     }
 
