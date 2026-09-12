@@ -117,6 +117,17 @@ os dois como tipo **Secret** (criptografado), nunca como texto puro:
 - `ML_CLIENT_ID` — o App ID
 - `ML_CLIENT_SECRET` — a Secret Key
 
+**Salvar o segredo não basta.** Este Worker usa versionamento: alterar uma
+variável cria uma versão nova, e a versão em execução continua sendo a
+anterior — sem os segredos — até que a nova seja publicada. Se o painel não
+oferecer um botão de implantar ali mesmo, qualquer commit novo resolve,
+porque o build seguinte nasce já com eles.
+
+O sintoma é enganoso: o painel mostra os dois segredos no lugar certo, com
+os nomes certos, e mesmo assim `/api/ml/estado` responde
+`"variaveisVisiveis": []`. Não é nome errado nem Worker errado — é versão
+velha rodando.
+
 ## Passo 4 — conectar e conferir
 
 1. Abra o app, vá em **Ajustes → Radar de mercado → Conectar conta**.
