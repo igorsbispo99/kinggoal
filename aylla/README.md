@@ -35,9 +35,14 @@ de segurança dos dados. O que já funciona:
 - Ranking de oportunidades com nota de 0 a 100, pesos ajustáveis e a
   explicação em uma frase de cada posição. Nota incompleta fica num grupo
   separado, abaixo das completas, mesmo quando o número é maior.
+- Compras com o câmbio travado na data do pagamento, recebimento com avarias,
+  vendas com o custo do estoque congelado no momento, estoque com custo médio
+  ponderado, caixa, quanto dá para reinvestir, curva ABC, cobertura de estoque
+  e o prazo real de cada fornecedor contra o prometido.
+- Os medidores do MEI se alimentam sozinhos das compras e vendas do ano.
 - Backup e restauração em JSON, com cópia fiel do formato de origem.
 - Migração de dados entre versões, com cópia de socorro antes de migrar.
-- 75 testes automatizados sobre as regras de negócio.
+- 90 testes automatizados sobre as regras de negócio.
 
 ## Roadmap
 
@@ -47,7 +52,7 @@ de segurança dos dados. O que já funciona:
 | F1 | Calculadora de importação e revenda | pronta |
 | F2 | Produtos e fornecedores | pronta |
 | F3 | Ranking de oportunidades | pronta |
-| F4 | Controle financeiro | a fazer |
+| F4 | Controle financeiro | pronta |
 | F5 | Radar de mercado e captura por compartilhamento | a fazer |
 | F6 | Camada de inteligência | a fazer |
 | F7 | Acabamento: câmera, notificações, checklist fiscal | a fazer |
@@ -57,7 +62,7 @@ de segurança dos dados. O que já funciona:
 ```
 npm install
 npm run dev      # desenvolvimento
-npm test         # 75 testes, sem dependência externa
+npm test         # 90 testes, sem dependência externa
 npm run build    # roda os testes, gera os ícones e compila
 npm run preview  # serve o que foi gerado
 ```
@@ -79,6 +84,7 @@ src/lib/          regras de negócio, sem React
   mei.js            os dois tetos do MEI
   catalogo.js       fornecedores, produtos e a comparação de ofertas
   ranking.js        a nota de oportunidade e a frase que a explica
+  financeiro.js     lotes, vendas, estoque, caixa e curva ABC
   cambio.js         PTAX do Banco Central, com plano B
   armazenamento.js  persistência local e backup
   configuracoes.js  ajustes da operação
@@ -91,6 +97,14 @@ test/             testes das regras de negócio, com node:test
 As regras de negócio são funções puras e ficam fora do React de propósito: são
 elas que precisam de teste, e são elas que vão continuar iguais quando a F5
 trocar o armazenamento local por sincronização entre aparelhos.
+
+## Sobre lucro e caixa
+
+São coisas diferentes e o sistema nunca as mistura. Lucro é o que sobrou das
+vendas; caixa é o dinheiro que existe. Dá para ter lucro no papel e não ter com
+que comprar, porque ele está todo parado em mercadoria. Por isso o painel
+responde "pode comprar hoje" — já com a reserva descontada — em vez de mostrar
+o lucro como se fosse saldo.
 
 ## Sobre dado que falta
 

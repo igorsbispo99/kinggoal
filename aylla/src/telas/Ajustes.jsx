@@ -11,7 +11,7 @@ import { reais, porcento, paraNumero } from '../lib/formato.js'
 
 const pct = (v) => String((v * 100).toFixed(2)).replace('.', ',').replace(/,00$/, '')
 
-export default function Ajustes({ config, setConfig, tema, setTema }) {
+export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI }) {
   const [buscando, setBuscando] = useState(false)
   const [recado, setRecado] = useState(null)
 
@@ -57,10 +57,11 @@ export default function Ajustes({ config, setConfig, tema, setTema }) {
     leitor.readAsText(arquivo)
   }
 
+  const totais = totaisMEI || { faturamento: 0, custoMercadoria: 0, registradoPeloSistema: { faturamento: 0, custoMercadoria: 0 } }
   const mei = config.regimeTributario === 'MEI'
     ? situacaoMEI({
-      faturamentoAno: config.meiFaturamentoAno,
-      custoMercadoriaAno: config.meiCustoMercadoriaAno,
+      faturamentoAno: totais.faturamento,
+      custoMercadoriaAno: totais.custoMercadoria,
       regras: config.regrasMEI,
     })
     : null
@@ -135,9 +136,12 @@ export default function Ajustes({ config, setConfig, tema, setTema }) {
 
         {mei ? (
           <>
+            <div className="linhas">
+              <Linha rotulo="Registrado no sistema" detalhe="somado das vendas e compras deste ano" valor={`${reais(totais.registradoPeloSistema.faturamento)} faturado`} />
+            </div>
             <div className="grade">
-              <Campo rotulo="Faturou no ano" prefixo="R$" valor={String(config.meiFaturamentoAno).replace('.', ',')} aoMudar={(t) => trocar('meiFaturamentoAno', paraNumero(t))} />
-              <Campo rotulo="Gastou em mercadoria" prefixo="R$" valor={String(config.meiCustoMercadoriaAno).replace('.', ',')} aoMudar={(t) => trocar('meiCustoMercadoriaAno', paraNumero(t))} />
+              <Campo rotulo="Faturou antes do sistema" ajuda="neste ano" prefixo="R$" valor={String(config.meiFaturamentoAnterior || 0).replace('.', ',')} aoMudar={(t) => trocar('meiFaturamentoAnterior', paraNumero(t))} />
+              <Campo rotulo="Gastou antes do sistema" ajuda="neste ano" prefixo="R$" valor={String(config.meiCustoAnterior || 0).replace('.', ',')} aoMudar={(t) => trocar('meiCustoAnterior', paraNumero(t))} />
             </div>
             <Medidor rotulo="Teto de faturamento" usado={mei.faturamentoAno} total={mei.teto} formatar={reais} />
             <Medidor rotulo="Teto de compra de mercadoria" usado={mei.custoMercadoriaAno} total={mei.tetoCusto} formatar={reais} />

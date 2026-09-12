@@ -22,8 +22,8 @@ export const CONFIG_PADRAO = {
   marketplaces: MARKETPLACES,
   regimeRemessa: REGIME_PADRAO,
   regrasMEI: REGRAS_MEI,
-  meiFaturamentoAno: 0,
-  meiCustoMercadoriaAno: 0,
+  meiFaturamentoAnterior: 0,
+  meiCustoAnterior: 0,
   capitalDisponivel: 0,
   pesosRanking: PESOS_PADRAO,
 }

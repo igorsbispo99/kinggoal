@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Calculadora, { FORMULARIO_VAZIO } from './telas/Calculadora.jsx'
 import Produtos from './telas/Produtos.jsx'
 import Fornecedores from './telas/Fornecedores.jsx'
+import Financeiro from './telas/Financeiro.jsx'
 import Ajustes from './telas/Ajustes.jsx'
-import { IconeCalcular, IconeProdutos, IconeFornecedores, IconeAjustes, Logotipo } from './componentes/Icones.jsx'
+import { IconeCalcular, IconeProdutos, IconeFornecedores, IconeFinanceiro, IconeAjustes, Logotipo } from './componentes/Icones.jsx'
 import { carregarConfig, salvarConfig } from './lib/configuracoes.js'
 import { listarProdutos, listarFornecedores, salvarProduto, converterSimulacoesEmProdutos } from './lib/catalogo.js'
+import { listarLotes, listarVendas, totaisDoAno } from './lib/financeiro.js'
 import { ler, gravar } from './lib/armazenamento.js'
 import { reais, paraCampo } from './lib/formato.js'
 
@@ -13,6 +15,7 @@ const ABAS = [
   { id: 'calcular', nome: 'Calcular', Icone: IconeCalcular },
   { id: 'produtos', nome: 'Produtos', Icone: IconeProdutos },
   { id: 'fornecedores', nome: 'Fornecedores', Icone: IconeFornecedores },
+  { id: 'financeiro', nome: 'Caixa', Icone: IconeFinanceiro },
   { id: 'ajustes', nome: 'Ajustes', Icone: IconeAjustes },
 ]
 
@@ -29,6 +32,11 @@ export default function App() {
     return listarProdutos()
   })
   const [fornecedores, setFornecedores] = useState(listarFornecedores)
+  const [lotes, setLotes] = useState(listarLotes)
+  const [vendas, setVendas] = useState(listarVendas)
+
+  // Os medidores do MEI passam a se alimentar sozinhos das compras e vendas.
+  const totaisMEI = useMemo(() => totaisDoAno({ lotes, vendas, config }), [lotes, vendas, config])
 
   const setConfig = (novo) => { setConfigBruto(novo); salvarConfig(novo) }
   const setTema = (novo) => { setTemaBruto(novo); gravar('tema', novo) }
@@ -143,8 +151,20 @@ export default function App() {
           <Fornecedores fornecedores={fornecedores} aoMudar={setFornecedores} />
         ) : null}
 
+        {aba === 'financeiro' ? (
+          <Financeiro
+            config={config}
+            produtos={produtos}
+            fornecedores={fornecedores}
+            lotes={lotes}
+            vendas={vendas}
+            aoMudarLotes={setLotes}
+            aoMudarVendas={setVendas}
+          />
+        ) : null}
+
         {aba === 'ajustes' ? (
-          <Ajustes config={config} setConfig={setConfig} tema={tema} setTema={setTema} />
+          <Ajustes config={config} setConfig={setConfig} tema={tema} setTema={setTema} totaisMEI={totaisMEI} />
         ) : null}
       </main>
 

@@ -36,6 +36,13 @@ export const IconeFornecedores = (p) => (
   </svg>
 )
 
+export const IconeFinanceiro = (p) => (
+  <svg {...base} {...p}>
+    <path d="M3 19V5M3 19h18" />
+    <path d="M7 15v-3M11.5 15V8M16 15v-5M20.5 15V6" />
+  </svg>
+)
+
 export const Logotipo = () => (
   <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true">
     <rect width="32" height="32" rx="7" fill="var(--verde)" />
