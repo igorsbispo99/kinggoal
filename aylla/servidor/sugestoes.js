@@ -20,7 +20,7 @@
 // configurações dela (ICMS do estado, dólar do dia, margem alvo). Aqui sai
 // só o que vem do Mercado Livre.
 
-import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive, fichaDoProduto, avaliacoesRuins, zerarGastos, lerGastos } from './descoberta.js'
+import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive, fichaDoProduto, avaliacoesRuins, marcaNaCategoria, zerarGastos, lerGastos } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
 import { notaDoNicho, explicarNicho } from './nichos.js'
 import { anotar, lerHistorico, compararHistorico, alertasDoHistorico } from './historico.js'
@@ -443,6 +443,7 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
       // funciona com id de ANUNCIO, nunca com id de produto de catalogo.
       anuncioExemploId: (melhor.anuncios[0] && melhor.anuncios[0].id) || null,
       queixas: null,
+      marca: null,
       vendedoresNaFicha: melhor.vendedores,
       visitasSomadas: melhor.visitasSomadas,
       visitasPorAnuncio: melhor.visitasPorAnuncio,
@@ -510,6 +511,15 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
   // alguem vai de fato agir. Ler as tres custaria tres, e o Worker gratuito
   // tem cinquenta por execucao contadas.
   const primeira = sugestoes[0]
+
+  // A categoria aceita produto sem marca? Ela e MEI e vai importar generico
+  // da China: se a marca for atributo obrigatorio do anuncio, ou ela
+  // registra marca propria ou nao anuncia — e descobrir isso depois de
+  // pagar o fornecedor e caro. Uma requisicao, so para a primeira.
+  if (primeira && primeira.categoriaId && lerGastos().rede < 47) {
+    try { primeira.marca = await marcaNaCategoria(env, { categoria: primeira.categoriaId, token }) } catch { /* vale sem */ }
+  }
+
   if (primeira && primeira.anuncioExemploId && lerGastos().rede < 48) {
     try {
       const brutas = await avaliacoesRuins(primeira.anuncioExemploId, token)

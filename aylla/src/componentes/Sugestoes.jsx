@@ -81,6 +81,7 @@ export default function Sugestoes({ config, aoCadastrar }) {
         const recortes = (s.cauda && s.cauda.recortes) || []
         const buscadoComo = Array.isArray(s.buscadoComo) ? s.buscadoComo : []
         const queixas = s.queixas && Array.isArray(s.queixas.queixas) ? s.queixas : null
+        const marca = s.marca || null
 
         return (
           <div key={s.produtoId || s.termo} className="sugestao">
@@ -171,6 +172,27 @@ export default function Sugestoes({ config, aoCadastrar }) {
                     Procurar no Alibaba
                   </a>
                 </div>
+
+                {marca && marca.obrigatoria && !marca.aceitaGenerica ? (
+                  <Aviso nivel="atencao" titulo="Esta categoria exige marca no anúncio">
+                    <span>
+                      O Mercado Livre pede marca obrigatória aqui e não aceita "genérica" entre as
+                      {' '}{marca.quantasMarcas} cadastradas. Produto sem marca da China não anuncia
+                      nesta categoria sem você registrar uma marca própria antes.
+                    </span>
+                    {marca.exemplos.length ? (
+                      <span className="tenue">Quem está lá: {marca.exemplos.slice(0, 4).join(', ')}.</span>
+                    ) : null}
+                  </Aviso>
+                ) : null}
+
+                {marca && marca.aceitaGenerica ? (
+                  <p className="dica">
+                    Caminho aberto: esta categoria aceita anúncio sem marca própria — o valor
+                    "{marca.comoChamar}" está na lista das {marca.quantasMarcas} cadastradas.
+                    {marca.soNoCatalogo ? ' Mas só dá para anunciar dentro de uma ficha de catálogo que já existe, não criando a sua.' : ''}
+                  </p>
+                ) : null}
 
                 {queixas ? (
                   <div className="queixas">

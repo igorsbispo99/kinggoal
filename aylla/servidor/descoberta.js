@@ -257,6 +257,48 @@ async function avaliacoesDoAnuncio(id, token) {
 }
 
 /**
+ * A categoria aceita produto sem marca?
+ *
+ * Pergunta decisiva para ela e que o aplicativo não sabia responder. Ela é
+ * MEI e vai importar produto genérico da China: existe categoria no
+ * Mercado Livre onde a marca é atributo OBRIGATÓRIO do anúncio, e aí ou
+ * ela registra uma marca própria ou não anuncia. Descobrir isso depois de
+ * pagar o fornecedor é caro.
+ *
+ * Medido na sonda: /categories/{id}/attributes responde 200 e traz o
+ * atributo BRAND com a lista completa de valores aceitos e as tags que
+ * dizem se ele é obrigatório.
+ *
+ * A boa notícia costuma estar na própria lista: a maioria das categorias
+ * aceita "Genérica" ou "Sem marca" como valor válido. Quando aceita, o
+ * caminho dela está aberto — e é isso que a tela precisa dizer.
+ */
+export async function marcaNaCategoria(env, { categoria, token }) {
+  const r = await pegar(`/categories/${categoria}/attributes`, token, { cacheSegundos: 86400 })
+  if (!r.ok || !Array.isArray(r.json)) return null
+  const marca = r.json.find((a) => a && a.id === 'BRAND')
+  if (!marca) return null
+
+  const tags = marca.tags || {}
+  const valores = Array.isArray(marca.values) ? marca.values : []
+  const gen = /generic|sem marca|no brand|sin marca/i
+  const generica = valores.find((v) => v && gen.test(String(v.name || '')))
+
+  return {
+    obrigatoria: Boolean(tags.required),
+    // "catalog_required" quer dizer que so da para anunciar dentro de uma
+    // ficha de catalogo ja existente — ela nao cria a ficha, entra na fila.
+    soNoCatalogo: Boolean(tags.catalog_required),
+    quantasMarcas: valores.length,
+    aceitaGenerica: Boolean(generica),
+    comoChamar: generica ? generica.name : null,
+    // As maiores da categoria, para ela reconhecer contra quem estaria
+    // competindo se entrasse com produto sem marca.
+    exemplos: valores.slice(0, 6).map((v) => v.name).filter(Boolean),
+  }
+}
+
+/**
  * As avaliações ruins de um anúncio, com o texto.
  *
  * A sonda mediu: /reviews/item/{id}?rating=1 responde só as de uma
