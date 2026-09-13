@@ -11,7 +11,7 @@
 // de responder "quanto posso comprar", porque é assim que uma operação
 // sobrevive a um lote atrasado.
 
-import { ler, gravar, novoId } from './armazenamento.js'
+import { ler, gravar, novoId, carimbar, sepultar } from './armazenamento.js'
 import { calcularImportacao } from './tributos.js'
 import { calcularVenda } from './precificacao.js'
 
@@ -77,13 +77,16 @@ export function salvarLote(lote, config) {
   if (lote.id) {
     // Um lote já registrado mantém o câmbio e o custo originais.
     return salvar(CHAVE_LOTES, lista.map((l) => (l.id === lote.id
-      ? { ...l, ...lote, quantidade }
+      ? carimbar({ ...l, ...lote, quantidade })
       : l)))
   }
-  return salvar(CHAVE_LOTES, [{ ...base, id: novoId(), criadoEm: new Date().toISOString() }, ...lista])
+  return salvar(CHAVE_LOTES, [carimbar({ ...base, id: novoId(), criadoEm: new Date().toISOString() }), ...lista])
 }
 
-export const excluirLote = (id) => salvar(CHAVE_LOTES, listarLotes().filter((l) => l.id !== id))
+export const excluirLote = (id) => {
+  sepultar(id)
+  return salvar(CHAVE_LOTES, listarLotes().filter((l) => l.id !== id))
+}
 
 /** Registra a venda com o custo do estoque no momento em que ela aconteceu. */
 export function salvarVenda(venda, { config, lotes, vendas }) {
@@ -104,9 +107,9 @@ export function salvarVenda(venda, { config, lotes, vendas }) {
   const resultado = calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida })
 
   if (venda.id) {
-    return salvar(CHAVE_VENDAS, lista.map((v) => (v.id === venda.id ? { ...v, ...venda, quantidade } : v)))
+    return salvar(CHAVE_VENDAS, lista.map((v) => (v.id === venda.id ? carimbar({ ...v, ...venda, quantidade }) : v)))
   }
-  return salvar(CHAVE_VENDAS, [{
+  return salvar(CHAVE_VENDAS, [carimbar({
     ...venda,
     id: novoId(),
     quantidade,
@@ -116,10 +119,13 @@ export function salvarVenda(venda, { config, lotes, vendas }) {
     receita: resultado.receitaLote,
     lucro: resultado.lucroLote,
     criadoEm: new Date().toISOString(),
-  }, ...lista])
+  }), ...lista])
 }
 
-export const excluirVenda = (id) => salvar(CHAVE_VENDAS, listarVendas().filter((v) => v.id !== id))
+export const excluirVenda = (id) => {
+  sepultar(id)
+  return salvar(CHAVE_VENDAS, listarVendas().filter((v) => v.id !== id))
+}
 
 const recebido = (lote) => Boolean(lote.recebidoEm)
 const quantidadeUtil = (lote) => {

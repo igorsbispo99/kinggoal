@@ -6,6 +6,7 @@ import { situacaoMEI } from '../lib/mei.js'
 import { PESOS_PADRAO, NOMES_PESOS } from '../lib/ranking.js'
 import { buscarCotacao, estaVelha } from '../lib/cambio.js'
 import { diagnosticarRadar, estadoDoRadar } from '../lib/radar.js'
+import Cofre from '../componentes/Cofre.jsx'
 import { exportarTudo, importarTudo } from '../lib/armazenamento.js'
 import { vigenciaVencida } from '../lib/configuracoes.js'
 import { reais, porcento, paraNumero } from '../lib/formato.js'
@@ -72,6 +73,10 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
 
   return (
     <>
+      {/* O cofre vem primeiro: e a unica coisa nesta tela que protege
+          trabalho ja feito, e nao um ajuste de calculo. */}
+      <Cofre />
+
       {recado ? <Aviso nivel={recado.nivel}>{recado.texto}</Aviso> : null}
 
       <section className="cartao">

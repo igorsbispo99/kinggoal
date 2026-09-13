@@ -563,3 +563,9 @@ details.dobra > div { padding-top: 10px; }
 .faixa-tendencia.sobe { background: var(--verde-fundo); color: var(--verde); }
 .faixa-tendencia.desce { background: var(--negativo-fundo); color: var(--negativo); }
 .faixa-tendencia.plana { background: var(--afundado); color: var(--tinta-3); }
+
+.chave-cofre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.05rem; font-weight: 700; letter-spacing: .06em;
+  word-break: break-all; line-height: 1.5;
+}

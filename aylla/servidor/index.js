@@ -16,6 +16,7 @@ import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal 
 import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
 import { estressar } from './estresse.js'
 import { avaliarConformidade } from './conformidade.js'
+import { criarCofre, lerCofre, gravarCofre } from './cofre.js'
 import { comecouExecucao, terminouExecucao, ultimasExecucoes, resumoDoHistorico } from './historico.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
@@ -432,6 +433,38 @@ export default {
         return erro('Caminho de descoberta não existe.', 404)
       } catch (falha) {
         return Response.json({ erro: falha.message, status: falha.status || 502 }, { status: 502 })
+      }
+    }
+
+    // O cofre. Estas rotas carregam dado de negocio, entao a chave e
+    // obrigatoria em todas — e vem por cabecalho, nunca na URL: endereco
+    // fica no historico do navegador, em log de servidor e em link
+    // compartilhado sem querer.
+    if (caminho.startsWith('/api/cofre')) {
+      if (!temBanco(env)) return erro('Sem banco.', 503)
+      const chave = request.headers.get('x-aylla-chave') || ''
+      const idCofre = request.headers.get('x-aylla-cofre') || ''
+
+      try {
+        if (caminho === '/api/cofre/criar' && request.method === 'POST') {
+          return Response.json(await criarCofre(env, chave))
+        }
+        if (caminho === '/api/cofre' && request.method === 'GET') {
+          return Response.json(await lerCofre(env, idCofre, chave))
+        }
+        if (caminho === '/api/cofre' && request.method === 'PUT') {
+          const corpo = await request.json().catch(() => null)
+          if (!corpo || typeof corpo !== 'object') return erro('Corpo inválido.')
+          return Response.json(
+            await gravarCofre(env, idCofre, chave, corpo.dados, corpo.versao),
+          )
+        }
+        return erro('Caminho do cofre não existe.', 404)
+      } catch (falha) {
+        return Response.json(
+          { erro: falha.message, versaoAtual: falha.versaoAtual },
+          { status: falha.status || 500 },
+        )
       }
     }
 

@@ -5,7 +5,7 @@
 // caro e pedido mínimo alto pode custar mais por unidade do que o "caro".
 // Quem está começando não tem como saber isso de cabeça — o sistema calcula.
 
-import { ler, gravar, novoId } from './armazenamento.js'
+import { ler, gravar, novoId, carimbar, sepultar } from './armazenamento.js'
 import { calcularImportacao } from './tributos.js'
 
 const CHAVE_FORNECEDORES = 'fornecedores'
@@ -51,32 +51,34 @@ function salvarLista(chave, lista) {
 export function salvarFornecedor(fornecedor) {
   const lista = listarFornecedores()
   if (fornecedor.id) {
-    return salvarLista(CHAVE_FORNECEDORES, lista.map((f) => (f.id === fornecedor.id ? { ...f, ...fornecedor } : f)))
+    return salvarLista(CHAVE_FORNECEDORES, lista.map((f) => (f.id === fornecedor.id ? carimbar({ ...f, ...fornecedor }) : f)))
   }
-  const novo = { ...FORNECEDOR_VAZIO, ...fornecedor, id: novoId(), criadoEm: new Date().toISOString() }
+  const novo = carimbar({ ...FORNECEDOR_VAZIO, ...fornecedor, id: novoId(), criadoEm: new Date().toISOString() })
   return salvarLista(CHAVE_FORNECEDORES, [novo, ...lista])
 }
 
 export function excluirFornecedor(id) {
+  sepultar(id)
   return salvarLista(CHAVE_FORNECEDORES, listarFornecedores().filter((f) => f.id !== id))
 }
 
 export function salvarProduto(produto) {
   const lista = listarProdutos()
   if (produto.id) {
-    return salvarLista(CHAVE_PRODUTOS, lista.map((p) => (p.id === produto.id ? { ...p, ...produto } : p)))
+    return salvarLista(CHAVE_PRODUTOS, lista.map((p) => (p.id === produto.id ? carimbar({ ...p, ...produto }) : p)))
   }
-  const novo = {
+  const novo = carimbar({
     ...PRODUTO_VAZIO,
     ...produto,
     id: novoId(),
     criadoEm: new Date().toISOString(),
     ofertas: produto.ofertas || [],
-  }
+  })
   return salvarLista(CHAVE_PRODUTOS, [novo, ...lista])
 }
 
 export function excluirProduto(id) {
+  sepultar(id)
   return salvarLista(CHAVE_PRODUTOS, listarProdutos().filter((p) => p.id !== id))
 }
 

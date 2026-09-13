@@ -157,3 +157,30 @@ export function importarTudo(pacote) {
 
 export const novoId = () =>
   `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
+
+/* ------------------------------------------------------------ sincronia */
+
+// Carimbo e lápide: as duas coisas que a fusão entre os celulares precisa.
+//
+// O carimbo diz quando o registro foi salvo, para a fusão saber qual das
+// duas versões é a mais nova. A lápide diz que um registro foi apagado —
+// sem ela, o outro aparelho, que ainda tem o item, o traria de volta na
+// próxima fusão. Item que ressuscita sozinho é o pior tipo de defeito:
+// ninguém entende, e ninguém confia mais no aplicativo.
+
+export const CHAVE_LAPIDES = 'lapides'
+
+/** Marca o momento em que este registro foi salvo. */
+export const carimbar = (registro) => ({ ...registro, atualizadoEm: new Date().toISOString() })
+
+/** Registra que um id foi apagado, para que a fusão não o traga de volta. */
+export function sepultar(id) {
+  if (!id) return
+  const lapides = ler(CHAVE_LAPIDES, [])
+  gravar(CHAVE_LAPIDES, [
+    ...lapides.filter((l) => l.id !== id),
+    { id, em: new Date().toISOString() },
+  ])
+}
+
+export const listarLapides = () => ler(CHAVE_LAPIDES, [])
