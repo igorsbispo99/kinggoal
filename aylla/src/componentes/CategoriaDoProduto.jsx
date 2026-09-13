@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Aviso, Linha } from './Campos.jsx'
 import { ondeIssoVive, tarifaReal } from '../lib/descobrir.js'
 import { porcento, reais } from '../lib/formato.js'
@@ -23,6 +23,19 @@ export default function CategoriaDoProduto({ produto, aoMudar, precoReferencia =
 
   const nome = (produto.nome || '').trim()
   const tarifa = produto.tarifa
+  const [conformidade, setConformidade] = useState(null)
+
+  // Confere assim que houver nome e categoria. E barato — a regra roda no
+  // servidor sem tocar o Mercado Livre — e chega antes de ela procurar
+  // fornecedor, que e quando ainda da para mudar de ideia sem custo.
+  useEffect(() => {
+    if (!nome && !produto.categoria) { setConformidade(null); return }
+    const busca = new URLSearchParams({ nome, categoria: produto.categoria || '' })
+    fetch(`/api/ml/conformidade?${busca}`, { headers: { accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setConformidade)
+      .catch(() => setConformidade(null))
+  }, [nome, produto.categoria])
 
   async function procurar() {
     if (!nome) { setFalha('Escreva o nome do produto primeiro.'); return }
@@ -83,6 +96,23 @@ export default function CategoriaDoProduto({ produto, aoMudar, precoReferencia =
           </span>
           <span>É este número que a calculadora e o ranking passam a usar, no lugar da média.</span>
         </Aviso>
+      ) : null}
+
+      {conformidade && conformidade.alertas.length ? (
+        <div className="linhas">
+          {conformidade.alertas.map((a) => (
+            <Aviso
+              key={a.id}
+              nivel={a.gravidade === 'bloqueia' ? 'critico' : a.gravidade === 'exige' ? 'atencao' : 'info'}
+              titulo={a.gravidade === 'bloqueia' ? `${a.orgao}: caminho fechado para MEI`
+                : a.gravidade === 'exige' ? `${a.orgao}: exige certificação antes de importar`
+                  : `${a.orgao}: atenção`}
+            >
+              <span>{a.porque}</span>
+              <span><b>{a.oQueFazer}</b></span>
+            </Aviso>
+          ))}
+        </div>
       ) : null}
 
       <button type="button" className="botao cheio" disabled={ocupado} onClick={procurar}>

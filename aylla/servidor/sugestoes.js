@@ -24,6 +24,7 @@ import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive } from './des
 import { categoria as lerCategoria } from './categorias.js'
 import { notaDoNicho, explicarNicho } from './nichos.js'
 import { anotar, lerHistorico, compararHistorico, alertasDoHistorico } from './historico.js'
+import { avaliarConformidade } from './conformidade.js'
 
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
@@ -358,8 +359,17 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
 
     const evolucao = compararHistorico(await lerHistorico(env, chave).catch(() => []))
 
+    // Conformidade antes de tudo: nao adianta a nota dizer que da para
+    // competir se a mercadoria nao entra no pais.
+    const conformidade = avaliarConformidade({
+      nome: t.termo,
+      categoria: cat.nome,
+      caminho: cat.caminho.map((c) => c.nome),
+    })
+
     sugestoes.push({
       termo: t.termo,
+      conformidade,
       evolucao,
       alertas: alertasDoHistorico(evolucao),
       serie: melhor.serie ? {
@@ -425,7 +435,10 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
   // tem. Nota tirada sem o sinal principal nao pode disputar posicao com
   // nota inteira; se disputar, produto de demanda desconhecida sobe ao topo
   // por nao ter nada que o derrube. E a mesma regra do ranking de produtos.
-  const faixa = (x) => (x.nota.semProcura ? 1 : 0)
+  // Tres faixas agora. A primeira separacao e se a mercadoria entra no
+  // pais: sugerir um produto que ela nao consegue importar e pior que nao
+  // sugerir nada, porque custa o tempo dela procurando fornecedor.
+  const faixa = (x) => (x.conformidade && x.conformidade.bloqueia ? 2 : x.nota.semProcura ? 1 : 0)
   sugestoes.sort((a, b) => (faixa(a) - faixa(b)) || ((b.nota.nota ?? -1) - (a.nota.nota ?? -1)))
 
   const resultado = { sugestoes, descartadas, termosLidos: termos.length }

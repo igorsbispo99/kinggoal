@@ -15,6 +15,7 @@ import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
 import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
 import { estressar } from './estresse.js'
+import { avaliarConformidade } from './conformidade.js'
 import { comecouExecucao, terminouExecucao, ultimasExecucoes, resumoDoHistorico } from './historico.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
@@ -432,6 +433,15 @@ export default {
       } catch (falha) {
         return Response.json({ erro: falha.message, status: falha.status || 502 }, { status: 502 })
       }
+    }
+
+    // Conformidade de um produto qualquer, para a ficha que ela cadastra a
+    // mao — nao so para as sugestoes.
+    if (caminho === '/api/ml/conformidade') {
+      const nome = url.searchParams.get('nome') || ''
+      const categoria = url.searchParams.get('categoria') || ''
+      if (!nome && !categoria) return erro('Diga o nome ou a categoria do produto.')
+      return Response.json(avaliarConformidade({ nome, categoria }))
     }
 
     // A arvore de categorias: o unico caminho de descoberta que o Mercado

@@ -100,6 +100,30 @@ export default function Sugestoes({ config, aoCadastrar }) {
               </div>
             ) : null}
 
+            {/* Conformidade vem antes de tudo, inclusive da nota: nao
+                adianta saber que da para competir se a mercadoria nao
+                entra no pais. */}
+            {s.conformidade && s.conformidade.alertas.length ? (
+              <div className="linhas">
+                {s.conformidade.alertas.map((a) => (
+                  <Aviso
+                    key={a.id}
+                    nivel={a.gravidade === 'bloqueia' ? 'critico' : a.gravidade === 'exige' ? 'atencao' : 'info'}
+                    titulo={a.gravidade === 'bloqueia' ? `${a.orgao}: caminho fechado para MEI`
+                      : a.gravidade === 'exige' ? `${a.orgao}: exige certificação antes de importar`
+                        : `${a.orgao}: atenção`}
+                  >
+                    <span>{a.porque}</span>
+                    <span><b>{a.oQueFazer}</b></span>
+                    <span className="tenue">
+                      Disparado por "{a.disparadoPor}".
+                      {a.onde ? <> Confira em <a href={a.onde} target="_blank" rel="noreferrer">{a.orgao}</a>.</> : null}
+                    </span>
+                  </Aviso>
+                ))}
+              </div>
+            ) : null}
+
             {/* Tendencia e alertas vem antes dos numeros porque mudam a
                 decisao inteira: procura caindo transforma um bom negocio
                 em prejuizo, e nenhum numero de hoje mostra isso. */}
@@ -280,6 +304,11 @@ export default function Sugestoes({ config, aoCadastrar }) {
       <button type="button" className="botao cheio" disabled={carregando} onClick={() => carregar(true)}>
         {carregando ? 'Recalculando...' : 'Recalcular agora'}
       </button>
+
+      <p className="dica">
+        Os avisos de Anatel, Anvisa e Inmetro são <b>indicadores para conferir</b>, não parecer jurídico.
+        Eles cobrem o que é comum em revenda importada — silêncio aqui não é atestado de que o produto é livre.
+      </p>
 
       <p className="dica">
         O <b>pague até</b> é calculado de trás para frente: preço de venda real, menos a comissão
