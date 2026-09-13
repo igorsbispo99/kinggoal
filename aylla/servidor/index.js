@@ -60,6 +60,41 @@ async function buscarPtax(hoje = new Date()) {
   return null
 }
 
+/**
+ * A cotação que o próprio Mercado Livre usa.
+ *
+ * Segunda fonte, nunca a primeira. O PTAX do Banco Central é o número
+ * legal: é ele que a Receita usa para converter a base do imposto de
+ * importação. O do Mercado Livre é comercial, e por isso vem sempre
+ * marcado como aproximado — a tela precisa dizer qual dos dois está
+ * valendo, porque a diferença entre eles vira diferença no imposto.
+ *
+ * Existe porque o Banco Central sai do ar. Quando isso acontecia, a única
+ * saída era ela digitar o dólar à mão, e dólar digitado à mão fica velho
+ * sem ninguém perceber.
+ *
+ * Medido na sonda: /currency_conversions/search?from=USD&to=BRL responde
+ * 200 com ratio e data.
+ */
+async function buscarCambioDoML(env) {
+  try {
+    const { token } = await obterTokenParaLeitura(env)
+    const r = await fetch('https://api.mercadolibre.com/currency_conversions/search?from=USD&to=BRL', {
+      headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    })
+    if (!r.ok) return null
+    const j = await r.json()
+    const valor = Number(j && j.ratio)
+    if (!Number.isFinite(valor) || valor <= 0) return null
+    return {
+      valor,
+      fonte: 'Mercado Livre (aproximado)',
+      dataCotacao: j.creation_date || j.date_created || new Date().toISOString(),
+      aproximada: true,
+    }
+  } catch { return null }
+}
+
 /* ------------------------------------------------------------ radar */
 
 const erro = (mensagem, status = 400) => Response.json({ erro: mensagem }, { status })
@@ -178,13 +213,14 @@ export default {
     const caminho = url.pathname
 
     if (caminho === '/api/ptax') {
-      try {
-        const cotacao = await buscarPtax()
-        if (!cotacao) return erro('Banco Central sem cotação nos últimos 8 dias', 502)
-        return Response.json(cotacao, { headers: { 'cache-control': 'public, max-age=1800' } })
-      } catch (falha) {
-        return erro('Falha ao consultar o Banco Central', 502)
-      }
+      // PTAX primeiro, sempre: e o numero que a Receita usa para converter
+      // a base do imposto. O do Mercado Livre so entra quando o Banco
+      // Central nao responde, e entra marcado como aproximado.
+      let cotacao = null
+      try { cotacao = await buscarPtax() } catch { cotacao = null }
+      if (!cotacao) cotacao = await buscarCambioDoML(env)
+      if (!cotacao) return erro('Banco Central sem cotação e Mercado Livre também não respondeu', 502)
+      return Response.json(cotacao, { headers: { 'cache-control': 'public, max-age=1800' } })
     }
 
     if (caminho === '/api/ml/estado') {

@@ -78,6 +78,9 @@ export default function Sugestoes({ config, aoCadastrar }) {
         // vendedores: dois hobistas e dois Gold sao o mesmo numero na tela e
         // mercados opostos na pratica.
         const profissional = vendedores.find((v) => v && v.profissional)
+        const recortes = (s.cauda && s.cauda.recortes) || []
+        const buscadoComo = Array.isArray(s.buscadoComo) ? s.buscadoComo : []
+        const queixas = s.queixas && Array.isArray(s.queixas.queixas) ? s.queixas : null
 
         return (
           <div key={s.produtoId || s.termo} className="sugestao">
@@ -113,6 +116,8 @@ export default function Sugestoes({ config, aoCadastrar }) {
                         {s.vendedoresNaFicha} {s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}
                       </span>
                     ) : null}
+                    {queixas && queixas.queixas.some((q) => q.grave)
+                      ? <span className="selo ruim">risco na alfândega</span> : null}
                     {profissional ? <span className="selo ruim">{profissional.porte}</span> : null}
                     {grave.length ? <span className="selo ruim">{grave[0].orgao}</span> : null}
                   </span>
@@ -166,6 +171,33 @@ export default function Sugestoes({ config, aoCadastrar }) {
                     Procurar no Alibaba
                   </a>
                 </div>
+
+                {queixas ? (
+                  <div className="queixas">
+                    <p className="rotulo-bloco">O que dá errado com este produto</p>
+                    <p className="dica">{queixas.resumo}</p>
+                    {queixas.queixas.map((q) => (
+                      <div key={q.id} className={`queixa${q.grave ? ' grave' : ''}`}>
+                        <span className="queixa-topo">
+                          <b>{q.nome}</b>
+                          <span className="queixa-conta">
+                            {q.quantas} de {queixas.lidas}
+                          </span>
+                        </span>
+                        {q.exemplo ? <span className="queixa-trecho">"{q.exemplo}"</span> : null}
+                        <span className="queixa-acao">{q.oQueFazer}</span>
+                      </div>
+                    ))}
+                    <p className="dica tenue">
+                      Li as {queixas.lidas} avaliações de uma estrela deste anúncio
+                      {queixas.totalRuins > queixas.lidas ? ` (de ${queixas.totalRuins} ao todo)` : ''} e
+                      agrupei por assunto. Isto é <b>contagem de palavra, não leitura</b>: acerta o tema e
+                      erra a ironia. Use como roteiro de pergunta ao fornecedor — e leia os comentários
+                      no anúncio antes de fechar.
+                      {queixas.semTema ? ` ${queixas.semTema} não se encaixaram em nenhum assunto.` : ''}
+                    </p>
+                  </div>
+                ) : null}
 
                 {alertasDeMudanca.map((a) => (
                   <Aviso key={a.texto} nivel={a.grave ? 'critico' : 'info'} titulo="Mudou desde a última vez">
@@ -242,6 +274,36 @@ export default function Sugestoes({ config, aoCadastrar }) {
                   {s.ficha && s.ficha.peso ? <Linha rotulo="Peso" detalhe="decide o frete" valor={s.ficha.peso} /> : null}
                   {s.ficha && s.ficha.material ? <Linha rotulo="Material" valor={s.ficha.material} /> : null}
                 </div>
+
+                {recortes.length ? (
+                  <div className="concorrentes">
+                    <p className="rotulo-bloco">Como as pessoas buscam isso</p>
+                    <p className="dica">
+                      "{s.cauda.generico}" é onde todo mundo briga. Estes são os recortes que o
+                      Brasil está buscando <b>dentro desta categoria</b> — cada um é um mercado
+                      menor, com muito menos gente disputando.
+                    </p>
+                    <span className="recortes">
+                      {recortes.map((r) => (
+                        <span key={r.termo} className={`recorte${buscadoComo.includes(r.termo) ? ' casa' : ''}`}>
+                          {r.termo}
+                        </span>
+                      ))}
+                    </span>
+                    {buscadoComo.length ? (
+                      <p className="dica">
+                        Os marcados em verde encontram <b>este</b> produto. São as palavras que
+                        precisam estar no título do anúncio dela, porque são as que as pessoas digitam.
+                      </p>
+                    ) : (
+                      <p className="dica">
+                        Nenhum recorte casa com o nome deste produto. Ele pode ser ótimo e ainda
+                        assim depender da busca genérica para aparecer — que é a briga mais difícil.
+                        Vale olhar os recortes acima como alternativa de produto.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
 
                 {vendedores.length ? (
                   <div className="concorrentes">

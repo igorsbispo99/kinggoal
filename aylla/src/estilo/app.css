@@ -660,6 +660,35 @@ details.dobra > div { padding-top: 10px; }
 .concorrente b { font-size: .82rem; font-weight: 600; }
 .concorrente small { font-size: .72rem; color: var(--tinta-3); }
 
+.recortes { display: flex; flex-wrap: wrap; gap: 5px; }
+.recorte {
+  font-size: .74rem; padding: 3px 9px; border-radius: 999px;
+  background: var(--afundado); color: var(--tinta-2); border: 1px solid var(--linha);
+}
+.queixas { display: flex; flex-direction: column; gap: 7px; }
+.queixa {
+  display: flex; flex-direction: column; gap: 3px;
+  border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px;
+}
+.queixa.grave { border-color: var(--negativo); background: var(--negativo-fundo); }
+.queixa-topo { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.queixa-topo b { font-size: .82rem; font-weight: 650; }
+.queixa-conta {
+  flex: 0 0 auto; font-size: .7rem; color: var(--tinta-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.queixa-trecho {
+  font-size: .78rem; line-height: 1.4; color: var(--tinta-2); font-style: italic;
+  border-left: 2px solid var(--linha-forte); padding-left: 8px;
+}
+.queixa-acao { font-size: .78rem; line-height: 1.45; color: var(--tinta); }
+.dica.tenue { opacity: .8; }
+
+.recorte.casa {
+  background: var(--verde-fundo); color: var(--verde);
+  border-color: var(--verde); font-weight: 600;
+}
+
 .rodape-explicativo > summary {
   cursor: pointer; font-size: .76rem; font-weight: 600;
   color: var(--tinta-3); padding: 4px 0; list-style: none;

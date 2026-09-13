@@ -31,6 +31,34 @@ const medianaDe = (lista) => {
   return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2
 }
 
+// Quantas chamadas de rede este funil gastou.
+//
+// O Worker gratuito faz CINQUENTA subrequisicoes por execucao, e esse teto
+// e o que limita todas as decisoes deste projeto: quantas sugestoes, quantos
+// vendedores por ficha, se cabe medir o frete. Ate agora eu vinha contando
+// no papel — "3 x 15 + 1 = 46" — e conta no papel erra.
+//
+// So o fetch conta. Acerto de cache nao e subrequisicao, e por isso a
+// segunda execucao do dia gasta muito menos que a primeira.
+//
+// Ressalva honesta: o isolate do Worker e compartilhado entre requisicoes,
+// entao o contador e global, nao por execucao. Ele e zerado no inicio do
+// funil e lido no fim; com duas montagens simultaneas no mesmo isolate o
+// numero sai alto. Serve para enxergar o orcamento, nao para cobrar.
+let gastos = { rede: 0, cache: 0 }
+export function zerarGastos() { gastos = { rede: 0, cache: 0 } }
+export function lerGastos() {
+  return {
+    ...gastos,
+    total: gastos.rede + gastos.cache,
+    teto: 50,
+    folga: 50 - gastos.rede,
+    // O aviso que eu quero ver ANTES de o Mercado Livre comecar a devolver
+    // erro por corte de subrequisicao.
+    apertado: gastos.rede >= 40,
+  }
+}
+
 async function pegar(caminho, token, { cacheSegundos = 0 } = {}) {
   const url = `${API}${caminho}`
   const cache = caches.default
@@ -38,9 +66,13 @@ async function pegar(caminho, token, { cacheSegundos = 0 } = {}) {
 
   if (cacheSegundos > 0) {
     const guardada = await cache.match(chave)
-    if (guardada) return { ok: true, status: 200, json: await guardada.json(), doCache: true }
+    if (guardada) {
+      gastos.cache += 1
+      return { ok: true, status: 200, json: await guardada.json(), doCache: true }
+    }
   }
 
+  gastos.rede += 1
   const resposta = await fetch(url, {
     headers: { accept: 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
   })
@@ -221,6 +253,33 @@ async function avaliacoesDoAnuncio(id, token) {
   return {
     total: (r.json.paging && r.json.paging.total) || 0,
     media: r.json.rating_average ?? null,
+  }
+}
+
+/**
+ * As avaliações ruins de um anúncio, com o texto.
+ *
+ * A sonda mediu: /reviews/item/{id}?rating=1 responde só as de uma
+ * estrela, e limit=50 é aceito. São as mais úteis que existem para quem
+ * vai importar — quem dá cinco estrelas escreve "amei, chegou rápido";
+ * quem dá uma escreve o que veio errado, que num produto importado é
+ * quase sempre o que o fornecedor faz de errado.
+ *
+ * Uma requisição, e só para o produto que ela vai de fato olhar.
+ */
+export async function avaliacoesRuins(anuncioId, token, { quantas = 50 } = {}) {
+  const r = await pegar(`/reviews/item/${anuncioId}?limit=${quantas}&rating=1`, token, { cacheSegundos: 86400 })
+  if (!r.ok || !r.json) return null
+  const lista = Array.isArray(r.json.reviews) ? r.json.reviews : []
+  return {
+    // O total do paging é quantas avaliações de uma estrela existem ao
+    // todo; a lista é a página que coube.
+    totalRuins: (r.json.paging && r.json.paging.total) ?? lista.length,
+    avaliacoes: lista.map((a) => ({
+      texto: a.content || a.comment || '',
+      titulo: a.title || '',
+      nota: a.rate ?? a.rating ?? null,
+    })).filter((a) => a.texto || a.titulo),
   }
 }
 

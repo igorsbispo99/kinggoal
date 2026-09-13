@@ -101,6 +101,16 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
         <div className="linhas">
           <Linha rotulo="Dólar efetivo" detalhe="cotação com IOF e spread" valor={reais(config.ptax * (1 + config.spread) * (1 + config.iof))} destaque />
         </div>
+        {/* Qual fonte esta valendo importa: o PTAX e o numero que a Receita
+            usa para converter a base do imposto; o do Mercado Livre e
+            comercial. A diferenca entre os dois vira diferenca no imposto,
+            entao o app diz qual esta na tela em vez de so mostrar o valor. */}
+        {config.ptaxFonte && String(config.ptaxFonte).includes('Mercado Livre') ? (
+          <Aviso nivel="atencao" titulo="Cotação aproximada, não é o PTAX">
+            O Banco Central não respondeu e esta cotação veio do Mercado Livre. Serve para estimar,
+            mas o imposto de importação é calculado pelo PTAX — tente de novo antes de fechar a compra.
+          </Aviso>
+        ) : null}
         {estaVelha(config.ptaxData) ? (
           <Aviso nivel="atencao" titulo="Cotação de mais de um dia">
             Toque em buscar antes de fechar uma compra. Um real de diferença no dólar muda a margem inteira de um lote grande.

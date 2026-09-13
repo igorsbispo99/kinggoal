@@ -20,11 +20,13 @@
 // configurações dela (ICMS do estado, dólar do dia, margem alvo). Aqui sai
 // só o que vem do Mercado Livre.
 
-import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive, fichaDoProduto } from './descoberta.js'
+import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive, fichaDoProduto, avaliacoesRuins, zerarGastos, lerGastos } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
 import { notaDoNicho, explicarNicho } from './nichos.js'
 import { anotar, lerHistorico, compararHistorico, alertasDoHistorico } from './historico.js'
 import { avaliarConformidade } from './conformidade.js'
+import { caudaLonga, comoEssePodeSerBuscado } from './cauda.js'
+import { lerQueixas, resumirQueixas } from './queixas.js'
 
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
@@ -291,12 +293,18 @@ export async function depurarFunil(env, { token, termo = null }) {
 // ficha sao MercadoLider Gold vale mais que uma quarta sugestao sobre a
 // qual nao se sabe nada.
 export async function montarSugestoes(env, { token, quantas = 3 }) {
+  zerarGastos()
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
   const descartadas = []
 
   for (const t of termos) {
     if (sugestoes.length >= quantas) break
+    // Parar por conta propria antes de o Mercado Livre cortar. Uma sugestao
+    // completa a menos e muito melhor que tres pela metade, e o corte por
+    // teto de subrequisicao chega como erro de rede no meio do funil — o
+    // tipo de falha que some no log e aparece como tela vazia para ela.
+    if (sugestoes.length > 0 && lerGastos().rede > 36) break
 
     let destinos = []
     try { destinos = await ondeIssoVive(env, { termo: t.termo, token }) } catch (e) {
@@ -314,6 +322,20 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
       descartadas.push({ termo: t.termo, porque: `categoria ${destino.categoriaId} não abriu` })
       continue
     }
+
+    // Onde o mercado se divide de verdade.
+    //
+    // "bolsa" e um dos termos mais buscados do Brasil e e exatamente onde
+    // ela nao entra. /trends/MLB/{categoria} devolve o que se busca DENTRO
+    // da categoria — "bolsa de couro", "bolsa praia feminina" — e esses
+    // recortes sao a mesma demanda com muito menos gente disputando cada
+    // pedaco. Uma requisicao, cacheada por meia hora e compartilhada entre
+    // as sugestoes da mesma categoria.
+    let cauda = null
+    try {
+      const t2 = await tendencias(env, { categoria: cat.id, token })
+      cauda = caudaLonga(t.termo, t2.termos)
+    } catch { /* a sugestao vale sem os recortes */ }
 
     // O nicho esta no produto, nao na arvore. domain_discovery ja devolve a
     // categoria folha — "Bolsas", com 421 mil anuncios, e o galho mais fino
@@ -413,6 +435,14 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
       // O nome que vai no titulo do cartao. O termo da tendencia vira
       // contexto: e por onde o produto foi encontrado, nao o que ele e.
       nomeDoProduto: ficha && ficha.nome ? ficha.nome : t.termo,
+      // Os recortes finos da categoria, e por quais deles ESTE produto pode
+      // ser encontrado — que e o que precisa estar no titulo do anuncio.
+      cauda,
+      buscadoComo: cauda ? comoEssePodeSerBuscado((ficha && ficha.nome) || t.termo, cauda) : [],
+      // Guardado para ler as avaliacoes depois da ordenacao: /reviews so
+      // funciona com id de ANUNCIO, nunca com id de produto de catalogo.
+      anuncioExemploId: (melhor.anuncios[0] && melhor.anuncios[0].id) || null,
+      queixas: null,
       vendedoresNaFicha: melhor.vendedores,
       visitasSomadas: melhor.visitasSomadas,
       visitasPorAnuncio: melhor.visitasPorAnuncio,
@@ -473,7 +503,28 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
   const faixa = (x) => (x.conformidade && x.conformidade.bloqueia ? 2 : x.nota.semProcura ? 1 : 0)
   sugestoes.sort((a, b) => (faixa(a) - faixa(b)) || ((b.nota.nota ?? -1) - (a.nota.nota ?? -1)))
 
-  const resultado = { sugestoes, descartadas, termosLidos: termos.length }
+  // As reclamacoes, so da primeira.
+  //
+  // Depois da ordenacao, de proposito: e uma requisicao, e ela vale para o
+  // produto que a tela vai mostrar no topo — que e o unico sobre o qual
+  // alguem vai de fato agir. Ler as tres custaria tres, e o Worker gratuito
+  // tem cinquenta por execucao contadas.
+  const primeira = sugestoes[0]
+  if (primeira && primeira.anuncioExemploId && lerGastos().rede < 48) {
+    try {
+      const brutas = await avaliacoesRuins(primeira.anuncioExemploId, token)
+      if (brutas) {
+        const leitura = lerQueixas(brutas.avaliacoes)
+        primeira.queixas = {
+          ...leitura,
+          totalRuins: brutas.totalRuins,
+          resumo: resumirQueixas(leitura),
+        }
+      }
+    } catch { /* a sugestao vale sem as reclamacoes */ }
+  }
+
+  const resultado = { sugestoes, descartadas, termosLidos: termos.length, gastos: lerGastos() }
   await guardar(env, 'semana', resultado)
   return resultado
 }
