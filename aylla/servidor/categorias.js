@@ -34,6 +34,17 @@ export const RAIZES_MLB = [
 
 const VALIDADE_MS = 7 * 24 * 60 * 60 * 1000
 
+// Versao do formato guardado.
+//
+// O cache dura uma semana. Quando eu passo a ler um campo novo da resposta
+// do Mercado Livre, tudo que ja esta no banco foi gravado sem ele — e o
+// codigo novo le `undefined` por sete dias sem nenhum aviso. Foi assim que
+// um campo ausente virou NaN no motor de preco.
+//
+// Subir este numero joga fora o que foi gravado pelo formato antigo. Custa
+// uma rodada de requisicoes e resolve a classe inteira do problema.
+const FORMATO = 2
+
 async function prepararCache(env) {
   await env.DB.exec(
     'CREATE TABLE IF NOT EXISTS ml_categoria (id TEXT PRIMARY KEY, dados TEXT, atualizado_em INTEGER)',
@@ -45,7 +56,11 @@ async function doCache(env, id) {
   const linha = await env.DB.prepare('SELECT dados, atualizado_em FROM ml_categoria WHERE id = ?').bind(id).first()
   if (!linha) return null
   if (Date.now() - Number(linha.atualizado_em) > VALIDADE_MS) return null
-  try { return JSON.parse(linha.dados) } catch { return null }
+  try {
+    const dados = JSON.parse(linha.dados)
+    if (!dados || dados.formato !== FORMATO) return null
+    return dados
+  } catch { return null }
 }
 
 async function guardarNoCache(env, id, dados) {
@@ -96,7 +111,33 @@ function arrumar(bruto) {
     if (b.anuncios === null) return -1
     return a.anuncios - b.anuncios
   })
+  // As regras da categoria vinham junto e eu descartava.
+  //
+  // `settings` estava na resposta desde sempre — a sonda mostrou a chave e
+  // eu nunca tinha aberto. Tem coisa ali que decide sozinha se ela pode ou
+  // nao vender naquela categoria, e descobrir isso depois de pagar o
+  // fornecedor e o tipo de erro que este aplicativo existe para evitar.
+  const cfg = bruto.settings || {}
+  const numeroOuNulo = (v) => (Number.isFinite(Number(v)) ? Number(v) : null)
+  const regras = {
+    // `false` aqui e porta fechada: nao da para criar anuncio na categoria.
+    // `undefined` nao e `false` — categoria que nao declara o campo esta
+    // liberada, e tratar ausencia como bloqueio assustaria ela a toa.
+    podeAnunciar: cfg.listing_allowed === undefined ? null : Boolean(cfg.listing_allowed),
+    ativa: cfg.status === undefined ? null : cfg.status === 'enabled',
+    precoMinimo: numeroOuNulo(cfg.minimum_price),
+    precoMaximo: numeroOuNulo(cfg.maximum_price),
+    maxFotos: numeroOuNulo(cfg.max_pictures_per_item),
+    // Condicoes aceitas: ha categoria que so aceita usado, e ela vai
+    // vender novo.
+    aceitaNovo: Array.isArray(cfg.item_conditions) && cfg.item_conditions.length
+      ? cfg.item_conditions.includes('new')
+      : null,
+    restricoes: Array.isArray(cfg.restrictions) ? cfg.restrictions.filter(Boolean) : [],
+  }
+
   return {
+    formato: FORMATO,
     id: bruto.id,
     nome: bruto.name,
     anuncios: total,
@@ -104,6 +145,7 @@ function arrumar(bruto) {
     filhas,
     folha: filhas.length === 0,
     link: bruto.permalink || null,
+    regras,
   }
 }
 

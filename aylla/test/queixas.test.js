@@ -110,3 +110,15 @@ test('texto solto também é aceito', () => {
   const r = lerQueixas(['chegou quebrado', 'veio quebrado também'])
   assert.equal(r.queixas[0].quantas, 2)
 })
+
+test('o total de avaliações ruins não é o total de avaliações', async () => {
+  // Medido na sonda: com ?rating=1 o Mercado Livre mantém paging.total em
+  // 1706 (todas as avaliações do anúncio) e responde ao filtro em
+  // total_pageable, que caiu para 25. Ler o campo errado transformaria um
+  // produto bom — 1,5% de uma estrela — em um produto terrível na tela.
+  const { lerQueixas } = await import('../servidor/queixas.js')
+  const r = lerQueixas([{ texto: 'chegou quebrado' }])
+  // O módulo de leitura só conta o que recebeu; quem traduz o paging é
+  // avaliacoesRuins. Aqui fica registrado que "lidas" é a amostra lida.
+  assert.equal(r.lidas, 1)
+})

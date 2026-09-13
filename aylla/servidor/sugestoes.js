@@ -381,7 +381,27 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
         if (classico && classico.percentual !== null) {
           tarifa = { percentual: classico.percentual, custoFixo: classico.custoFixo, tipo: classico.nome }
         }
-      } catch { /* a sugestao vale sem a tarifa; a tela diz que e estimada */ }
+      } catch { /* cai na tentativa sem categoria, logo abaixo */ }
+
+      // Segunda tentativa, sem a categoria: a tarifa base do site. Generica,
+      // mas e numero do Mercado Livre — e a alternativa e a media que eu
+      // digitei a mao, que erra por categoria inteira.
+      if (!tarifa && lerGastos().rede < 45) {
+        try {
+          const r = await comissaoReal(env, { preco: Math.round(melhor.precoMediano), token, semCategoria: true })
+          const classico = r.tipos.find((x) => x.tipo === 'gold_special') || r.tipos[0]
+          if (classico && classico.percentual !== null) {
+            tarifa = {
+              percentual: classico.percentual,
+              custoFixo: classico.custoFixo,
+              tipo: classico.nome,
+              // A tela precisa saber que este numero nao e da categoria
+              // dela: comissao varia de 10% a 19% entre categorias.
+              doSite: true,
+            }
+          }
+        } catch { /* a sugestao vale sem a tarifa; a tela diz que e estimada */ }
+      }
     }
 
     // Anota o estado de hoje ANTES de qualquer outra coisa: o dado de hoje
@@ -427,6 +447,9 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
       categoriaId: cat.id,
       caminho: cat.caminho.map((c) => c.nome),
       anunciosNaCategoria: cat.anuncios,
+      // As regras da categoria: se da para anunciar, se aceita produto
+      // novo, limites de preco. Vem de graca na leitura da categoria.
+      regrasDaCategoria: cat.regras || null,
       outrasCategorias: destinos.slice(1, 3).map((d) => d.categoria),
 
       // O nicho: um produto especifico, com quem disputa ele.
@@ -528,6 +551,9 @@ export async function montarSugestoes(env, { token, quantas = 3 }) {
         primeira.queixas = {
           ...leitura,
           totalRuins: brutas.totalRuins,
+          totalGeral: brutas.totalGeral,
+          media: brutas.media,
+          fracaoUmaEstrela: brutas.fracaoUmaEstrela,
           resumo: resumirQueixas(leitura),
         }
       }

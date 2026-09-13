@@ -26,7 +26,13 @@ const semAcento = (s) => String(s || '')
   .normalize('NFD').replace(/[̀-ͯ]/g, '')
   .toLowerCase()
 
-const palavras = (s) => semAcento(s).split(/[^a-z0-9]+/).filter((p) => p.length > 2)
+// Palavra repetida conta uma vez.
+//
+// /trends devolve coisa como "bolsa feminina transversal bolsa de" — termo
+// digitado de verdade por gente de verdade, com a palavra repetida. Sem o
+// Set, "bolsa" entrava duas vezes, o termo parecia ter mais palavras do que
+// tem, e dois termos que sao a mesma busca escapavam da deduplicacao.
+const palavras = (s) => [...new Set(semAcento(s).split(/[^a-z0-9]+/).filter((p) => p.length > 2))]
 
 /**
  * Separa os recortes finos do termo genérico que os gerou.

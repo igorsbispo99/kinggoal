@@ -82,6 +82,9 @@ export default function Sugestoes({ config, aoCadastrar }) {
         const buscadoComo = Array.isArray(s.buscadoComo) ? s.buscadoComo : []
         const queixas = s.queixas && Array.isArray(s.queixas.queixas) ? s.queixas : null
         const marca = s.marca || null
+        const regras = s.regrasDaCategoria || null
+        // Porta fechada da categoria: nem adianta olhar o resto.
+        const categoriaFechada = regras && (regras.podeAnunciar === false || regras.ativa === false)
 
         return (
           <div key={s.produtoId || s.termo} className="sugestao">
@@ -173,6 +176,32 @@ export default function Sugestoes({ config, aoCadastrar }) {
                   </a>
                 </div>
 
+                {categoriaFechada ? (
+                  <Aviso nivel="critico" titulo="O Mercado Livre não deixa anunciar nesta categoria">
+                    <span>
+                      {regras.podeAnunciar === false
+                        ? 'A categoria está marcada como fechada para novos anúncios.'
+                        : 'A categoria está desativada no Mercado Livre.'}
+                      {' '}Não importa quão bom seja o produto: não há onde publicar.
+                    </span>
+                  </Aviso>
+                ) : null}
+
+                {regras && regras.aceitaNovo === false ? (
+                  <Aviso nivel="atencao" titulo="Esta categoria não aceita produto novo">
+                    <span>Ela vai vender importado novo, e aqui só entra usado ou recondicionado.</span>
+                  </Aviso>
+                ) : null}
+
+                {regras && regras.precoMaximo && s.precoMediano && s.precoMediano > regras.precoMaximo ? (
+                  <Aviso nivel="atencao" titulo="Preço acima do teto da categoria">
+                    <span>
+                      A categoria limita o anúncio a {reais(regras.precoMaximo)} e o preço praticado
+                      aqui é {reais(s.precoMediano)}.
+                    </span>
+                  </Aviso>
+                ) : null}
+
                 {marca && marca.obrigatoria && !marca.aceitaGenerica ? (
                   <Aviso nivel="atencao" titulo="Esta categoria exige marca no anúncio">
                     <span>
@@ -197,6 +226,20 @@ export default function Sugestoes({ config, aoCadastrar }) {
                 {queixas ? (
                   <div className="queixas">
                     <p className="rotulo-bloco">O que dá errado com este produto</p>
+                    {/* A proporcao vem de graca na mesma resposta, e separa
+                        dois produtos que a media esconde: 1,5% de uma
+                        estrela e 15% sao negocios diferentes. */}
+                    {queixas.fracaoUmaEstrela !== null && queixas.fracaoUmaEstrela !== undefined ? (
+                      <span className="selos">
+                        <span className={`selo ${queixas.fracaoUmaEstrela <= 0.03 ? 'bom' : queixas.fracaoUmaEstrela >= 0.1 ? 'ruim' : 'medio'}`}>
+                          {porcento(queixas.fracaoUmaEstrela, 1)} dão 1 estrela
+                        </span>
+                        {queixas.media ? <span className="selo neutro">nota {queixas.media.toFixed(1)}</span> : null}
+                        {queixas.totalGeral ? (
+                          <span className="selo neutro">{queixas.totalGeral.toLocaleString('pt-BR')} avaliações</span>
+                        ) : null}
+                      </span>
+                    ) : null}
                     <p className="dica">{queixas.resumo}</p>
                     {queixas.queixas.map((q) => (
                       <div key={q.id} className={`queixa${q.grave ? ' grave' : ''}`}>
@@ -211,9 +254,8 @@ export default function Sugestoes({ config, aoCadastrar }) {
                       </div>
                     ))}
                     <p className="dica tenue">
-                      Li as {queixas.lidas} avaliações de uma estrela deste anúncio
-                      {queixas.totalRuins > queixas.lidas ? ` (de ${queixas.totalRuins} ao todo)` : ''} e
-                      agrupei por assunto. Isto é <b>contagem de palavra, não leitura</b>: acerta o tema e
+                      Li {queixas.lidas} das {queixas.totalRuins} avaliações de uma estrela deste
+                      anúncio e agrupei por assunto. Isto é <b>contagem de palavra, não leitura</b>: acerta o tema e
                       erra a ironia. Use como roteiro de pergunta ao fornecedor — e leia os comentários
                       no anúncio antes de fechar.
                       {queixas.semTema ? ` ${queixas.semTema} não se encaixaram em nenhum assunto.` : ''}
@@ -374,6 +416,14 @@ export default function Sugestoes({ config, aoCadastrar }) {
                     Frete estimado em {reais(mp.freteEstimado || 0)}: o Mercado Livre não respondeu o
                     frete deste anúncio. Em produto leve e barato o frete decide a margem — confira
                     antes de comprar.
+                  </p>
+                ) : null}
+
+                {s.tarifa && s.tarifa.doSite ? (
+                  <p className="dica">
+                    Comissão de {porcento(s.tarifa.percentual, 1)}: é a tarifa base do Mercado Livre,
+                    não a desta categoria — ela não respondeu. Comissão varia de 10% a 19% entre
+                    categorias, então confirme no painel antes de comprar.
                   </p>
                 ) : null}
 

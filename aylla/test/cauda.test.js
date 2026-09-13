@@ -73,3 +73,14 @@ test('entradas vazias ou malformadas não quebram', () => {
   assert.deepEqual(caudaLonga('bolsa', [null, { termo: '' }, 'bolsa de couro']).recortes.map((r) => r.termo), ['bolsa de couro'])
   assert.deepEqual(comoEssePodeSerBuscado('bolsa', null), [])
 })
+
+test('termo com palavra repetida não engana a contagem nem a deduplicação', () => {
+  // Caso real de /trends/MLB/MLB7022: "bolsa feminina transversal bolsa de".
+  // São termos digitados por gente de verdade, com repetição.
+  const c = caudaLonga('bolsa', [
+    { termo: 'bolsa feminina transversal bolsa de', posicao: 1 },
+    { termo: 'bolsa feminina transversal', posicao: 2 },
+  ])
+  assert.equal(c.recortes.length, 1, 'os dois são a mesma busca')
+  assert.equal(c.recortes[0].palavras, 3, '"bolsa" repetida conta uma vez')
+})

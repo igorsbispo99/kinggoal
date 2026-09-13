@@ -313,10 +313,40 @@ export async function avaliacoesRuins(anuncioId, token, { quantas = 50 } = {}) {
   const r = await pegar(`/reviews/item/${anuncioId}?limit=${quantas}&rating=1`, token, { cacheSegundos: 86400 })
   if (!r.ok || !r.json) return null
   const lista = Array.isArray(r.json.reviews) ? r.json.reviews : []
+  const paging = r.json.paging || {}
+
+  // `paging.total` NAO respeita o filtro de nota. Medido na sonda: com
+  // ?rating=1 ele continua devolvendo 1706, que e o total de avaliacoes do
+  // anuncio inteiro. Quem responde ao filtro e `total_pageable`, que caiu
+  // para 25 na mesma chamada.
+  //
+  // Eu estava lendo o campo errado, e a tela ia dizer "de 1706 avaliacoes
+  // ruins" sobre um produto que tem 25 — transformando um produto bom
+  // (1,5% de uma estrela) em um produto terrivel, na leitura dela.
+  //
+  // 999 e o teto de paginacao do Mercado Livre, nao uma contagem: quando
+  // aparece esse numero, a unica coisa que se sabe e "mais que isso".
+  const pageavel = Number(paging.total_pageable)
+  const totalRuins = Number.isFinite(pageavel) && pageavel < 999
+    ? pageavel
+    : lista.length
+
+  // A distribuicao vem de graca na MESMA resposta. Um produto com 1,5% de
+  // uma estrela e outro com 15% sao produtos diferentes, e ate agora o app
+  // nao olhava para isso.
+  const niveis = r.json.rating_levels || {}
+  const somaNiveis = ['one', 'two', 'three', 'four', 'five']
+    .reduce((t, k) => t + (Number(niveis[k]) || 0), 0)
+
   return {
-    // O total do paging é quantas avaliações de uma estrela existem ao
-    // todo; a lista é a página que coube.
-    totalRuins: (r.json.paging && r.json.paging.total) ?? lista.length,
+    totalRuins,
+    // Quantas avaliacoes o anuncio tem ao todo — util como prova social, e
+    // e o denominador da fracao de uma estrela.
+    totalGeral: Number(paging.total) || somaNiveis || null,
+    media: Number.isFinite(Number(r.json.rating_average)) ? Number(r.json.rating_average) : null,
+    fracaoUmaEstrela: somaNiveis > 0 && Number.isFinite(Number(niveis.one))
+      ? Number(niveis.one) / somaNiveis
+      : null,
     avaliacoes: lista.map((a) => ({
       texto: a.content || a.comment || '',
       titulo: a.title || '',
@@ -828,12 +858,16 @@ export async function buscarNoCatalogo(env, { termo, token, limite = 20 }) {
  * cobra naquela categoria, naquele preço — inclusive o custo fixo por
  * unidade, que muda de faixa e é o que mais surpreende quem começa.
  */
-export async function comissaoReal(env, { categoria, preco, token }) {
-  const r = await pegar(
-    `/sites/${SITE}/listing_prices?price=${preco}&category_id=${categoria}`,
-    token,
-    { cacheSegundos: 86400 },
-  )
+export async function comissaoReal(env, { categoria, preco, token, semCategoria = false }) {
+  // Sem categoria o Mercado Livre responde a tarifa BASE do site, medido na
+  // sonda: /sites/MLB/listing_prices?price=100 devolve 200, com Premium a
+  // 16%. Serve de segunda tentativa quando a categoria nao responde — e um
+  // numero do Mercado Livre, ainda que generico, vale mais que a media que
+  // eu digitei a mao na tabela de marketplaces.
+  const caminho = semCategoria
+    ? `/sites/${SITE}/listing_prices?price=${preco}`
+    : `/sites/${SITE}/listing_prices?price=${preco}&category_id=${categoria}`
+  const r = await pegar(caminho, token, { cacheSegundos: 86400 })
   if (!r.ok) {
     const erro = new Error(`O Mercado Livre respondeu ${r.status} para as tarifas.`)
     erro.status = r.status
