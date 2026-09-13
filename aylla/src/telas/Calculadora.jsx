@@ -19,6 +19,9 @@ export const FORMULARIO_VAZIO = {
   // Percentual confirmado pelo Mercado Livre para a categoria, quando o
   // calculo veio de um produto que ja perguntou.
   comissaoMedida: null,
+  // Frete que ELA paga para entregar no Brasil, quando medido. Vazio cai no
+  // estimado do marketplace — que e um numero chutado, e a tela diz isso.
+  freteBrasil: '',
 }
 
 export default function Calculadora({ config, setConfig, formulario, setFormulario, aoSalvar, aoAbrirAjustes }) {
@@ -52,25 +55,41 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
   // So vale para o Mercado Livre: a medicao veio da API dele.
   const comissaoMedida = mp.id === 'mercadolivre' ? (f.comissaoMedida ?? null) : null
 
+  // O frete que ela paga para entregar aqui dentro.
+  //
+  // Ate agora este numero era R$ 24 fixos, escritos por mim no primeiro dia
+  // e impossiveis de corrigir na tela. Acima de R$ 79 o frete e do vendedor,
+  // entao esse chute mandava na margem, no preco alvo, no ponto de
+  // equilibrio e na comparacao entre canais — tudo de uma vez, e sem que ela
+  // pudesse fazer nada a respeito.
+  //
+  // Campo vazio continua caindo no estimado: ausencia nao e zero.
+  const freteMedido = f.freteBrasil === '' || f.freteBrasil === null || f.freteBrasil === undefined
+    ? null
+    : paraNumero(f.freteBrasil)
+
   const venda = useMemo(
-    () => calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida }),
-    [mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida],
+    () => calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida, freteMedido }),
+    [mp, tipoId, preco, custoUnitario, quantidade, comissaoMedida, freteMedido],
   )
 
   const precoAlvo = useMemo(
-    () => precoParaMargem({ mp, tipoId, custoUnitario, margemAlvo: config.margemAlvo, comissaoMedida }),
-    [mp, tipoId, custoUnitario, config.margemAlvo, comissaoMedida],
+    () => precoParaMargem({ mp, tipoId, custoUnitario, margemAlvo: config.margemAlvo, comissaoMedida, freteMedido }),
+    [mp, tipoId, custoUnitario, config.margemAlvo, comissaoMedida, freteMedido],
   )
   const equilibrio = useMemo(
-    () => pontoDeEquilibrio({ mp, tipoId, custoUnitario, comissaoMedida }),
-    [mp, tipoId, custoUnitario, comissaoMedida],
+    () => pontoDeEquilibrio({ mp, tipoId, custoUnitario, comissaoMedida, freteMedido }),
+    [mp, tipoId, custoUnitario, comissaoMedida, freteMedido],
   )
 
   const canais = useMemo(
     () => (preco > 0 && custoUnitario > 0
-      ? compararCanais({ marketplaces: config.marketplaces, tipos: config.tipos, preco, custoUnitario, quantidade })
+      ? compararCanais({
+        marketplaces: config.marketplaces, tipos: config.tipos, preco, custoUnitario, quantidade,
+        freteMedido, canalDoFrete: mp.id,
+      })
       : []),
-    [config.marketplaces, config.tipos, preco, custoUnitario, quantidade],
+    [config.marketplaces, config.tipos, preco, custoUnitario, quantidade, freteMedido, mp.id],
   )
 
   const mei = useMemo(
@@ -102,6 +121,15 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
           <Campo rotulo="Quantidade" ajuda="do lote" valor={f.quantidade} aoMudar={mudar('quantidade')} placeholder="10" />
           <Campo rotulo="Frete internacional" prefixo="US$" valor={f.freteUSD} aoMudar={mudar('freteUSD')} placeholder="0,00" />
           <Campo rotulo="Outros custos" ajuda="embalagem, etiqueta" prefixo="R$" valor={f.outrosCustosBRL} aoMudar={mudar('outrosCustosBRL')} placeholder="0,00" />
+          <Campo
+            rotulo="Frete no Brasil"
+            ajuda={`vazio usa ${reais(mp.freteEstimado || 0)} estimado`}
+            prefixo="R$"
+            valor={f.freteBrasil}
+            aoMudar={mudar('freteBrasil')}
+            placeholder={String(mp.freteEstimado || 0).replace('.', ',')}
+            largo
+          />
           {mostrarAvancado ? (
             <Campo rotulo="Seguro" prefixo="US$" valor={f.seguroUSD} aoMudar={mudar('seguroUSD')} placeholder="0,00" largo />
           ) : null}
@@ -242,7 +270,17 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
               <Linha rotulo={`Comissão ${mp.nome}`} detalhe={mp.tetoComissao && venda.custos.comissao >= mp.tetoComissao ? `teto de ${reais(mp.tetoComissao)}` : undefined} valor={`- ${reais(venda.custos.comissao)}`} tom="desconta" />
               {venda.custos.fixo > 0 ? <Linha rotulo="Custo fixo por item" valor={`- ${reais(venda.custos.fixo)}`} tom="desconta" /> : null}
               {venda.custos.frete > 0 ? (
-                <Linha rotulo="Frete por conta do vendedor" detalhe={mp.freteGratisAcimaDe ? `obrigatório acima de ${reais(mp.freteGratisAcimaDe)}` : undefined} valor={`- ${reais(venda.custos.frete)}`} tom="desconta" />
+                <Linha
+                  rotulo="Frete por conta do vendedor"
+                  detalhe={[
+                    mp.freteGratisAcimaDe ? `obrigatório acima de ${reais(mp.freteGratisAcimaDe)}` : null,
+                    // Dizer qual dos dois numeros esta valendo. Estimado e um
+                    // chute meu; ela precisa saber que pode corrigir.
+                    freteMedido === null ? 'valor estimado — preencha o frete real acima' : 'valor que você informou',
+                  ].filter(Boolean).join(' · ')}
+                  valor={`- ${reais(venda.custos.frete)}`}
+                  tom="desconta"
+                />
               ) : null}
               <Linha rotulo="Custo desembarcado" valor={`- ${reais(custoUnitario)}`} tom="desconta" />
               <Linha rotulo="Sobra por unidade" valor={reais(venda.lucroUnitario)} destaque tom={venda.lucroUnitario < 0 ? 'desconta' : undefined} />
@@ -256,7 +294,8 @@ export default function Calculadora({ config, setConfig, formulario, setFormular
 
             {mp.freteGratisAcimaDe && preco >= mp.freteGratisAcimaDe && preco < mp.freteGratisAcimaDe + 15 ? (
               <Aviso nivel="atencao" titulo="Você esta em cima do degrau dos R$ 79">
-                Acima de {reais(mp.freteGratisAcimaDe)} o frete passa a ser seu ({reais(mp.freteEstimado)}). Vender um pouco abaixo pode sobrar mais. Compare os dois precos aqui.
+                Acima de {reais(mp.freteGratisAcimaDe)} o frete passa a ser seu ({reais(venda.custos.frete)}
+                {freteMedido === null ? ', estimado' : ''}). Vender um pouco abaixo pode sobrar mais. Compare os dois preços aqui.
               </Aviso>
             ) : null}
 

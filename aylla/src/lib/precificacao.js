@@ -71,12 +71,23 @@ export function pontoDeEquilibrio(args) {
  * Compara o mesmo produto nos três marketplaces ao mesmo preço.
  * E a pergunta que ela faz toda semana: "vendo onde?".
  */
-export function compararCanais({ marketplaces, tipos, preco, custoUnitario, quantidade }) {
+export function compararCanais({
+  marketplaces, tipos, preco, custoUnitario, quantidade,
+  // O frete medido vale para o canal onde foi medido, e so para ele. O
+  // Mercado Envios tem tabela propria; aplicar o numero dele na Amazon e
+  // na Shopee seria inventar uma medicao que nao existe — e a comparacao
+  // entre canais e justamente o lugar onde um numero inventado decide
+  // errado em qual marketplace ela vai vender.
+  freteMedido = null, canalDoFrete = 'mercadolivre',
+}) {
   return Object.values(marketplaces)
     .map((mp) => {
       const tipoId = tipos[mp.id] || (mp.tipos[0] && mp.tipos[0].id)
-      const r = calcularVenda({ mp, tipoId, preco, custoUnitario, quantidade })
-      return { mp, tipoId, ...r }
+      const r = calcularVenda({
+        mp, tipoId, preco, custoUnitario, quantidade,
+        freteMedido: mp.id === canalDoFrete ? freteMedido : null,
+      })
+      return { mp, tipoId, ...r, freteEstimado: mp.id !== canalDoFrete || freteMedido === null }
     })
     .sort((a, b) => b.lucroUnitario - a.lucroUnitario)
 }

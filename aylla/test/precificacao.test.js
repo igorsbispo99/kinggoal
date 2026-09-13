@@ -186,3 +186,30 @@ test('comissão em pontos percentuais não vira comissão de 1400%', () => {
   assert.ok(perto(emPontos.custos.comissao, certo.custos.comissao), '14 e 0,14 têm que dar na mesma comissão')
   assert.ok(emPontos.lucroUnitario > 0, 'e o produto continua viável')
 })
+
+test('a comparação entre canais não empresta o frete medido para outro marketplace', () => {
+  // O Mercado Envios tem tabela própria. Aplicar o frete medido dele na
+  // Amazon e na Shopee inventaria uma medição que não existe — e é
+  // justamente aqui que um número inventado decide errado em qual
+  // marketplace ela vai vender.
+  const canais = compararCanais({
+    marketplaces: MARKETPLACES, tipos: { mercadolivre: 'classico', amazon: 'individual', shopee: 'padrao' },
+    preco: 200, custoUnitario: 60, quantidade: 1,
+    freteMedido: 41, canalDoFrete: 'mercadolivre',
+  })
+  const ml = canais.find((c) => c.mp.id === 'mercadolivre')
+  const amazon = canais.find((c) => c.mp.id === 'amazon')
+
+  assert.ok(perto(ml.custos.frete, 41), 'no canal medido vale o medido')
+  assert.equal(ml.freteEstimado, false)
+  assert.ok(perto(amazon.custos.frete, MARKETPLACES.amazon.freteEstimado), 'nos outros continua o estimado')
+  assert.equal(amazon.freteEstimado, true, 'e a tela sabe que ali é estimativa')
+})
+
+test('sem frete medido, toda a comparação continua marcada como estimativa', () => {
+  const canais = compararCanais({
+    marketplaces: MARKETPLACES, tipos: { mercadolivre: 'classico', amazon: 'individual', shopee: 'padrao' },
+    preco: 200, custoUnitario: 60, quantidade: 1,
+  })
+  assert.ok(canais.every((c) => c.freteEstimado))
+})
