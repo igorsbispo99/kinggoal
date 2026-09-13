@@ -34,7 +34,11 @@ export default function Descobrir({ aoAbrirCategoria }) {
     } catch (e) { setFalha(e.message) } finally { setBuscando(false) }
   }
 
-  const termos = subindo ? (tudo ? subindo.termos : subindo.termos.slice(0, 12)) : []
+  // Resposta fora do formato nao pode derrubar a tela inteira. Se
+  // `termos` vier ausente, isto era `undefined.slice` e o aplicativo
+  // ficava em branco — a pessoa nao ve um erro, ve um app quebrado.
+  const lista = Array.isArray(subindo && subindo.termos) ? subindo.termos : []
+  const termos = tudo ? lista : lista.slice(0, 12)
 
   return (
     <section className="cartao">
@@ -94,7 +98,7 @@ export default function Descobrir({ aoAbrirCategoria }) {
               </li>
             ))}
           </ul>
-          {subindo.termos.length > 12 ? (
+          {lista.length > 12 ? (
             <button type="button" className="botao cheio" onClick={() => setTudo(!tudo)}>
               {tudo ? 'Mostrar menos' : `Ver os ${subindo.termos.length} termos`}
             </button>

@@ -60,7 +60,7 @@ export default function Sugestoes({ config, aoCadastrar }) {
         </p>
       ) : null}
 
-      {dados && dados.sugestoes ? dados.sugestoes.map((s) => {
+      {Array.isArray(dados && dados.sugestoes) ? dados.sugestoes.map((s) => {
         const comissaoMedida = s.tarifa ? s.tarifa.percentual : null
         const leitura = lerOportunidade({
           mp, tipoId, precoVenda: s.precoMediano, comissaoMedida, config, quantidade: 10, freteUSD: 0, margens,
@@ -189,7 +189,7 @@ export default function Sugestoes({ config, aoCadastrar }) {
 
             {leitura ? (
               <div className="cenarios">
-                {leitura.cenarios.map((c) => (
+                {(leitura.cenarios || []).map((c) => (
                   <div key={c.margem} className={`cenario${c.impossivel ? ' impossivel' : ''}`}>
                     <span className="rotulo-cenario">{porcento(c.margem, 0)} de margem</span>
                     {c.impossivel ? (
@@ -261,7 +261,7 @@ export default function Sugestoes({ config, aoCadastrar }) {
                   </>
                 ) : null}
                 <ul className="lista-categorias">
-                  {s.exemplos.map((e) => (
+                  {(s.exemplos || []).map((e) => (
                     <li key={e.link || e.titulo}>
                       <a className="linha-categoria" href={e.link} target="_blank" rel="noreferrer">
                         <span className="nome">{e.titulo}</span>
@@ -284,7 +284,7 @@ export default function Sugestoes({ config, aoCadastrar }) {
         )
       }) : null}
 
-      {dados && dados.sugestoes && !dados.sugestoes.length && !carregando ? (
+      {Array.isArray(dados && dados.sugestoes) && !dados.sugestoes.length && !carregando ? (
         <Aviso nivel="atencao" titulo="Nenhuma sugestão fechou">
           <span>
             {dados.termosLidos

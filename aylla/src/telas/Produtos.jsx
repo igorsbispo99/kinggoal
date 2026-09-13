@@ -10,6 +10,7 @@ import RadarMercado from '../componentes/Radar.jsx'
 import Categorias from '../componentes/Categorias.jsx'
 import Descobrir from '../componentes/Descobrir.jsx'
 import Sugestoes from '../componentes/Sugestoes.jsx'
+import JanelaDeCompra from '../componentes/JanelaDeCompra.jsx'
 import CategoriaDoProduto from '../componentes/CategoriaDoProduto.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
@@ -79,6 +80,10 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
       {/* Antes dos produtos, porque no comeco nao ha produto nenhum: a
           primeira pergunta dela nao e "quanto rende este" e sim "o que
           vender". */}
+      {/* Antes das sugestoes: nao adianta achar o produto certo e descobrir
+          depois que o prazo para a proxima data ja venceu. */}
+      <JanelaDeCompra fornecedores={fornecedores} />
+
       {/* Primeiro as sugestoes prontas, porque foi isso que ela pediu:
           produtos com numeros, nao uma caixa de busca. A descoberta e a
           arvore ficam abaixo, para quando ela quiser procurar por conta. */}

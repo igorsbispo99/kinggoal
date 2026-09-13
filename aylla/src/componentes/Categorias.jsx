@@ -60,7 +60,14 @@ export default function Categorias({ aoEscolher, abrirId = null }) {
     descer(id)
   }
 
-  const filhas = nivel ? nivel.filhas : (listaRaiz ? listaRaiz.categorias.map((c) => ({ ...c, fatia: null })) : [])
+  // Mesma defesa: resposta sem `filhas` ou sem `categorias` nao pode
+  // derrubar a tela. Lista vazia mostra o cartao sem itens; undefined.map
+  // apaga o aplicativo.
+  const filhas = nivel
+    ? (Array.isArray(nivel.filhas) ? nivel.filhas : [])
+    : (Array.isArray(listaRaiz && listaRaiz.categorias)
+      ? listaRaiz.categorias.map((c) => ({ ...c, fatia: null }))
+      : [])
   const totalAtual = nivel ? nivel.anuncios : 0
 
   return (
@@ -80,10 +87,10 @@ export default function Categorias({ aoEscolher, abrirId = null }) {
       {nivel ? (
         <div className="trilha">
           <button type="button" className="migalha" onClick={() => voltarPara(null)}>todas</button>
-          {nivel.caminho.map((p, i) => (
+          {(nivel.caminho || []).map((p, i) => (
             <React.Fragment key={p.id}>
               <span className="separador">›</span>
-              {i === nivel.caminho.length - 1
+              {i === (nivel.caminho || []).length - 1
                 ? <span className="migalha atual">{p.nome}</span>
                 : <button type="button" className="migalha" onClick={() => voltarPara(p.id)}>{p.nome}</button>}
             </React.Fragment>
