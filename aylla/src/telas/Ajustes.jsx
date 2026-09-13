@@ -79,6 +79,12 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
 
       {recado ? <Aviso nivel={recado.nivel}>{recado.texto}</Aviso> : null}
 
+      {/* Onze cartoes empilhados davam cinco telas de rolagem. Agrupados, o
+          que ela mexe uma vez por ano fica fechado, e o que precisa ver — o
+          cofre e a conexao do radar — fica na frente. */}
+      <details className="grupo-ajustes">
+        <summary>Dinheiro e impostos<small>dólar, ICMS, regime de importação</small></summary>
+
       <section className="cartao">
         <header>
           <h2>Dólar</h2>
@@ -171,6 +177,11 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
         )}
       </section>
 
+      </details>
+
+      <details className="grupo-ajustes">
+        <summary>Metas e ranking<small>capital, margem alvo, o que pesa na nota</small></summary>
+
       <section className="cartao">
         <header>
           <h2>Metas e capital</h2>
@@ -212,6 +223,11 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
           Voltar aos pesos iniciais
         </button>
       </section>
+
+      </details>
+
+      <details className="grupo-ajustes">
+        <summary>Taxas dos marketplaces<small>comissão e frete de cada canal</small></summary>
 
       {ORDEM_MARKETPLACES.map((id) => {
         const mp = config.marketplaces[id]
@@ -261,6 +277,8 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
           </section>
         )
       })}
+
+      </details>
 
       <section className="cartao">
         <header>
@@ -342,6 +360,9 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
         ) : null}
       </section>
 
+      <details className="grupo-ajustes">
+        <summary>Aparência e backup<small>tema e cópia dos dados</small></summary>
+
       <section className="cartao">
         <header><h2>Aparência</h2></header>
         <Segmentado
@@ -372,6 +393,7 @@ export default function Ajustes({ config, setConfig, tema, setTema, totaisMEI, r
         <br />
         Este sistema calcula. Ele não substitui contador.
       </p>
+      </details>
     </>
   )
 }

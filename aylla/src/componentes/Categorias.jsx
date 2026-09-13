@@ -144,7 +144,7 @@ export default function Categorias({ aoEscolher, abrirId = null }) {
             </a>
           ) : null}
           {aoEscolher ? (
-            <button type="button" className="botao primario cheio" onClick={() => aoEscolher(nivel)}>
+            <button type="button" className="botao primario cheio" onClick={() => aoEscolher({ nome: nivel.nome, categoria: nivel.nome, id: nivel.id, categoriaId: nivel.id, anuncios: nivel.anuncios })}>
               Cadastrar um produto desta categoria
             </button>
           ) : null}

@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Calculadora, { FORMULARIO_VAZIO } from './telas/Calculadora.jsx'
-import Produtos from './telas/Produtos.jsx'
+import Produtos, { rascunhoDaSugestao } from './telas/Produtos.jsx'
+import TelaDescobrir from './telas/Descobrir.jsx'
 import Fornecedores from './telas/Fornecedores.jsx'
 import Financeiro from './telas/Financeiro.jsx'
 import Ajustes from './telas/Ajustes.jsx'
-import { IconeCalcular, IconeProdutos, IconeFornecedores, IconeFinanceiro, IconeAjustes, Logotipo } from './componentes/Icones.jsx'
+import { IconeBusca, IconeCalcular, IconeProdutos, IconeFornecedores, IconeFinanceiro, IconeAjustes, Logotipo } from './componentes/Icones.jsx'
 import { carregarConfig, salvarConfig } from './lib/configuracoes.js'
 import { listarProdutos, listarFornecedores, salvarProduto, converterSimulacoesEmProdutos } from './lib/catalogo.js'
 import { listarLotes, listarVendas, totaisDoAno } from './lib/financeiro.js'
@@ -13,9 +14,14 @@ import { estadoDoRadar } from './lib/radar.js'
 import { reais, paraCampo } from './lib/formato.js'
 
 const ABAS = [
+  // "Descobrir" antes de "Produtos" porque e a ordem do trabalho: primeiro
+  // se acha o que vender, depois se estuda o que foi achado.
+  { id: 'descobrir', nome: 'Descobrir', Icone: IconeBusca },
   { id: 'calcular', nome: 'Calcular', Icone: IconeCalcular },
   { id: 'produtos', nome: 'Produtos', Icone: IconeProdutos },
-  { id: 'fornecedores', nome: 'Fornecedores', Icone: IconeFornecedores },
+  // "Fornecedores" com seis abas corta em tela de 360px, e rotulo cortado
+  // e pior que rotulo curto.
+  { id: 'fornecedores', nome: 'Quem vende', Icone: IconeFornecedores },
   { id: 'financeiro', nome: 'Caixa', Icone: IconeFinanceiro },
   { id: 'ajustes', nome: 'Ajustes', Icone: IconeAjustes },
 ]
@@ -92,6 +98,15 @@ export default function App() {
   }
 
   /** Vai do produto para a calculadora já com os números do melhor fornecedor. */
+  // Uma sugestao vira produto em rascunho, e a tela de Produtos abre o
+  // formulario ja preenchido. O rascunho mora aqui porque quem cria esta
+  // numa aba e quem edita esta em outra.
+  const [rascunho, setRascunho] = useState(null)
+
+  function abrirNovoProduto(sugestao, leitura) {
+    setRascunho(rascunhoDaSugestao(sugestao, leitura))
+  }
+
   function calcularComFornecedor(produto, linha) {
     setFormulario({
       ...FORMULARIO_VAZIO,
@@ -163,6 +178,14 @@ export default function App() {
           </div>
         ) : null}
 
+        {aba === 'descobrir' ? (
+          <TelaDescobrir
+            config={config}
+            fornecedores={fornecedores}
+            aoCadastrar={(s, leitura) => { abrirNovoProduto(s, leitura); irPara('produtos') }}
+          />
+        ) : null}
+
         {aba === 'calcular' ? (
           <Calculadora
             config={config}
@@ -176,6 +199,8 @@ export default function App() {
 
         {aba === 'produtos' ? (
           <Produtos
+            rascunho={rascunho}
+            aoConsumirRascunho={() => setRascunho(null)}
             produtos={produtos}
             fornecedores={fornecedores}
             config={config}

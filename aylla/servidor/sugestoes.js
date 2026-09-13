@@ -406,6 +406,10 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       anunciosMedidos: melhor.anunciosMedidos,
       temLojaOficial: melhor.temLojaOficial,
       fracaoOficial: melhor.fracaoOficial,
+      descontoMedio: melhor.descontoMedio,
+      quantosDescontam: melhor.quantosDescontam,
+      fracaoComFreteGratis: melhor.fracaoComFreteGratis,
+      fracaoPremium: melhor.fracaoPremium,
       precoMediano: melhor.precoMediano,
       precoMin: melhor.precoMin,
       precoMax: melhor.anuncios.length

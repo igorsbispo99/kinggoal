@@ -67,80 +67,108 @@ export default function Sugestoes({ config, aoCadastrar }) {
         })
         const aberta = abertaId === s.produtoId
         const n = s.nota || {}
+        const grave = (s.conformidade && s.conformidade.alertas || []).filter((a) => a.gravidade !== 'atencao')
+        const alertasDeMudanca = s.alertas || []
+        const conservador = leitura && leitura.cenarios && leitura.cenarios[0]
+
         return (
           <div key={s.produtoId || s.termo} className="sugestao">
-            {/* O produto e o cartao. Antes o titulo era o termo da
-                tendencia — "bolsa feminina" — e isso sao milhoes de
-                modelos: nao da para procurar no Alibaba, nem julgar preco,
-                nem ler avaliacao de "bolsa". O termo virou contexto. */}
+            {/* O cabecalho e a decisao. Tudo o mais desce um nivel.
+                A tela tinha virado uma parede: nota, tendencia, dois
+                alertas de mudanca, tres de conformidade, cinco linhas de
+                numero e dois cenarios — trinta linhas por produto, quatro
+                produtos. Ninguem decide olhando isso. */}
             <button type="button" className="cabeca-sugestao" onClick={() => setAbertaId(aberta ? null : s.produtoId)}>
               <span className="produto-linha">
                 {s.ficha && s.ficha.imagem ? (
                   <img className="foto-produto" src={s.ficha.imagem} alt="" loading="lazy" />
-                ) : null}
+                ) : <span className="foto-produto vazia" aria-hidden="true" />}
                 <span className="produto-texto">
                   <span className="titulo-sugestao">{s.nomeDoProduto || s.termo}</span>
                   <span className="sub-sugestao">
                     {s.categoria}
                     {s.ficha && s.ficha.marca ? ` · ${s.ficha.marca}` : ''}
                   </span>
-                  <span className="sub-sugestao tenue">
-                    {s.posicaoNaTendencia}º mais buscado — apareceu em "{s.termo}"
+                  <span className="selos">
+                    {n.nota !== null && n.nota !== undefined ? (
+                      <span className={`selo ${n.fichaDeMarca ? 'ruim' : n.semProcura ? 'incerto' : n.nota >= 65 ? 'bom' : n.nota >= 40 ? 'medio' : 'ruim'}`}>
+                        {n.semProcura ? `(${n.nota})` : n.nota}/100
+                      </span>
+                    ) : null}
+                    {s.serie && s.serie.tendencia ? (
+                      <span className={`selo ${s.serie.tendencia === 'subindo' ? 'bom' : s.serie.tendencia === 'caindo' ? 'ruim' : 'neutro'}`}>
+                        {s.serie.tendencia === 'subindo' ? '↑' : s.serie.tendencia === 'caindo' ? '↓' : '→'} procura
+                      </span>
+                    ) : null}
+                    {s.vendedoresNaFicha ? (
+                      <span className={`selo ${s.vendedoresNaFicha <= 3 ? 'bom' : s.vendedoresNaFicha >= 10 ? 'ruim' : 'neutro'}`}>
+                        {s.vendedoresNaFicha} {s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}
+                      </span>
+                    ) : null}
+                    {grave.length ? <span className="selo ruim">{grave[0].orgao}</span> : null}
                   </span>
                 </span>
               </span>
             </button>
 
-            {s.ficha ? (
-              <div className="atalhos-produto">
-                <a className="botao" href={s.ficha.link} target="_blank" rel="noreferrer">
-                  Ver no Mercado Livre
-                </a>
-                <a
-                  className="botao"
-                  href={`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(s.ficha.familia || s.ficha.nome || s.termo)}`}
-                  target="_blank" rel="noreferrer"
-                >
-                  Procurar no Alibaba
-                </a>
-              </div>
+            {/* Os dois numeros que ela usa para agir. */}
+            <div className="numeros-chave">
+              <span className="numero-chave">
+                <small>vende a</small>
+                <b>{s.precoMediano ? reais(s.precoMediano) : '—'}</b>
+              </span>
+              <span className="numero-chave alvo">
+                <small>pague até ({porcento(margens[0], 0)})</small>
+                <b>{conservador && !conservador.impossivel ? dolares(conservador.precoMaximoUSD) : 'não fecha'}</b>
+              </span>
+            </div>
+
+            {/* Uma frase. A que mais muda a decisao, e so ela. */}
+            <p className={`veredito ${n.fichaDeMarca || (s.serie && s.serie.tendencia === 'caindo') ? 'alerta' : ''}`}>
+              {s.serie && s.serie.tendencia === 'caindo' ? s.resumoDaSerie : s.resumoDoNicho}
+            </p>
+
+            {grave.length ? (
+              <Aviso
+                nivel={grave[0].gravidade === 'bloqueia' ? 'critico' : 'atencao'}
+                titulo={grave[0].gravidade === 'bloqueia'
+                  ? `${grave[0].orgao}: caminho fechado para MEI`
+                  : `${grave[0].orgao}: exige certificação`}
+              >
+                <span>{grave[0].oQueFazer}</span>
+              </Aviso>
             ) : null}
 
-            {/* Sem procura medida a faixa nao fica verde e a nota nao vira
-                veredito: ela sai cinza, com o numero entre parenteses. Verde
-                em produto de demanda desconhecida seria um convite a comprar
-                estoque no escuro. */}
-            {n.nota !== null && n.nota !== undefined ? (
-              <div className={`faixa-entrada${n.fichaDeMarca ? ' ruim' : n.semProcura ? ' incerta' : n.nota >= 65 ? ' boa' : n.nota >= 40 ? ' media' : ' ruim'}`}>
-                <span className="rotulo-entrada">
-                  {n.fichaDeMarca ? 'Ficha da própria marca'
-                    : n.semProcura ? 'Procura não medida'
-                      : 'Dá para competir neste produto?'}
-                </span>
-                <span className="nota-entrada">
-                  {n.semProcura ? `(${n.nota})` : n.nota}<small>/100</small>
-                </span>
-                <span className="frase-entrada">{s.resumoDoNicho}</span>
-                {!n.completo ? (
-                  <span className="frase-entrada tenue">
-                    A nota saiu de {porcento(n.cobertura, 0)} dos sinais — faltou: {n.faltando.join(', ')}.
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
+            <button type="button" className="mais-detalhes" onClick={() => setAbertaId(aberta ? null : s.produtoId)}>
+              {aberta ? 'Menos detalhes' : `Ver detalhes${alertasDeMudanca.length ? ` · ${alertasDeMudanca.length} mudança${alertasDeMudanca.length > 1 ? 's' : ''}` : ''}`}
+            </button>
 
-            {/* Conformidade vem antes de tudo, inclusive da nota: nao
-                adianta saber que da para competir se a mercadoria nao
-                entra no pais. */}
-            {s.conformidade && s.conformidade.alertas.length ? (
-              <div className="linhas">
-                {s.conformidade.alertas.map((a) => (
+            {aberta ? (
+              <>
+                <div className="atalhos-produto">
+                  {s.ficha ? (
+                    <a className="botao" href={s.ficha.link} target="_blank" rel="noreferrer">Ver no Mercado Livre</a>
+                  ) : null}
+                  <a
+                    className="botao"
+                    href={`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent((s.ficha && (s.ficha.familia || s.ficha.nome)) || s.termo)}`}
+                    target="_blank" rel="noreferrer"
+                  >
+                    Procurar no Alibaba
+                  </a>
+                </div>
+
+                {alertasDeMudanca.map((a) => (
+                  <Aviso key={a.texto} nivel={a.grave ? 'critico' : 'info'} titulo="Mudou desde a última vez">
+                    {a.texto}
+                  </Aviso>
+                ))}
+
+                {(s.conformidade && s.conformidade.alertas || []).map((a) => (
                   <Aviso
                     key={a.id}
                     nivel={a.gravidade === 'bloqueia' ? 'critico' : a.gravidade === 'exige' ? 'atencao' : 'info'}
-                    titulo={a.gravidade === 'bloqueia' ? `${a.orgao}: caminho fechado para MEI`
-                      : a.gravidade === 'exige' ? `${a.orgao}: exige certificação antes de importar`
-                        : `${a.orgao}: atenção`}
+                    titulo={`${a.orgao}${a.gravidade === 'atencao' ? ': atenção' : ''}`}
                   >
                     <span>{a.porque}</span>
                     <span><b>{a.oQueFazer}</b></span>
@@ -150,173 +178,84 @@ export default function Sugestoes({ config, aoCadastrar }) {
                     </span>
                   </Aviso>
                 ))}
-              </div>
-            ) : null}
 
-            {/* Tendencia e alertas vem antes dos numeros porque mudam a
-                decisao inteira: procura caindo transforma um bom negocio
-                em prejuizo, e nenhum numero de hoje mostra isso. */}
-            {s.resumoDaSerie && s.serie && s.serie.tendencia ? (
-              <div className={`faixa-tendencia ${s.serie.tendencia === 'subindo' ? 'sobe' : s.serie.tendencia === 'caindo' ? 'desce' : 'plana'}`}>
-                <span className="seta">
-                  {s.serie.tendencia === 'subindo' ? '↑' : s.serie.tendencia === 'caindo' ? '↓' : '→'}
-                </span>
-                <span>{s.resumoDaSerie}</span>
-              </div>
-            ) : null}
+                <div className="linhas">
+                  {s.visitasPorAnuncio !== null && s.visitasPorAnuncio !== undefined ? (
+                    <Linha
+                      rotulo="Visitas por anúncio"
+                      detalhe={`em 30 dias, medido em ${s.anunciosMedidos} ${s.anunciosMedidos === 1 ? 'anúncio' : 'anúncios'}`}
+                      valor={Math.round(s.visitasPorAnuncio).toLocaleString('pt-BR')}
+                    />
+                  ) : null}
+                  <Linha
+                    rotulo="Faixa de preço"
+                    detalhe="entre os anúncios desta ficha"
+                    valor={s.precoMin && s.precoMax ? `${reais(s.precoMin)} – ${reais(s.precoMax)}` : '—'}
+                  />
+                  <Linha
+                    rotulo="Categoria inteira"
+                    detalhe="só contexto: o que importa é a ficha"
+                    valor={`${(s.anunciosNaCategoria || 0).toLocaleString('pt-BR')} anúncios`}
+                  />
+                  {s.descontoMedio !== null && s.descontoMedio !== undefined ? (
+                    <Linha
+                      rotulo="Desconto dos concorrentes"
+                      detalhe={`${s.quantosDescontam} já anunciam abaixo do preço de lista`}
+                      valor={porcento(s.descontoMedio, 0)}
+                      tom={s.descontoMedio >= 0.2 ? 'desconta' : undefined}
+                    />
+                  ) : null}
+                  {s.fracaoComFreteGratis !== null && s.fracaoComFreteGratis !== undefined ? (
+                    <Linha
+                      rotulo="Já dão frete grátis"
+                      detalhe="se todos dão e você não der, seu anúncio não aparece"
+                      valor={porcento(s.fracaoComFreteGratis, 0)}
+                    />
+                  ) : null}
+                  {s.fracaoPremium ? (
+                    <Linha
+                      rotulo="Anunciam como Premium"
+                      detalhe="premium cobra ~5 pontos a mais de comissão"
+                      valor={porcento(s.fracaoPremium, 0)}
+                      tom={s.fracaoPremium >= 0.5 ? 'desconta' : undefined}
+                    />
+                  ) : null}
+                  {s.ficha && s.ficha.peso ? <Linha rotulo="Peso" detalhe="decide o frete" valor={s.ficha.peso} /> : null}
+                  {s.ficha && s.ficha.material ? <Linha rotulo="Material" valor={s.ficha.material} /> : null}
+                </div>
 
-            {s.alertas && s.alertas.length ? (
-              <div className="linhas">
-                {s.alertas.map((a) => (
-                  <Aviso key={a.texto} nivel={a.grave ? 'critico' : 'info'} titulo={a.grave ? 'Mudou desde a última vez' : 'Observação'}>
-                    {a.texto}
-                  </Aviso>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="linhas">
-              {/* O numero do nicho vem primeiro porque e ele que decide. A
-                  categoria inteira e so contexto: "Bolsas" tem 421 mil
-                  anuncios e isso nao diz nada sobre o produto onde dois
-                  vendedores brigam. */}
-              {s.visitasPorAnuncio !== null && s.visitasPorAnuncio !== undefined ? (
-                <Linha
-                  rotulo="Visitas por anúncio"
-                  detalhe={`em 30 dias, medido em ${s.anunciosMedidos} ${s.anunciosMedidos === 1 ? 'anúncio' : 'anúncios'} desta ficha`}
-                  valor={Math.round(s.visitasPorAnuncio).toLocaleString('pt-BR')}
-                  destaque
-                />
-              ) : null}
-              <Linha
-                rotulo="Disputam esta ficha"
-                detalhe={n.fichaDeMarca ? 'todos são loja oficial da marca'
-                  : s.temLojaOficial ? 'há loja oficial entre eles'
-                    : 'nenhuma loja oficial'}
-                valor={`${s.vendedoresNaFicha} ${s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}`}
-                tom={n.fichaDeMarca || s.vendedoresNaFicha >= 10 || s.temLojaOficial ? 'desconta' : undefined}
-              />
-              <Linha
-                rotulo="Categoria inteira"
-                detalhe="só contexto: o que importa é a ficha acima"
-                valor={`${s.anunciosNaCategoria.toLocaleString('pt-BR')} anúncios`}
-              />
-              <Linha
-                rotulo="Preço de venda"
-                detalhe={s.precoMin && s.precoMax ? `de ${reais(s.precoMin)} a ${reais(s.precoMax)}` : 'mediana dos anúncios da ficha'}
-                valor={s.precoMediano ? reais(s.precoMediano) : '—'}
-                destaque
-              />
-            </div>
-
-            {leitura && comissaoMedida === null ? (
-              <p className="dica">
-                Comissão estimada: o Mercado Livre não respondeu a tarifa desta categoria, então o teto
-                abaixo usa a média. Confirme antes de comprar.
-              </p>
-            ) : null}
-
-            {leitura ? (
-              <div className="cenarios">
-                {(leitura.cenarios || []).map((c) => (
-                  <div key={c.margem} className={`cenario${c.impossivel ? ' impossivel' : ''}`}>
-                    <span className="rotulo-cenario">{porcento(c.margem, 0)} de margem</span>
-                    {c.impossivel ? (
-                      <span className="nao-da">não fecha nem de graça</span>
-                    ) : (
-                      <>
-                        <span className="pague-ate">pague até {dolares(c.precoMaximoUSD)}</span>
-                        <span className="detalhe-cenario">
-                          {reais(c.custoMaximoBRL)} posto aqui · lucro {reais(c.lucroUnitario)}/un
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            {aberta ? (
-              <>
-                {s.ficha && (s.ficha.cor || s.ficha.material || s.ficha.modelo || s.ficha.peso) ? (
-                  <div className="linhas">
-                    {s.ficha.modelo ? <Linha rotulo="Modelo" valor={s.ficha.modelo} /> : null}
-                    {s.ficha.cor ? <Linha rotulo="Cor" valor={s.ficha.cor} /> : null}
-                    {s.ficha.material ? <Linha rotulo="Material" valor={s.ficha.material} /> : null}
-                    {s.ficha.peso ? <Linha rotulo="Peso" detalhe="decide o frete" valor={s.ficha.peso} /> : null}
+                {leitura && leitura.cenarios ? (
+                  <div className="cenarios">
+                    {leitura.cenarios.map((c) => (
+                      <div key={c.margem} className={`cenario${c.impossivel ? ' impossivel' : ''}`}>
+                        <span className="rotulo-cenario">{porcento(c.margem, 0)} de margem</span>
+                        {c.impossivel ? <span className="nao-da">não fecha nem de graça</span> : (
+                          <>
+                            <span className="pague-ate">{dolares(c.precoMaximoUSD)}</span>
+                            <span className="detalhe-cenario">
+                              {reais(c.custoMaximoBRL)} posto aqui · lucro {reais(c.lucroUnitario)}/un
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 ) : null}
 
-                {s.ficha && s.ficha.destaques && s.ficha.destaques.length ? (
-                  <>
-                    <div className="separa-secao"><span>como o Mercado Livre descreve</span></div>
-                    <ul className="destaques">
-                      {s.ficha.destaques.map((d) => <li key={d}>{d}</li>)}
-                    </ul>
-                  </>
+                {comissaoMedida === null ? (
+                  <p className="dica">
+                    Comissão estimada: o Mercado Livre não respondeu a tarifa desta categoria.
+                    Confirme antes de comprar.
+                  </p>
                 ) : null}
 
-                {/* Ha quanto tempo o app observa este nicho. Com uma
-                    anotacao so nao ha evolucao, e dizer "estavel" com um
-                    ponto seria inventar. */}
-                {s.evolucao ? (
-                  <div className="linhas">
-                    {s.evolucao.suficiente ? (
-                      <>
-                        <Linha
-                          rotulo="Preço"
-                          detalhe={`de ${s.evolucao.desde} até hoje`}
-                          valor={s.evolucao.variacaoDePreco !== null
-                            ? `${s.evolucao.variacaoDePreco > 0 ? '+' : ''}${Math.round(s.evolucao.variacaoDePreco * 100)}%`
-                            : '—'}
-                          tom={s.evolucao.variacaoDePreco !== null && s.evolucao.variacaoDePreco < 0 ? 'desconta' : undefined}
-                        />
-                        <Linha
-                          rotulo="Vendedores"
-                          detalhe={`${s.evolucao.vendedoresAntes} quando comecei a olhar`}
-                          valor={s.evolucao.entraram !== null
-                            ? `${s.evolucao.entraram > 0 ? '+' : ''}${s.evolucao.entraram}`
-                            : '—'}
-                          tom={s.evolucao.entraram > 0 ? 'desconta' : undefined}
-                        />
-                      </>
-                    ) : (
-                      <p className="dica">
-                        Observando este nicho desde {s.evolucao.desde || 'hoje'}. A partir da segunda
-                        medição aparece aqui se o preço caiu e quantos vendedores entraram —
-                        é o que diz se ele está sendo descoberto.
-                      </p>
-                    )}
-                  </div>
+                {s.evolucao && !s.evolucao.suficiente ? (
+                  <p className="dica">
+                    Observando esta ficha desde {s.evolucao.desde || 'hoje'}. Da segunda medição em diante
+                    aparece aqui se o preço caiu e quantos vendedores entraram.
+                  </p>
                 ) : null}
 
-                {s.alternativas && s.alternativas.length ? (
-                  <>
-                    <div className="separa-secao"><span>outros produtos desta categoria</span></div>
-                    <div className="linhas">
-                      {s.alternativas.map((a) => (
-                        <Linha
-                          key={a.produtoId}
-                          rotulo={a.preco ? reais(a.preco) : 'sem preço'}
-                          detalhe={`${a.vendedores} disputando`}
-                          valor={a.visitasPorAnuncio !== null && a.visitasPorAnuncio !== undefined
-                            ? `${Math.round(a.visitasPorAnuncio).toLocaleString('pt-BR')} visitas/anúncio`
-                            : '—'}
-                        />
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-                <ul className="lista-categorias">
-                  {(s.exemplos || []).map((e) => (
-                    <li key={e.link || e.titulo}>
-                      <a className="linha-categoria" href={e.link} target="_blank" rel="noreferrer">
-                        <span className="nome">{e.titulo}</span>
-                        <span className="numeros"><b>{reais(e.preco)}</b></span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
                 <button type="button" className="botao primario cheio" onClick={() => aoCadastrar(s, leitura)}>
                   Estudar este produto
                 </button>
@@ -347,16 +286,18 @@ export default function Sugestoes({ config, aoCadastrar }) {
         {carregando ? 'Recalculando...' : 'Recalcular agora'}
       </button>
 
-      <p className="dica">
-        Os avisos de Anatel, Anvisa e Inmetro são <b>indicadores para conferir</b>, não parecer jurídico.
-        Eles cobrem o que é comum em revenda importada — silêncio aqui não é atestado de que o produto é livre.
-      </p>
-
-      <p className="dica">
-        O <b>pague até</b> é calculado de trás para frente: preço de venda real, menos a comissão
-        do Mercado Livre, menos o imposto da importação e o frete — o que sobra é o teto.
-        Não existe API que diga o preço do fornecedor; esse número diz o que fazer com isso.
-      </p>
+      <details className="rodape-explicativo">
+        <summary>Como estes números são calculados</summary>
+        <p className="dica">
+          O <b>pague até</b> vai de trás para frente: preço de venda real, menos a comissão do Mercado
+          Livre, menos o imposto da importação e o frete — o que sobra é o teto. Não existe API que diga
+          o preço do fornecedor; esse número diz o que fazer com isso.
+        </p>
+        <p className="dica">
+          Os avisos de Anatel, Anvisa e Inmetro são <b>indicadores para conferir</b>, não parecer
+          jurídico. Silêncio ali não é atestado de que o produto é livre.
+        </p>
+      </details>
     </section>
   )
 }

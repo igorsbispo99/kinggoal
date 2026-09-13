@@ -316,9 +316,28 @@ async function produtosComDisputa(ids, token, limite) {
       shipping: a.shipping || null,
       condition: a.condition || null,
       catalog_listing: true,
+      // Campos que ja vinham nesta mesma resposta e eu descartava:
+      //
+      // original_price ... quanto o concorrente ja esta descontando. Preco
+      //                    de lista com 30% de desconto nao e preco de lista:
+      //                    a margem dela sai do preco praticado.
+      // shipping ......... se o concorrente ja da frete gratis. Se todos dao
+      //                    e ela nao der, o anuncio dela nao aparece.
+      // listing_type_id .. classico ou premium. Se o topo e todo premium,
+      //                    ela vai precisar de premium tambem — e premium
+      //                    cobra cinco pontos a mais de comissao.
+      original_price: Number(a.original_price) || null,
+      freteGratis: Boolean(a.shipping && a.shipping.free_shipping),
+      tipoDeAnuncio: a.listing_type_id || null,
     }))
     if (!anuncios.length) continue
     const oficiais = anuncios.filter((a) => a.official_store_id).length
+    const comDesconto = anuncios.filter((a) => a.original_price && a.original_price > a.price)
+    const descontoMedio = comDesconto.length
+      ? comDesconto.reduce((t, a) => t + (a.original_price - a.price) / a.original_price, 0) / comDesconto.length
+      : null
+    const comFreteGratis = anuncios.filter((a) => a.freteGratis).length
+    const premium = anuncios.filter((a) => a.tipoDeAnuncio === 'gold_pro').length
     produtos.push({
       produtoId: id,
       vendedores: (r.json.paging && r.json.paging.total) || anuncios.length,
@@ -331,6 +350,10 @@ async function produtosComDisputa(ids, token, limite) {
       anunciosOficiais: oficiais,
       anunciosVistos: anuncios.length,
       fracaoOficial: anuncios.length ? oficiais / anuncios.length : null,
+      descontoMedio,
+      quantosDescontam: comDesconto.length,
+      fracaoComFreteGratis: anuncios.length ? comFreteGratis / anuncios.length : null,
+      fracaoPremium: anuncios.length ? premium / anuncios.length : null,
     })
   }
   return produtos

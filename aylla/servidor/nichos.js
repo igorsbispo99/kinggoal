@@ -1,104 +1,12 @@
-// Caça ao nicho: descer a árvore até onde dá para competir.
+// A nota do nicho.
 //
-// O problema que isto resolve: uma tendência devolve "bolsa feminina", o
-// Mercado Livre traduz para a categoria "Bolsas", e "Bolsas" tem 421 mil
-// anúncios. Nenhuma pessoa começando entra ali. Mas dentro de "Bolsas"
-// existem galhos com três mil anúncios, e alguns deles recebem visita.
+// Este arquivo ja teve o dobro do tamanho. A metade que saiu era a descida
+// pela arvore de categorias — escolher filha, descer niveis, medir o galho.
+// Ela nasceu de um erro de conceito meu: eu procurava o nicho na arvore,
+// quando o domain_discovery ja devolve a categoria FOLHA. "Bolsas", com 421
+// mil anuncios, e o galho mais fino que existe; nao ha para onde descer.
 //
-// O sistema tem que descer até esses galhos em vez de parar na porta.
-//
-// Duas regras guiam a descida, e as duas vêm de como o marketplace
-// funciona, não de preferência minha:
-//
-// 1. Menor é melhor, até certo ponto. Menos anúncios é menos gente
-//    disputando a mesma atenção. Mas categoria vazia não é oportunidade,
-//    é ausência de comprador — então existe um piso.
-//
-// 2. Relevância manda sobre tamanho. Se uma filha tem no nome a palavra
-//    que a pessoa buscou, é nela que a busca vai cair. Descer para o galho
-//    pequeno errado seria trocar concorrência por irrelevância.
-
-const semAcento = (t) => String(t || '')
-  .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-
-/** Piso: abaixo disso, a categoria provavelmente não tem comprador. */
-export const PISO_DE_ANUNCIOS = 300
-
-/** Teto: acima disso ainda vale descer mais, se houver por onde. */
-export const TETO_PARA_PARAR = 20000
-
-/**
- * Qual filha seguir.
- *
- * Relevância primeiro: filha cujo nome contém palavra do termo buscado.
- * Entre as relevantes, a menor — que é o nicho dentro do nicho.
- * Sem nenhuma relevante, a menor que ainda esteja acima do piso.
- */
-export function escolherFilha(filhas, termo, piso = PISO_DE_ANUNCIOS) {
-  const validas = (filhas || []).filter((f) => f && f.id)
-  if (!validas.length) return null
-
-  const palavras = semAcento(termo).split(/\s+/).filter((p) => p.length >= 4)
-  const quantoCasa = (f) => {
-    const nome = semAcento(f.nome)
-    return palavras.filter((p) => nome.includes(p.replace(/s$/, ''))).length
-  }
-
-  const tamanho = (f) => (Number.isFinite(Number(f.anuncios)) ? Number(f.anuncios) : Infinity)
-  const acimaDoPiso = validas.filter((f) => tamanho(f) >= piso)
-  const candidatas = acimaDoPiso.length ? acimaDoPiso : validas
-
-  // Relevância manda, e manda por quantas palavras casam, não por casar
-  // alguma. Para "bolsa feminina", "Bolsas Femininas" casa duas e "Bolsas
-  // Térmicas" casa uma — ordenar só por tamanho levava para a térmica, que
-  // é um mercado diferente.
-  //
-  // Seguir a filha relevante mesmo quando ela é grande é o certo: quem
-  // decide onde parar é o teto de tamanho, na descida. Trocar o galho certo
-  // por um menor seria trocar concorrência por irrelevância, e anúncio no
-  // lugar errado não vende nem sem concorrente nenhum.
-  return [...candidatas].sort((a, b) => (quantoCasa(b) - quantoCasa(a)) || (tamanho(a) - tamanho(b)))[0]
-}
-
-/**
- * Desce a árvore enquanto a categoria for grande demais e houver por onde.
- *
- * Cada nível custa uma requisição, e as filhas já vêm com contagem na
- * resposta da mãe — então descer três níveis custa três chamadas, não uma
- * por categoria.
- */
-export async function descerAteNicho(env, { categoriaId, termo, token, maxNiveis = 3, abrir }) {
-  let atual = await abrir(env, categoriaId, token)
-  const trilha = [{ id: atual.id, nome: atual.nome, anuncios: atual.anuncios }]
-  let niveis = 0
-
-  while (niveis < maxNiveis) {
-    // Pequena o bastante: parar aqui é melhor que cavar até o vazio.
-    if (atual.anuncios && atual.anuncios <= TETO_PARA_PARAR) break
-    if (!atual.filhas || !atual.filhas.length) break
-
-    const escolhida = escolherFilha(atual.filhas, termo)
-    if (!escolhida) break
-
-    // Descer para algo abaixo do piso seria trocar concorrência por deserto.
-    if (Number.isFinite(Number(escolhida.anuncios)) && Number(escolhida.anuncios) < PISO_DE_ANUNCIOS) break
-
-    atual = await abrir(env, escolhida.id, token)
-    trilha.push({ id: atual.id, nome: atual.nome, anuncios: atual.anuncios })
-    niveis += 1
-  }
-
-  return {
-    nicho: atual,
-    trilha,
-    desceu: niveis,
-    // Por que parou: a tela precisa poder explicar, e eu preciso poder
-    // conferir se a regra está fazendo o que eu penso que faz.
-    parouPorque: atual.anuncios <= TETO_PARA_PARAR ? 'pequena o bastante'
-      : (!atual.filhas || !atual.filhas.length) ? 'não tem subcategoria'
-        : niveis >= maxNiveis ? 'limite de níveis' : 'próxima filha ficaria vazia',
-  }
-}
+// O nicho esta no produto, e e la que a nota mede.
 
 const numeroOuNulo = (v) => {
   if (v === null || v === undefined || v === '') return null

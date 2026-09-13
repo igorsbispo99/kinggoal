@@ -107,12 +107,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: none; border: 0; cursor: pointer;
   padding: 9px 2px 10px;
   display: flex; flex-direction: column; align-items: center; gap: 3px;
-  color: var(--tinta-3); font-size: .61rem; font-weight: 550; letter-spacing: 0;
+  color: var(--tinta-3); font-size: .58rem; font-weight: 550; letter-spacing: -.01em;
   min-height: var(--barra); min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .barra-nav button svg { width: 20px; height: 20px; stroke-width: 1.7; flex: none; }
-@media (min-width: 420px) { .barra-nav button { font-size: .66rem; } }
+/* Abaixo de 340px nao ha largura para seis rotulos: fica so o icone, que
+   continua dizendo o que e. Rotulo cortado nao diz nada. */
+@media (max-width: 339px) {
+  .barra-nav button { font-size: 0; gap: 0; padding: 12px 2px; }
+  .barra-nav button svg { width: 22px; height: 22px; }
+}
+@media (min-width: 400px) { .barra-nav button { font-size: .64rem; letter-spacing: 0; } }
 .barra-nav button[aria-current="page"] { color: var(--verde); }
 
 /* ---------- cartoes ---------- */
@@ -605,3 +611,68 @@ details.dobra > div { padding-top: 10px; }
 
 .destaques { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
 .destaques li { font-size: .8rem; line-height: 1.4; color: var(--tinta-2); }
+
+/* ---------- cartao de sugestao: hierarquia ---------- */
+
+.selos { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.selo {
+  font-size: .66rem; font-weight: 700; letter-spacing: .01em;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--afundado); color: var(--tinta-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.selo.bom { background: var(--verde-fundo); color: var(--verde); }
+.selo.medio { background: var(--atencao-fundo); color: var(--atencao); }
+.selo.ruim { background: var(--negativo-fundo); color: var(--negativo); }
+.selo.incerto { background: var(--afundado); color: var(--tinta-3); }
+
+.numeros-chave { display: flex; gap: 8px; }
+.numero-chave {
+  flex: 1; display: flex; flex-direction: column; gap: 1px;
+  border: 1px solid var(--linha); border-radius: 8px; padding: 8px 10px;
+}
+.numero-chave small { font-size: .66rem; color: var(--tinta-3); text-transform: uppercase; letter-spacing: .04em; }
+.numero-chave b { font-size: 1.1rem; font-variant-numeric: tabular-nums; color: var(--tinta); }
+.numero-chave.alvo { border-color: var(--verde); background: var(--verde-fundo); }
+
+.veredito { margin: 0; font-size: .82rem; line-height: 1.45; color: var(--tinta-2); }
+.veredito.alerta { color: var(--negativo); font-weight: 600; }
+
+.mais-detalhes {
+  border: 0; background: none; cursor: pointer; align-self: flex-start;
+  padding: 2px 0; font-size: .78rem; font-weight: 650; color: var(--verde);
+}
+
+.foto-produto.vazia { display: block; }
+
+.rodape-explicativo > summary {
+  cursor: pointer; font-size: .76rem; font-weight: 600;
+  color: var(--tinta-3); padding: 4px 0; list-style: none;
+}
+.rodape-explicativo > summary::-webkit-details-marker { display: none; }
+.rodape-explicativo > summary::before { content: '▸ '; }
+.rodape-explicativo[open] > summary::before { content: '▾ '; }
+.rodape-explicativo[open] { display: flex; flex-direction: column; gap: 6px; }
+
+/* ---------- grupos dos ajustes ---------- */
+
+.grupo-ajustes {
+  background: var(--carta); border: 1px solid var(--linha);
+  border-radius: 12px; overflow: hidden;
+}
+.grupo-ajustes > summary {
+  cursor: pointer; padding: 13px 14px; list-style: none;
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: .92rem; font-weight: 650; color: var(--tinta);
+}
+.grupo-ajustes > summary::-webkit-details-marker { display: none; }
+.grupo-ajustes > summary small { font-size: .74rem; font-weight: 400; color: var(--tinta-3); }
+.grupo-ajustes > summary::after {
+  content: '▾'; position: absolute; right: 28px; color: var(--tinta-3); font-size: .8rem;
+}
+.grupo-ajustes > summary { position: relative; }
+.grupo-ajustes[open] > summary { border-bottom: 1px solid var(--linha); }
+.grupo-ajustes[open] > summary::after { content: '▴'; }
+/* Os cartoes de dentro perdem a moldura: a moldura do grupo ja e a deles. */
+.grupo-ajustes .cartao { border: 0; border-radius: 0; }
+.grupo-ajustes .cartao + .cartao { border-top: 1px solid var(--linha); }

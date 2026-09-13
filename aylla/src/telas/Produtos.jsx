@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Campo, CampoTexto, Selecao, Aviso, Linha } from '../componentes/Campos.jsx'
 import {
   PRODUTO_VAZIO, salvarProduto, excluirProduto,
@@ -7,18 +7,53 @@ import {
 import { ORDEM_MARKETPLACES } from '../lib/marketplaces.js'
 import { ranquear, pontuarProduto, NOMES_PESOS } from '../lib/ranking.js'
 import RadarMercado from '../componentes/Radar.jsx'
-import Categorias from '../componentes/Categorias.jsx'
-import Descobrir from '../componentes/Descobrir.jsx'
-import Sugestoes from '../componentes/Sugestoes.jsx'
-import JanelaDeCompra from '../componentes/JanelaDeCompra.jsx'
 import CategoriaDoProduto from '../componentes/CategoriaDoProduto.jsx'
 import { reais, dolares, porcento, paraNumero, dataCurta } from '../lib/formato.js'
 
 const faixaDe = (r) => (r.nota === null ? 'sem' : r.completo ? 'completo' : 'parcial')
 
-export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCalcular, radar = { configurado: false, conectado: false } }) {
+/**
+ * Transforma uma sugestão em produto pronto para estudar.
+ *
+ * Mora aqui, e não na tela que sugere, porque é conhecimento sobre a FICHA
+ * do produto: quais campos existem e o que cada um espera. A aba Descobrir
+ * não precisa saber disso.
+ */
+export function rascunhoDaSugestao(s, leitura) {
+  const primeiro = leitura && leitura.cenarios && leitura.cenarios[0]
+  return {
+    ...PRODUTO_VAZIO,
+    // O nome exato da ficha, nunca o termo generico: e o que ela leva para
+    // o fornecedor e o que identifica o produto depois.
+    nome: s.nomeDoProduto || s.nome || s.termo || '',
+    categoria: s.categoria || '',
+    categoriaId: s.categoriaId || s.id || '',
+    precoVendaAlvo: s.precoMediano ? String(s.precoMediano) : '',
+    linkReferencia: s.ficha ? s.ficha.link : '',
+    tarifa: s.tarifa
+      ? { ...s.tarifa, precoConsultado: s.precoMediano, medidoEm: new Date().toISOString() }
+      : null,
+    observacoes: primeiro && !primeiro.impossivel
+      ? `Pagar no máximo US$ ${primeiro.precoMaximoUSD} para ${Math.round(primeiro.margem * 100)}% de margem.`
+      : '',
+    pesquisa: {
+      // A concorrencia que importa e quem disputa a ficha, nao o tamanho da
+      // categoria: e com esses que ela briga pela venda.
+      anunciosConcorrentes: s.vendedoresNaFicha ?? s.anuncios ?? '',
+      vendasDoLiderMes: '',
+      precoMin: s.precoMin ?? '',
+      precoMax: s.precoMax ?? '',
+      origem: s.produtoId ? `Ficha ${s.produtoId} no Mercado Livre` : 'Categoria no Mercado Livre',
+      medidoEm: new Date().toISOString(),
+    },
+  }
+}
+
+export default function Produtos({
+  produtos, fornecedores, config, aoMudar, aoCalcular, rascunho, aoConsumirRascunho,
+  radar = { configurado: false, conectado: false },
+}) {
   const [aberto, setAberto] = useState(null)      // produto em detalhe
-  const [categoriaAlvo, setCategoriaAlvo] = useState(null) // vinda da descoberta
   const [editando, setEditando] = useState(null)  // produto em formulário
   const ranqueados = useMemo(
     () => ranquear({ produtos, fornecedores, config }),
@@ -26,6 +61,11 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
   )
 
   const atualizar = (lista) => { aoMudar(lista); return lista }
+
+  // Chegou uma sugestao de outra aba: abre o formulario com ela.
+  useEffect(() => {
+    if (rascunho) { setEditando(rascunho); aoConsumirRascunho && aoConsumirRascunho() }
+  }, [rascunho])
 
   if (editando) {
     return <Formulario
@@ -72,7 +112,8 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
         <section className="cartao">
           <p className="vazio">
             Nenhum produto ainda.<br /><br />
-            Não sabe por onde começar? A árvore abaixo mostra onde tem menos gente disputando.
+            Em <b>Descobrir</b> o aplicativo mostra o que está em alta, quantos vendedores
+            disputam cada ficha e quanto você pode pagar no fornecedor.
           </p>
         </section>
       ) : null}
@@ -80,59 +121,6 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
       {/* Antes dos produtos, porque no comeco nao ha produto nenhum: a
           primeira pergunta dela nao e "quanto rende este" e sim "o que
           vender". */}
-      {/* Antes das sugestoes: nao adianta achar o produto certo e descobrir
-          depois que o prazo para a proxima data ja venceu. */}
-      <JanelaDeCompra fornecedores={fornecedores} />
-
-      {/* Primeiro as sugestoes prontas, porque foi isso que ela pediu:
-          produtos com numeros, nao uma caixa de busca. A descoberta e a
-          arvore ficam abaixo, para quando ela quiser procurar por conta. */}
-      <Sugestoes
-        config={config}
-        aoCadastrar={(s, leitura) => setEditando({
-          ...PRODUTO_VAZIO,
-          // O nome exato da ficha, nao o termo generico: e o que ela vai
-          // levar para o fornecedor e o que identifica o produto depois.
-          nome: s.nomeDoProduto || s.termo,
-          categoria: s.categoria,
-          categoriaId: s.categoriaId,
-          precoVendaAlvo: s.precoMediano ? String(s.precoMediano) : '',
-          tarifa: s.tarifa ? { ...s.tarifa, precoConsultado: s.precoMediano, medidoEm: new Date().toISOString() } : null,
-          linkReferencia: s.ficha ? s.ficha.link : '',
-          observacoes: leitura && leitura.cenarios[0] && !leitura.cenarios[0].impossivel
-            ? `Pagar no máximo US$ ${leitura.cenarios[0].precoMaximoUSD} para ${Math.round(leitura.cenarios[0].margem * 100)}% de margem.`
-            : '',
-          pesquisa: {
-            // A concorrencia que importa e quem disputa a ficha, nao o
-            // tamanho da categoria: e com esses que ela briga pela venda.
-            anunciosConcorrentes: s.vendedoresNaFicha,
-            // Visitas nao sao vendas, e o campo e de vendas. Fica vazio.
-            vendasDoLiderMes: '',
-            precoMin: s.precoMin,
-            precoMax: s.precoMax,
-            origem: `${s.produtoId} — ${s.vendedoresNaFicha} vendedores disputam a ficha`,
-            medidoEm: new Date().toISOString(),
-          },
-        })}
-      />
-
-      <Descobrir aoAbrirCategoria={setCategoriaAlvo} />
-
-      <Categorias
-        abrirId={categoriaAlvo}
-        aoEscolher={(cat) => setEditando({
-          ...PRODUTO_VAZIO,
-          categoria: cat.nome,
-          categoriaId: cat.id,
-          observacoes: `${cat.anuncios.toLocaleString('pt-BR')} anúncios concorrentes nesta categoria (${cat.id}).`,
-          pesquisa: {
-            anunciosConcorrentes: cat.anuncios,
-            origem: `Categoria ${cat.nome} no Mercado Livre`,
-            medidoEm: new Date().toISOString(),
-          },
-        })}
-      />
-
       <div className="lista-cartoes">
         {ranqueados.map((r, i) => {
           const anterior = ranqueados[i - 1]

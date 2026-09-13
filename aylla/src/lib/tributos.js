@@ -97,9 +97,3 @@ export function calcularImportacao(entrada) {
     ].filter((l) => !(l.ocultarSeZero && !l.usd)),
   }
 }
-
-/** Quanto do preco final e imposto. Util para ela enxergar o peso da carga. */
-export function pesoTributario(resultado) {
-  if (!resultado.valorAduaneiroUSD) return 0
-  return (resultado.iiUSD + resultado.icmsUSD) / resultado.valorAduaneiroUSD
-}
