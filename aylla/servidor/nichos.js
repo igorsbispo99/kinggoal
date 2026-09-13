@@ -124,9 +124,16 @@ export function explicarEntrada({ nota, anuncios, visitasPorAnuncio, lojasOficia
  *                              com quarenta, mesmo com a mesma atenção.
  *   topo sem loja oficial .... marca com loja própria na ficha ganha a
  *                              caixa de compra quase sempre.
+ *   com quem se disputa ...... dois hobistas e dois MercadoLíder Gold dão
+ *                              o mesmo número em "quantos disputam" e são
+ *                              mercados opostos.
+ *   peso do frete ............ acima de R$ 79 o frete é do vendedor. Frete
+ *                              de R$ 40 num produto de R$ 90 não é detalhe,
+ *                              é o negócio inteiro.
  */
 export function notaDoNicho({
   visitasPorAnuncio, vendedores, temLojaOficial, fracaoOficial, anunciosOficiais, tendencia,
+  vendedoresConhecidos = null, frete = null, precoMediano = null, freteGratisAcimaDe = 79,
 }) {
   const vpv = numeroOuNulo(visitasPorAnuncio)
   const n = numeroOuNulo(vendedores)
@@ -172,11 +179,49 @@ export function notaDoNicho({
       : tendencia === 'caindo' ? 15
         : null
 
+  // COM QUEM se disputa, e nao so quantos.
+  //
+  // "2 vendedores" tirava nota alta em "quantos disputam" sem que o app
+  // fizesse ideia de quem eram. Dois hobistas e dois MercadoLider Gold com
+  // trinta mil vendas cada sao o mesmo 2 na tela e negocios opostos na
+  // pratica: no primeiro caso ela entra por anuncio melhor, no segundo ela
+  // entra para perder dinheiro.
+  //
+  // /users/{id} responde a reputacao, entao isto agora e medido — numa
+  // amostra de ate dois vendedores da ficha, que e o que cabe no orcamento
+  // de cinquenta subrequisicoes do Worker gratuito.
+  const perfis = Array.isArray(vendedoresConhecidos) ? vendedoresConhecidos.filter(Boolean) : []
+  const porQuemDisputa = perfis.length
+    ? Math.round((1 - (perfis.filter((v) => v.profissional).length / perfis.length)) * 85 + 15)
+    : null
+
+  // O peso do frete no preco.
+  //
+  // Acima do limite de frete gratis quem paga o frete e o vendedor. Um
+  // frete de R$ 40 num produto que vende a R$ 90 come 44% do preco antes
+  // da comissao, do imposto e do custo da mercadoria — nao ha margem que
+  // sobreviva, por melhor que seja a procura.
+  //
+  // Abaixo do limite o frete e do comprador: o sinal sai da conta em vez
+  // de entrar como bom, porque ali ele nao mede folga dela.
+  const custoFrete = frete && frete.maisBarata ? numeroOuNulo(frete.maisBarata.custoReal) : null
+  const preco = numeroOuNulo(precoMediano)
+  const limite = numeroOuNulo(freteGratisAcimaDe)
+  const pesoDoFrete = custoFrete !== null && preco !== null && preco > 0
+    && (limite === null || preco >= limite)
+    ? custoFrete / preco
+    : null
+  // 10% do preco e frete leve; 45% nao fecha de jeito nenhum.
+  const porFrete = pesoDoFrete === null ? null
+    : Math.round(Math.min(100, Math.max(0, (1 - (pesoDoFrete - 0.1) / 0.35) * 100)))
+
   const sinais = [
-    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.4 },
-    { nome: 'para onde a procura vai', valor: porTendencia, peso: 0.2 },
-    { nome: 'quantos disputam', valor: fichaDeMarca ? null : porConcorrentes, peso: 0.2 },
-    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.2 },
+    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.34 },
+    { nome: 'para onde a procura vai', valor: porTendencia, peso: 0.17 },
+    { nome: 'quantos disputam', valor: fichaDeMarca ? null : porConcorrentes, peso: 0.17 },
+    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.17 },
+    { nome: 'com quem se disputa', valor: fichaDeMarca ? null : porQuemDisputa, peso: 0.1 },
+    { nome: 'peso do frete no preço', valor: porFrete, peso: 0.05 },
   ]
   const presentes = sinais.filter((s) => s.valor !== null)
   const faltando = sinais.filter((s) => s.valor === null).map((s) => s.nome)
@@ -214,12 +259,17 @@ export function notaDoNicho({
     cobertura: Math.round(soma * 100) / 100,
     faltando,
     emQueda: tendencia === 'caindo',
-    motivos: { porAtencao, porTendencia, porConcorrentes, porMarca },
+    temProfissional: perfis.length ? perfis.some((v) => v.profissional) : null,
+    pesoDoFrete,
+    motivos: { porAtencao, porTendencia, porConcorrentes, porMarca, porQuemDisputa, porFrete },
   }
 }
 
 /** A frase do nicho. Números sem porquê não ensinam ninguém a escolher. */
-export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, fichaDeMarca, semProcura, emQueda }) {
+export function explicarNicho({
+  nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, fichaDeMarca,
+  semProcura, emQueda, vendedoresConhecidos = null, pesoDoFrete = null,
+}) {
   const pedacos = []
   if (Number.isFinite(visitasPorAnuncio)) {
     pedacos.push(`${Math.round(visitasPorAnuncio).toLocaleString('pt-BR')} visitas por anúncio em 30 dias`)
@@ -234,6 +284,20 @@ export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vended
     pedacos.push('e todos são loja oficial: a ficha é da marca dona do produto')
   } else if (temLojaOficial) {
     pedacos.push('há loja oficial entre eles, e ela costuma levar a caixa de compra')
+  }
+
+  // Quem sao, com nome. O numero sozinho ja estava na frase; o que faltava
+  // era o porte de quem esta do outro lado.
+  const perfis = Array.isArray(vendedoresConhecidos) ? vendedoresConhecidos.filter(Boolean) : []
+  const fortes = perfis.filter((v) => v.profissional)
+  if (fortes.length) {
+    pedacos.push(`${fortes[0].nome || 'um deles'} é ${fortes[0].porte}`)
+  } else if (perfis.length) {
+    pedacos.push('nenhum MercadoLíder entre os que checamos')
+  }
+
+  if (Number.isFinite(pesoDoFrete) && pesoDoFrete >= 0.25) {
+    pedacos.push(`o frete come ${Math.round(pesoDoFrete * 100)}% do preço, e acima de R$ 79 ele é seu`)
   }
 
   // Sem procura medida nao se emite veredito. Dizer "bom lugar para entrar"

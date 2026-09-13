@@ -30,7 +30,9 @@ test('sem visitas medidas, a nota sai parcial e não zerada', async () => {
   const { notaDoNicho } = await import('../servidor/nichos.js')
   const r = notaDoNicho({ visitasPorAnuncio: null, vendedores: 2, temLojaOficial: false })
   assert.equal(r.completo, false)
-  assert.deepEqual(r.faltando, ['atenção por anúncio', 'para onde a procura vai'])
+  assert.deepEqual(r.faltando, [
+    'atenção por anúncio', 'para onde a procura vai', 'com quem se disputa', 'peso do frete no preço',
+  ])
   assert.ok(r.nota > 0, 'o que foi medido continua valendo')
 })
 
@@ -161,4 +163,76 @@ test('uma oficial entre vinte e sete continua sendo só concorrência', async ()
   })
   assert.equal(r.fichaDeMarca, false)
   assert.ok(r.nota > 60)
+})
+
+
+test('com quem se disputa pesa, não só quantos', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  // "2 vendedores" tirava nota alta sem que o app soubesse quem eram.
+  // /users/{id} responde a reputação, então agora isso é medido.
+  const base = { visitasPorAnuncio: 900, vendedores: 2, temLojaOficial: false, tendencia: 'estável' }
+  const fracos = notaDoNicho({
+    ...base,
+    vendedoresConhecidos: [
+      { id: 1, nome: 'fulano', porte: 'vendedor pequeno', profissional: false },
+      { id: 2, nome: 'sicrano', porte: 'vendedor pequeno', profissional: false },
+    ],
+  })
+  const fortes = notaDoNicho({
+    ...base,
+    vendedoresConhecidos: [
+      { id: 1, nome: 'LHF ECOMMERCE', porte: 'MercadoLíder Gold', profissional: true },
+      { id: 2, nome: 'OUTRA LOJA', porte: 'MercadoLíder Platinum', profissional: true },
+    ],
+  })
+  assert.ok(fracos.nota > fortes.nota, 'dois hobistas não são dois MercadoLíder Gold')
+  assert.equal(fortes.temProfissional, true)
+  assert.equal(fracos.temProfissional, false)
+})
+
+test('sem saber quem são os vendedores, o sinal sai da conta em vez de virar zero', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  const base = { visitasPorAnuncio: 900, vendedores: 2, temLojaOficial: false, tendencia: 'estável' }
+  const semSaber = notaDoNicho(base)
+  const fracos = notaDoNicho({
+    ...base,
+    vendedoresConhecidos: [{ id: 1, porte: 'vendedor pequeno', profissional: false }],
+  })
+  assert.equal(semSaber.temProfissional, null)
+  assert.ok(semSaber.faltando.includes('com quem se disputa'))
+  // Não saber não pode custar nota: o sinal ausente sai e os pesos se
+  // redistribuem. Se entrasse como zero, todo produto sem medição de
+  // vendedor apareceria pior do que é.
+  assert.ok(Math.abs(semSaber.nota - fracos.nota) <= 2)
+})
+
+test('frete que come o preço derruba a nota — e só acima do limite de frete grátis', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  const base = { visitasPorAnuncio: 900, vendedores: 3, temLojaOficial: false, tendencia: 'estável' }
+  const leve = notaDoNicho({ ...base, precoMediano: 400, frete: { maisBarata: { custoReal: 30 } } })
+  const pesado = notaDoNicho({ ...base, precoMediano: 90, frete: { maisBarata: { custoReal: 40 } } })
+  assert.ok(leve.nota > pesado.nota, 'R$ 40 de frete num produto de R$ 90 é o negócio inteiro')
+  assert.ok(pesado.pesoDoFrete > 0.4)
+
+  // Abaixo de R$ 79 quem paga o frete é o comprador: o sinal sai da conta
+  // em vez de entrar como ruim, porque ali ele não mede folga dela.
+  const barato = notaDoNicho({ ...base, precoMediano: 60, frete: { maisBarata: { custoReal: 40 } } })
+  assert.equal(barato.pesoDoFrete, null)
+  assert.ok(barato.faltando.includes('peso do frete no preço'))
+})
+
+test('a frase diz quem é o concorrente, com nome e porte', async () => {
+  const { explicarNicho } = await import('../servidor/nichos.js')
+  const frase = explicarNicho({
+    nota: 70, visitasPorAnuncio: 900, anunciosMedidos: 3, vendedores: 2, temLojaOficial: false,
+    vendedoresConhecidos: [{ id: 1, nome: 'LHF ECOMMERCE', porte: 'MercadoLíder Gold', profissional: true }],
+  })
+  assert.ok(frase.includes('LHF ECOMMERCE'), 'o nome do concorrente aparece')
+  assert.ok(frase.includes('MercadoLíder Gold'))
+
+  const semForte = explicarNicho({
+    nota: 70, visitasPorAnuncio: 900, anunciosMedidos: 3, vendedores: 2, temLojaOficial: false,
+    vendedoresConhecidos: [{ id: 1, nome: 'fulano', porte: 'vendedor pequeno', profissional: false }],
+  })
+  assert.ok(semForte.includes('nenhum MercadoLíder'))
 })

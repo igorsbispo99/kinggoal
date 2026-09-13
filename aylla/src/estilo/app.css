@@ -645,6 +645,21 @@ details.dobra > div { padding-top: 10px; }
 
 .foto-produto.vazia { display: block; }
 
+/* ---------- quem ja vende a ficha ---------- */
+
+.concorrentes { display: flex; flex-direction: column; gap: 6px; }
+.rotulo-bloco {
+  margin: 0; font-size: .66rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--tinta-3);
+}
+.concorrente {
+  display: flex; flex-direction: column; gap: 1px;
+  border-left: 2px solid var(--linha-forte); padding: 2px 0 2px 9px;
+}
+.concorrente.forte { border-left-color: var(--negativo); }
+.concorrente b { font-size: .82rem; font-weight: 600; }
+.concorrente small { font-size: .72rem; color: var(--tinta-3); }
+
 .rodape-explicativo > summary {
   cursor: pointer; font-size: .76rem; font-weight: 600;
   color: var(--tinta-3); padding: 4px 0; list-style: none;

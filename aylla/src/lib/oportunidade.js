@@ -24,13 +24,13 @@ import { calcularImportacao } from './tributos.js'
  * o frete grátis do Mercado Livre acima de R$ 79, o teto da Shopee. Fórmula
  * fechada erraria justamente nos degraus.
  */
-export function custoMaximoBRL({ mp, tipoId, precoVenda, margemAlvo, comissaoMedida = null }) {
+export function custoMaximoBRL({ mp, tipoId, precoVenda, margemAlvo, comissaoMedida = null, freteMedido = null }) {
   const preco = Number(precoVenda) || 0
   const alvo = Number(margemAlvo) || 0
   if (preco <= 0 || alvo >= 1) return null
 
   const margemCom = (custo) =>
-    calcularVenda({ mp, tipoId, preco, custoUnitario: custo, comissaoMedida }).margem
+    calcularVenda({ mp, tipoId, preco, custoUnitario: custo, comissaoMedida, freteMedido }).margem
 
   // Com custo zero a margem é a maior possível. Se nem assim chega no alvo,
   // não existe preço de compra que salve: o produto não fecha nesse preço.
@@ -95,7 +95,7 @@ export function precoMaximoUSD({ custoMaxBRL, quantidade = 1, freteUSD = 0, conf
  * ir se o produto for muito bom". Uma sozinha esconde a outra metade.
  */
 export function lerOportunidade({
-  mp, tipoId, precoVenda, comissaoMedida = null, config,
+  mp, tipoId, precoVenda, comissaoMedida = null, freteMedido = null, config,
   quantidade = 10, freteUSD = 0,
   margens = [0.3, 0.2],
 }) {
@@ -103,11 +103,11 @@ export function lerOportunidade({
   if (preco <= 0) return null
 
   const cenarios = margens.map((margem) => {
-    const custoMax = custoMaximoBRL({ mp, tipoId, precoVenda: preco, margemAlvo: margem, comissaoMedida })
+    const custoMax = custoMaximoBRL({ mp, tipoId, precoVenda: preco, margemAlvo: margem, comissaoMedida, freteMedido })
     const usdMax = custoMax === null ? null : precoMaximoUSD({ custoMaxBRL: custoMax, quantidade, freteUSD, config })
     const venda = custoMax === null
       ? null
-      : calcularVenda({ mp, tipoId, preco, custoUnitario: custoMax, comissaoMedida })
+      : calcularVenda({ mp, tipoId, preco, custoUnitario: custoMax, comissaoMedida, freteMedido })
     return {
       margem,
       custoMaximoBRL: custoMax,

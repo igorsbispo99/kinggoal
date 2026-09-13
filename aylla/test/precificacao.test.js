@@ -112,6 +112,59 @@ test('ausência de medição nunca vira comissão zero', () => {
   }
 })
 
+test('frete medido manda sobre o chute de R$ 24', () => {
+  // freteEstimado: 24 foi um numero que eu chutei no primeiro dia. O Mercado
+  // Livre responde o frete real daquele produto em /items/{id}/shipping_options,
+  // e frete e o que mais come margem em produto leve e barato.
+  const mp = MARKETPLACES.mercadolivre
+  const chute = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60 })
+  const real = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, freteMedido: 38.4 })
+
+  assert.equal(chute.custos.frete, 24, 'sem medição, vale o estimado da tabela')
+  assert.ok(perto(real.custos.frete, 38.4), 'com medição, vale o número do Mercado Livre')
+  assert.ok(real.lucroUnitario < chute.lucroUnitario, 'frete maior tira lucro')
+})
+
+test('frete ausente cai no estimado; frete zero medido é zero de verdade', () => {
+  // A MESMA armadilha de sempre: Number(null) é 0, e 0 passa em ">= 0". Sem
+  // separar ausência de zero, toda venda sem medição ficava com frete zero —
+  // e toda venda parecia mais lucrativa do que é.
+  //
+  // O outro lado importa igual: quando o Mercado Livre responde que o frete
+  // daquele anúncio custa nada (vendedor com frete grátis bancado pelo ML),
+  // zero é medição, não vazio, e não pode virar R$ 24.
+  const mp = MARKETPLACES.mercadolivre
+  for (const vazio of [null, undefined, '', NaN]) {
+    const v = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, freteMedido: vazio })
+    assert.equal(v.custos.frete, 24, `freteMedido = ${String(vazio)} tem que cair no estimado`)
+  }
+  const gratis = calcularVenda({ mp, tipoId: 'classico', preco: 200, custoUnitario: 60, freteMedido: 0 })
+  assert.equal(gratis.custos.frete, 0, 'zero medido é uma afirmação, não uma ausência')
+})
+
+test('abaixo do limite de frete grátis o frete medido não é cobrado dela', () => {
+  // Abaixo de R$ 79 quem paga o frete é o comprador. O frete medido existe
+  // (o app mostra), mas não pode entrar no custo dela.
+  const mp = MARKETPLACES.mercadolivre
+  const v = calcularVenda({ mp, tipoId: 'classico', preco: 60, custoUnitario: 20, freteMedido: 38.4 })
+  assert.equal(v.custos.frete, 0)
+  assert.ok(v.custos.fixo > 0, 'mas aí entra o custo fixo por item')
+})
+
+test('o preço alvo e o teto de compra enxergam o frete medido', () => {
+  // Se o frete medido parasse em custosDaVenda e não chegasse à bissecção, o
+  // preço alvo continuaria calculado sobre o chute — e ela compraria caro
+  // demais achando que fechava a margem.
+  const mp = MARKETPLACES.mercadolivre
+  const base = { mp, tipoId: 'classico', custoUnitario: 50, margemAlvo: 0.3 }
+  const comChute = precoParaMargem(base)
+  const comFreteCaro = precoParaMargem({ ...base, freteMedido: 45 })
+  assert.ok(comFreteCaro > comChute, 'frete real maior exige preço maior para a mesma margem')
+
+  const conferido = calcularVenda({ ...base, preco: comFreteCaro, freteMedido: 45 })
+  assert.ok(conferido.margem >= 0.3 - 0.001, 'a bissecção entrega a margem pedida com o frete real')
+})
+
 test('o preço para a margem alvo respeita a comissão medida', () => {
   const mp = MARKETPLACES.mercadolivre
   const base = { mp, tipoId: 'classico', custoUnitario: 50, margemAlvo: 0.3 }

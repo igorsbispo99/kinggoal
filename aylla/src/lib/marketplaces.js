@@ -59,6 +59,21 @@ export const MARKETPLACES = {
 
 export const ORDEM_MARKETPLACES = ['mercadolivre', 'amazon', 'shopee']
 
+/**
+ * Um numero ausente nunca e zero.
+ *
+ * Zero e uma afirmacao — "o frete custa nada", "a comissao e nada". Ausencia
+ * e outra coisa: ninguem mediu. `Number(null)` e `0`, e `0` passa em
+ * `Number.isFinite` e em `>= 0`, entao todo teste de finitude aceita o vazio
+ * como se fosse medicao. E o erro sempre cai para o mesmo lado: faz o
+ * negocio parecer melhor do que e.
+ *
+ * Esta armadilha pegou este projeto tres vezes — ranking com campo em
+ * branco, comissao medida, frete medido. Por isso virou funcao com nome:
+ * esta e a unica forma de perguntar "veio vazio?".
+ */
+export const ausente = (v) => v === null || v === undefined || v === '' || Number.isNaN(Number(v))
+
 function custoFixoDoPreco(mp, preco, tipoId) {
   if (mp.custoFixoPorPlano && tipoId in mp.custoFixoPorPlano) {
     return mp.custoFixoPorPlano[tipoId]
@@ -83,13 +98,11 @@ function custoFixoDoPreco(mp, preco, tipoId) {
  * das faixas daqui porque ele depende do preço, não da categoria — é a
  * mesma escada para o site todo.
  */
-export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null } = {}) {
+export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null, freteMedido = null } = {}) {
   const tipo = (mp.tipos || []).find((t) => t.id === tipoId) || (mp.tipos || [])[0]
-  // Number(null) e zero e Number.isFinite(0) e verdadeiro: testar so a
-  // finitude faria a comissao virar 0% sempre que nao houvesse medicao.
-  const medida = comissaoMedida === null || comissaoMedida === undefined || comissaoMedida === ''
-    ? null
-    : Number(comissaoMedida)
+  // Sem ausente() aqui a comissao viraria 0% sempre que nao houvesse medicao.
+  const medida = ausente(comissaoMedida) ? null : Number(comissaoMedida)
+
   // Ultima defesa contra ponto percentual chegando como fracao. A conversao
   // certa acontece na origem, mas uma comissao acima de 1 aqui so pode ser
   // engano de unidade — e o estrago (todo produto virando inviavel) e grande
@@ -100,8 +113,16 @@ export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null } = {})
   const bruta = preco * percentual
   const comissao = mp.tetoComissao ? Math.min(bruta, mp.tetoComissao) : bruta
   const fixo = custoFixoDoPreco(mp, preco, tipoId)
+  // O frete medido manda sobre o estimado.
+  //
+  // `freteEstimado` e R$ 24 desde o primeiro dia — numero que eu chutei. O
+  // Mercado Livre responde o frete real daquele produto por CEP em
+  // /items/{id}/shipping_options, e frete e o que mais come margem em
+  // produto leve e barato: o chute contaminava margem, preco alvo, ponto
+  // de equilibrio e ranking de uma vez.
+  const porUnidade = ausente(freteMedido) ? (mp.freteEstimado || 0) : Math.max(0, Number(freteMedido))
   const frete = mp.freteGratisAcimaDe
-    ? (preco >= mp.freteGratisAcimaDe ? (mp.freteEstimado || 0) : 0)
-    : (mp.freteEstimado || 0)
+    ? (preco >= mp.freteGratisAcimaDe ? porUnidade : 0)
+    : porUnidade
   return { comissao, fixo, frete, total: comissao + fixo + frete }
 }

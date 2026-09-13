@@ -283,7 +283,14 @@ export async function depurarFunil(env, { token, termo = null }) {
 // erro claro — a execucao simplesmente morre no meio. Por isso a segunda
 // via das visitas tem limite de uma tentativa: sem ele o bloco de visitas
 // ia a oito e o total passava de cinquenta.
-export async function montarSugestoes(env, { token, quantas = 4 }) {
+// Tres sugestoes, nao quatro. Cada uma ganhou quem sao os concorrentes
+// (duas requisicoes) e o frete real (uma), e o teto do Worker gratuito e
+// cinquenta subrequisicoes por execucao: 3 x 14 + 1 = 43.
+//
+// Menos e mais fundo e a troca certa. Saber que os dois concorrentes da
+// ficha sao MercadoLider Gold vale mais que uma quarta sugestao sobre a
+// qual nao se sabe nada.
+export async function montarSugestoes(env, { token, quantas = 3 }) {
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
   const descartadas = []
@@ -314,7 +321,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
     // com dois vendedores e outro com quarenta, e esses dois sao negocios
     // diferentes.
     let achados
-    try { achados = await nichosDaCategoria(env, { categoria: cat.id, token, quantosProdutos: 2 }) } catch (e) {
+    try { achados = await nichosDaCategoria(env, { categoria: cat.id, token, quantosProdutos: 2, quantosVendedores: 2, comFrete: true }) } catch (e) {
       descartadas.push({ termo: t.termo, categoria: cat.nome, porque: `mais vendidos falhou: ${e.message}` })
       continue
     }
@@ -333,6 +340,12 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       vendedores: melhor.vendedores,
       temLojaOficial: melhor.temLojaOficial,
       fracaoOficial: melhor.fracaoOficial,
+      vendedoresConhecidos: melhor.vendedoresConhecidos || null,
+      frete: melhor.frete || null,
+      // O peso do frete so faz sentido contra o preco que a ficha pratica:
+      // R$ 40 de frete num produto de R$ 500 e ruido, no de R$ 90 e o
+      // negocio inteiro.
+      precoMediano: melhor.precoMediano,
       anunciosOficiais: melhor.anunciosOficiais,
       tendencia: melhor.serie ? melhor.serie.tendencia : null,
     })
@@ -406,6 +419,9 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       anunciosMedidos: melhor.anunciosMedidos,
       temLojaOficial: melhor.temLojaOficial,
       fracaoOficial: melhor.fracaoOficial,
+      vendedoresConhecidos: melhor.vendedoresConhecidos || null,
+      temProfissional: melhor.temProfissional ?? null,
+      frete: melhor.frete || null,
       descontoMedio: melhor.descontoMedio,
       quantosDescontam: melhor.quantosDescontam,
       fracaoComFreteGratis: melhor.fracaoComFreteGratis,
@@ -425,6 +441,8 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
         temLojaOficial: melhor.temLojaOficial,
         fichaDeMarca: nota.fichaDeMarca,
         emQueda: nota.emQueda,
+        vendedoresConhecidos: melhor.vendedoresConhecidos || null,
+        pesoDoFrete: nota.pesoDoFrete,
       }),
       // Os outros produtos medidos, para ela comparar dentro da categoria.
       alternativas: achados.nichos.slice(1, 3).map((n) => ({

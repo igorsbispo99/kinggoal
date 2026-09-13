@@ -283,6 +283,93 @@ export async function fichaDoProduto(env, { produtoId, token }) {
 }
 
 /**
+ * Quem é o concorrente.
+ *
+ * Até aqui o aplicativo dizia "2 vendedores disputam esta ficha" e não
+ * fazia ideia de quem eram. Dois hobistas e dois MercadoLíder Gold são
+ * mercados opostos com o mesmo número na tela.
+ *
+ * Medido: /users/{id} responde 200 e traz seller_reputation com o nível,
+ * o status de MercadoLíder e as transações. /users/{id}/reputation dá 404
+ * — a reputação vem dentro do usuário — e buscar os anúncios de outro
+ * vendedor é proibido ("Searching another user items is restricted").
+ */
+async function quemEOVendedor(id, token) {
+  const r = await pegar(`/users/${id}`, token, { cacheSegundos: 86400 })
+  if (!r.ok || !r.json) return null
+  const j = r.json
+  const rep = j.seller_reputation || {}
+  const t = rep.transactions || {}
+
+  // "5_green" e o topo da escala de cores do Mercado Livre; power_seller
+  // gold/platinum e MercadoLider. Traduzido, porque "5_green" nao diz nada
+  // para quem esta comecando.
+  const nivel = Number(String(rep.level_id || '').split('_')[0]) || null
+  const lider = rep.power_seller_status || null
+
+  return {
+    id: j.id,
+    nome: j.nickname || null,
+    // "brand" quer dizer loja com marca propria cadastrada: outro porte.
+    tipo: j.user_type || null,
+    cidade: j.address ? [j.address.city, j.address.state].filter(Boolean).join('/') : null,
+    link: j.permalink || null,
+    nivel,
+    lider,
+    vendasCompletas: Number(t.completed) || null,
+    // O peso do concorrente numa palavra so.
+    porte: lider === 'platinum' ? 'MercadoLíder Platinum'
+      : lider === 'gold' ? 'MercadoLíder Gold'
+        : lider === 'silver' ? 'MercadoLíder'
+          : nivel === 5 ? 'vendedor consolidado'
+            : Number(t.completed) > 500 ? 'vendedor ativo'
+              : 'vendedor pequeno',
+    // Profissional de verdade e o que ela precisa saber para decidir se
+    // entra ou procura outra ficha.
+    profissional: Boolean(lider) || nivel === 5,
+  }
+}
+
+/**
+ * O frete de verdade, pelo CEP.
+ *
+ * A calculadora usa R$ 24 fixos desde o primeiro dia — número que eu
+ * chutei. Frete é o que mais come margem em produto leve e barato, então
+ * um chute ali contamina margem, preço alvo, ponto de equilíbrio e
+ * ranking.
+ *
+ * Medido: /items/{id}/shipping_options?zip_code= responde 200 com as
+ * opções reais. É o frete daquele anúncio, da origem daquele vendedor —
+ * não é o dela. Mas é o mesmo produto, o mesmo peso e a mesma
+ * transportadora, e isso é muito melhor que um número inventado.
+ */
+async function freteReal(anuncioId, token, cep = '01001000') {
+  const r = await pegar(`/items/${anuncioId}/shipping_options?zip_code=${cep}`, token, { cacheSegundos: 86400 })
+  if (!r.ok || !r.json || !Array.isArray(r.json.options) || !r.json.options.length) return null
+
+  const opcoes = r.json.options.map((o) => ({
+    nome: o.name || o.display_name || null,
+    // `cost` e o que o comprador paga (zero quando o frete e gratis);
+    // `list_cost` e quanto custa de fato. Para a margem dela importa o
+    // segundo, porque no frete gratis quem paga e o vendedor.
+    custoParaOComprador: Number(o.cost),
+    custoReal: Number(o.list_cost ?? o.cost),
+    prazoDias: o.estimated_delivery_time ? Math.round((o.estimated_delivery_time.shipping || 0) / 24) : null,
+  })).filter((o) => Number.isFinite(o.custoReal))
+
+  if (!opcoes.length) return null
+  const maisBarata = opcoes.reduce((m, o) => (o.custoReal < m.custoReal ? o : m), opcoes[0])
+  return {
+    cep,
+    maisBarata,
+    // Se alguma opcao sai de graca para o comprador, o vendedor esta
+    // bancando — e ela vai precisar bancar tambem para competir.
+    alguemDaGratis: opcoes.some((o) => o.custoParaOComprador === 0),
+    opcoes: opcoes.slice(0, 3),
+  }
+}
+
+/**
  * Os produtos de catálogo de uma categoria, cada um com quantos vendedores
  * disputam ele e quanta atenção ele recebe.
  *
@@ -432,7 +519,9 @@ async function anunciosDoProduto(id, token) {
  *
  * Custa uma requisição por produto mais uma para as visitas de todos.
  */
-export async function nichosDaCategoria(env, { categoria, token, quantosProdutos = 3 }) {
+export async function nichosDaCategoria(env, {
+  categoria, token, quantosProdutos = 3, quantosVendedores = 0, comFrete = false,
+}) {
   const r = await pegar(`/highlights/${SITE}/category/${categoria}`, token, { cacheSegundos: 3600 })
   if (!r.ok) {
     const erro = new Error(`O Mercado Livre respondeu ${r.status} para os mais vendidos.`)
@@ -489,6 +578,27 @@ export async function nichosDaCategoria(env, { categoria, token, quantosProdutos
   }
 
   nichos.sort((a, b) => (b.visitasPorAnuncio ?? -1) - (a.visitasPorAnuncio ?? -1))
+
+  // Quem sao os concorrentes e quanto custa o frete: so do melhor nicho, e
+  // so quando pedido. Cada vendedor custa uma requisicao e o Worker
+  // gratuito faz cinquenta por execucao.
+  const melhor = nichos[0]
+  if (melhor) {
+    if (quantosVendedores > 0) {
+      const ids = [...new Set(melhor.anuncios.map((a) => a.seller_id).filter(Boolean))].slice(0, quantosVendedores)
+      const perfis = []
+      for (const id of ids) {
+        const quem = await quemEOVendedor(id, token)
+        if (quem) perfis.push(quem)
+      }
+      melhor.vendedoresConhecidos = perfis
+      melhor.temProfissional = perfis.some((v) => v.profissional)
+    }
+    if (comFrete && melhor.anuncios[0] && melhor.anuncios[0].id) {
+      melhor.frete = await freteReal(melhor.anuncios[0].id, token)
+    }
+  }
+
   return { nichos, semProdutos: false }
 }
 

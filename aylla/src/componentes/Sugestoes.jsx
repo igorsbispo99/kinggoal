@@ -62,14 +62,22 @@ export default function Sugestoes({ config, aoCadastrar }) {
 
       {Array.isArray(dados && dados.sugestoes) ? dados.sugestoes.map((s) => {
         const comissaoMedida = s.tarifa ? s.tarifa.percentual : null
+        // Frete medido daquele produto, quando o Mercado Livre respondeu.
+        const freteMedido = s.frete && s.frete.maisBarata ? s.frete.maisBarata.custoReal : null
         const leitura = lerOportunidade({
-          mp, tipoId, precoVenda: s.precoMediano, comissaoMedida, config, quantidade: 10, freteUSD: 0, margens,
+          mp, tipoId, precoVenda: s.precoMediano, comissaoMedida, freteMedido,
+          config, quantidade: 10, freteUSD: 0, margens,
         })
         const aberta = abertaId === s.produtoId
         const n = s.nota || {}
         const grave = (s.conformidade && s.conformidade.alertas || []).filter((a) => a.gravidade !== 'atencao')
         const alertasDeMudanca = s.alertas || []
         const conservador = leitura && leitura.cenarios && leitura.cenarios[0]
+        const vendedores = Array.isArray(s.vendedoresConhecidos) ? s.vendedoresConhecidos : []
+        // Um MercadoLider na ficha muda a decisao mais do que a contagem de
+        // vendedores: dois hobistas e dois Gold sao o mesmo numero na tela e
+        // mercados opostos na pratica.
+        const profissional = vendedores.find((v) => v && v.profissional)
 
         return (
           <div key={s.produtoId || s.termo} className="sugestao">
@@ -105,6 +113,7 @@ export default function Sugestoes({ config, aoCadastrar }) {
                         {s.vendedoresNaFicha} {s.vendedoresNaFicha === 1 ? 'vendedor' : 'vendedores'}
                       </span>
                     ) : null}
+                    {profissional ? <span className="selo ruim">{profissional.porte}</span> : null}
                     {grave.length ? <span className="selo ruim">{grave[0].orgao}</span> : null}
                   </span>
                 </span>
@@ -205,6 +214,16 @@ export default function Sugestoes({ config, aoCadastrar }) {
                       tom={s.descontoMedio >= 0.2 ? 'desconta' : undefined}
                     />
                   ) : null}
+                  {s.frete && s.frete.maisBarata ? (
+                    <Linha
+                      rotulo="Frete medido"
+                      detalhe={`${s.frete.maisBarata.nome || 'envio'} até São Paulo${
+                        s.frete.maisBarata.prazoDias ? `, ${s.frete.maisBarata.prazoDias} dias` : ''
+                      } — é este valor que entra na conta acima`}
+                      valor={reais(s.frete.maisBarata.custoReal)}
+                      tom={s.frete.maisBarata.custoReal > (mp.freteEstimado || 24) ? 'desconta' : undefined}
+                    />
+                  ) : null}
                   {s.fracaoComFreteGratis !== null && s.fracaoComFreteGratis !== undefined ? (
                     <Linha
                       rotulo="Já dão frete grátis"
@@ -224,6 +243,30 @@ export default function Sugestoes({ config, aoCadastrar }) {
                   {s.ficha && s.ficha.material ? <Linha rotulo="Material" valor={s.ficha.material} /> : null}
                 </div>
 
+                {vendedores.length ? (
+                  <div className="concorrentes">
+                    <p className="rotulo-bloco">Quem já vende esta ficha</p>
+                    {vendedores.map((v) => (
+                      <span key={v.id} className={`concorrente${v.profissional ? ' forte' : ''}`}>
+                        <b>{v.nome || `vendedor ${v.id}`}</b>
+                        <small>
+                          {v.porte}
+                          {v.vendasCompletas ? ` · ${v.vendasCompletas.toLocaleString('pt-BR')} vendas` : ''}
+                          {v.cidade ? ` · ${v.cidade}` : ''}
+                        </small>
+                      </span>
+                    ))}
+                    {profissional ? (
+                      <p className="dica">
+                        Tem vendedor profissional na disputa. Dá para entrar, mas não por preço:
+                        precisa de anúncio melhor, foto melhor ou variação que eles não têm.
+                      </p>
+                    ) : (
+                      <p className="dica">Nenhum MercadoLíder na ficha — é uma disputa de igual para igual.</p>
+                    )}
+                  </div>
+                ) : null}
+
                 {leitura && leitura.cenarios ? (
                   <div className="cenarios">
                     {leitura.cenarios.map((c) => (
@@ -240,6 +283,14 @@ export default function Sugestoes({ config, aoCadastrar }) {
                       </div>
                     ))}
                   </div>
+                ) : null}
+
+                {freteMedido === null ? (
+                  <p className="dica">
+                    Frete estimado em {reais(mp.freteEstimado || 0)}: o Mercado Livre não respondeu o
+                    frete deste anúncio. Em produto leve e barato o frete decide a margem — confira
+                    antes de comprar.
+                  </p>
                 ) : null}
 
                 {comissaoMedida === null ? (
