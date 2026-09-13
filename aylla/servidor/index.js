@@ -15,6 +15,7 @@ import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
 import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
 import { estressar } from './estresse.js'
+import { sondar } from './sonda.js'
 import { avaliarConformidade } from './conformidade.js'
 import { criarCofre, lerCofre, gravarCofre } from './cofre.js'
 import { comecouExecucao, terminouExecucao, ultimasExecucoes, resumoDoHistorico } from './historico.js'
@@ -321,6 +322,20 @@ export default {
       } catch (falha) {
         await terminouExecucao(env, id, 'falhou', falha.message)
         return Response.json({ ok: false, erro: falha.message }, { status: 502 })
+      }
+    }
+
+    // A sonda larga: tudo que ainda nao foi testado, de uma vez.
+    if (caminho === '/api/ml/sonda') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      try {
+        const { token } = await obterTokenParaLeitura(env)
+        return Response.json(await sondar(env, {
+          token,
+          categoria: url.searchParams.get('categoria') || 'MLB7022',
+        }))
+      } catch (falha) {
+        return Response.json({ erro: falha.message }, { status: 502 })
       }
     }
 
