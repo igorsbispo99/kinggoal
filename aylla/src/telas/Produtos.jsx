@@ -91,11 +91,14 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
         config={config}
         aoCadastrar={(s, leitura) => setEditando({
           ...PRODUTO_VAZIO,
-          nome: s.produtoExemplo || s.termo,
+          // O nome exato da ficha, nao o termo generico: e o que ela vai
+          // levar para o fornecedor e o que identifica o produto depois.
+          nome: s.nomeDoProduto || s.termo,
           categoria: s.categoria,
           categoriaId: s.categoriaId,
           precoVendaAlvo: s.precoMediano ? String(s.precoMediano) : '',
           tarifa: s.tarifa ? { ...s.tarifa, precoConsultado: s.precoMediano, medidoEm: new Date().toISOString() } : null,
+          linkReferencia: s.ficha ? s.ficha.link : '',
           observacoes: leitura && leitura.cenarios[0] && !leitura.cenarios[0].impossivel
             ? `Pagar no máximo US$ ${leitura.cenarios[0].precoMaximoUSD} para ${Math.round(leitura.cenarios[0].margem * 100)}% de margem.`
             : '',
@@ -107,7 +110,7 @@ export default function Produtos({ produtos, fornecedores, config, aoMudar, aoCa
             vendasDoLiderMes: '',
             precoMin: s.precoMin,
             precoMax: s.precoMax,
-            origem: `"${s.termo}" — ${s.vendedoresNaFicha} vendedores disputam a ficha`,
+            origem: `${s.produtoId} — ${s.vendedoresNaFicha} vendedores disputam a ficha`,
             medidoEm: new Date().toISOString(),
           },
         })}

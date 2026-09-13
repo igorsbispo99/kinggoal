@@ -225,6 +225,64 @@ async function avaliacoesDoAnuncio(id, token) {
 }
 
 /**
+ * A ficha do produto: nome exato, foto e link.
+ *
+ * Isto conserta um erro de projeto que atravessou o sistema inteiro. O
+ * nicho sempre foi uma ficha de catálogo específica — MLB65143241, "Bolsa
+ * Feminina De Ombro Alça De Mão E Transversal De Lado Cor Bordô" — e a
+ * tela mostrava "bolsa feminina", que é o termo de busca de onde a ficha
+ * foi encontrada.
+ *
+ * A diferença não é cosmética. "Bolsa" são milhões de modelos: ela não tem
+ * como procurar isso no Alibaba, não tem como julgar se o preço faz
+ * sentido, e — o que importa para o passo seguinte — avaliação de "bolsa"
+ * não quer dizer nada. Comentário só vira informação quando se sabe de
+ * qual bolsa se está falando.
+ *
+ * Custa uma requisição por sugestão, e só para o produto escolhido.
+ */
+export async function fichaDoProduto(env, { produtoId, token }) {
+  const r = await pegar(`/products/${produtoId}`, token, { cacheSegundos: 86400 })
+  if (!r.ok || !r.json) return null
+  const j = r.json
+
+  const fotos = Array.isArray(j.pictures) ? j.pictures : []
+  const atributos = Array.isArray(j.attributes) ? j.attributes : []
+  const pegarAtributo = (...ids) => {
+    for (const id of ids) {
+      const a = atributos.find((x) => x && x.id === id)
+      if (a && (a.value_name || a.values)) return a.value_name || (a.values[0] && a.values[0].name)
+    }
+    return null
+  }
+
+  return {
+    id: j.id,
+    // `name` e o nome completo, com cor e variacao; `family_name` e o
+    // modelo sem a variacao. Os dois servem: um identifica a ficha exata, o
+    // outro e o que ela digita procurando fornecedor.
+    nome: j.name || null,
+    familia: j.family_name || null,
+    // permalink veio vazio na medicao; a pagina de catalogo se monta pelo id.
+    link: j.permalink || `https://www.mercadolivre.com.br/p/${j.id}`,
+    imagem: fotos[0] ? (fotos[0].secure_url || fotos[0].url) : null,
+    imagens: fotos.slice(0, 4).map((f) => f.secure_url || f.url).filter(Boolean),
+    marca: pegarAtributo('BRAND'),
+    modelo: pegarAtributo('MODEL', 'ALPHANUMERIC_MODEL'),
+    cor: pegarAtributo('COLOR', 'MAIN_COLOR'),
+    material: pegarAtributo('MATERIAL', 'MAIN_MATERIAL'),
+    // Peso e dimensao decidem o frete, que e o que mais come margem em
+    // produto leve e barato.
+    peso: pegarAtributo('WEIGHT', 'PACKAGE_WEIGHT'),
+    // As caracteristicas que o proprio Mercado Livre destaca na pagina:
+    // e o vocabulario que os compradores usam.
+    destaques: Array.isArray(j.main_features)
+      ? j.main_features.map((f) => f && f.text).filter(Boolean).slice(0, 4)
+      : [],
+  }
+}
+
+/**
  * Os produtos de catálogo de uma categoria, cada um com quantos vendedores
  * disputam ele e quanta atenção ele recebe.
  *

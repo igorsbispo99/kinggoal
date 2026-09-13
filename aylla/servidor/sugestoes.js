@@ -20,7 +20,7 @@
 // configurações dela (ICMS do estado, dólar do dia, margem alvo). Aqui sai
 // só o que vem do Mercado Livre.
 
-import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive } from './descoberta.js'
+import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive, fichaDoProduto } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
 import { notaDoNicho, explicarNicho } from './nichos.js'
 import { anotar, lerHistorico, compararHistorico, alertasDoHistorico } from './historico.js'
@@ -324,6 +324,10 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       continue
     }
 
+    // Qual produto e este, exatamente. Uma requisicao, so para o escolhido.
+    let ficha = null
+    try { ficha = await fichaDoProduto(env, { produtoId: melhor.produtoId, token }) } catch { /* a sugestao vale sem a foto */ }
+
     const nota = notaDoNicho({
       visitasPorAnuncio: melhor.visitasPorAnuncio,
       vendedores: melhor.vendedores,
@@ -362,7 +366,9 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
     // Conformidade antes de tudo: nao adianta a nota dizer que da para
     // competir se a mercadoria nao entra no pais.
     const conformidade = avaliarConformidade({
-      nome: t.termo,
+      // Com o nome exato a regra fica muito melhor: "bolsa feminina" nao
+      // dispara nada, mas "caixa de som bluetooth 20W" dispara a Anatel.
+      nome: [ficha && ficha.nome, ficha && ficha.familia, t.termo].filter(Boolean).join(' '),
       categoria: cat.nome,
       caminho: cat.caminho.map((c) => c.nome),
     })
@@ -390,6 +396,10 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
 
       // O nicho: um produto especifico, com quem disputa ele.
       produtoId: melhor.produtoId,
+      ficha,
+      // O nome que vai no titulo do cartao. O termo da tendencia vira
+      // contexto: e por onde o produto foi encontrado, nao o que ele e.
+      nomeDoProduto: ficha && ficha.nome ? ficha.nome : t.termo,
       vendedoresNaFicha: melhor.vendedores,
       visitasSomadas: melhor.visitasSomadas,
       visitasPorAnuncio: melhor.visitasPorAnuncio,

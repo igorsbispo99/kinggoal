@@ -69,13 +69,42 @@ export default function Sugestoes({ config, aoCadastrar }) {
         const n = s.nota || {}
         return (
           <div key={s.produtoId || s.termo} className="sugestao">
+            {/* O produto e o cartao. Antes o titulo era o termo da
+                tendencia — "bolsa feminina" — e isso sao milhoes de
+                modelos: nao da para procurar no Alibaba, nem julgar preco,
+                nem ler avaliacao de "bolsa". O termo virou contexto. */}
             <button type="button" className="cabeca-sugestao" onClick={() => setAbertaId(aberta ? null : s.produtoId)}>
-              <span className="titulo-sugestao">
-                <span className="posicao-rank">{s.posicaoNaTendencia}º</span>
-                {s.termo}
+              <span className="produto-linha">
+                {s.ficha && s.ficha.imagem ? (
+                  <img className="foto-produto" src={s.ficha.imagem} alt="" loading="lazy" />
+                ) : null}
+                <span className="produto-texto">
+                  <span className="titulo-sugestao">{s.nomeDoProduto || s.termo}</span>
+                  <span className="sub-sugestao">
+                    {s.categoria}
+                    {s.ficha && s.ficha.marca ? ` · ${s.ficha.marca}` : ''}
+                  </span>
+                  <span className="sub-sugestao tenue">
+                    {s.posicaoNaTendencia}º mais buscado — apareceu em "{s.termo}"
+                  </span>
+                </span>
               </span>
-              <span className="sub-sugestao">{s.categoria}</span>
             </button>
+
+            {s.ficha ? (
+              <div className="atalhos-produto">
+                <a className="botao" href={s.ficha.link} target="_blank" rel="noreferrer">
+                  Ver no Mercado Livre
+                </a>
+                <a
+                  className="botao"
+                  href={`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(s.ficha.familia || s.ficha.nome || s.termo)}`}
+                  target="_blank" rel="noreferrer"
+                >
+                  Procurar no Alibaba
+                </a>
+              </div>
+            ) : null}
 
             {/* Sem procura medida a faixa nao fica verde e a nota nao vira
                 veredito: ela sai cinza, com o numero entre parenteses. Verde
@@ -209,6 +238,24 @@ export default function Sugestoes({ config, aoCadastrar }) {
 
             {aberta ? (
               <>
+                {s.ficha && (s.ficha.cor || s.ficha.material || s.ficha.modelo || s.ficha.peso) ? (
+                  <div className="linhas">
+                    {s.ficha.modelo ? <Linha rotulo="Modelo" valor={s.ficha.modelo} /> : null}
+                    {s.ficha.cor ? <Linha rotulo="Cor" valor={s.ficha.cor} /> : null}
+                    {s.ficha.material ? <Linha rotulo="Material" valor={s.ficha.material} /> : null}
+                    {s.ficha.peso ? <Linha rotulo="Peso" detalhe="decide o frete" valor={s.ficha.peso} /> : null}
+                  </div>
+                ) : null}
+
+                {s.ficha && s.ficha.destaques && s.ficha.destaques.length ? (
+                  <>
+                    <div className="separa-secao"><span>como o Mercado Livre descreve</span></div>
+                    <ul className="destaques">
+                      {s.ficha.destaques.map((d) => <li key={d}>{d}</li>)}
+                    </ul>
+                  </>
+                ) : null}
+
                 {/* Ha quanto tempo o app observa este nicho. Com uma
                     anotacao so nao ha evolucao, e dizer "estavel" com um
                     ponto seria inventar. */}
@@ -270,14 +317,9 @@ export default function Sugestoes({ config, aoCadastrar }) {
                     </li>
                   ))}
                 </ul>
-                <div className="botoes">
-                  <a className="botao" href={`https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(s.termo)}`} target="_blank" rel="noreferrer">
-                    Procurar no Alibaba
-                  </a>
-                  <button type="button" className="botao primario" onClick={() => aoCadastrar(s, leitura)}>
-                    Estudar este
-                  </button>
-                </div>
+                <button type="button" className="botao primario cheio" onClick={() => aoCadastrar(s, leitura)}>
+                  Estudar este produto
+                </button>
               </>
             ) : null}
           </div>
