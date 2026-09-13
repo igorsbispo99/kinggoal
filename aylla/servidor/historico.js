@@ -172,3 +172,31 @@ export async function ultimasExecucoes(env, limite = 10) {
   ).bind(limite).all()
   return (r && r.results) || []
 }
+
+/**
+ * Quantos nichos estão sendo observados e desde quando.
+ *
+ * É a única forma de confirmar de fora que o histórico começou a
+ * acumular — e o histórico é a parte do sistema onde cada dia perdido
+ * não se recupera.
+ */
+export async function resumoDoHistorico(env) {
+  if (!env || !env.DB) return { ativo: false }
+  await preparar(env)
+  const r = await env.DB.prepare(
+    `SELECT COUNT(DISTINCT chave) AS nichos, COUNT(*) AS anotacoes,
+            MIN(dia) AS desde, MAX(dia) AS ate FROM ml_historico`,
+  ).first()
+  if (!r) return { ativo: false }
+  const diasDistintos = await env.DB.prepare('SELECT COUNT(DISTINCT dia) AS dias FROM ml_historico').first()
+  return {
+    ativo: Number(r.anotacoes) > 0,
+    nichos: Number(r.nichos) || 0,
+    anotacoes: Number(r.anotacoes) || 0,
+    desde: r.desde || null,
+    ate: r.ate || null,
+    diasComRegistro: diasDistintos ? Number(diasDistintos.dias) || 0 : 0,
+    // Com um dia só não há comparação; a evolução começa no segundo.
+    comparacaoDisponivel: (diasDistintos ? Number(diasDistintos.dias) : 0) >= 2,
+  }
+}

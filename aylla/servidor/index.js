@@ -15,7 +15,7 @@ import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
 import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
 import { estressar } from './estresse.js'
-import { comecouExecucao, terminouExecucao, ultimasExecucoes } from './historico.js'
+import { comecouExecucao, terminouExecucao, ultimasExecucoes, resumoDoHistorico } from './historico.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -170,7 +170,7 @@ export default {
     })())
   },
 
-  async fetch(request, env) {
+  async fetch(request, env, contexto) {
     const url = new URL(request.url)
     const caminho = url.pathname
 
@@ -299,6 +299,9 @@ export default {
       return Response.json({
         agora: new Date().toISOString(),
         cronConfigurado: '0 6 * * * (UTC) = 03:00 em São Paulo',
+        // Quantos nichos ja estao sendo observados e desde quando: e a
+        // unica forma de confirmar que o historico comecou a acumular.
+        historico: await resumoDoHistorico(env),
         execucoes,
         // Rodar agora, a pedido, para nao esperar a madrugada para saber.
         comoTestar: 'acrescente ?rodar=1 para executar o trabalho do cron agora',
@@ -349,7 +352,30 @@ export default {
       if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
       const guardado = await lerDoCache(env, 'semana')
       if (guardado && !url.searchParams.get('refazer')) {
-        return Response.json({ ...guardado, doCache: true })
+        // Entrega o que esta gravado na hora e reconstroi por tras quando
+        // passou de um dia.
+        //
+        // Isto existe porque o cron nao disparou: o trabalho foi provado
+        // bom rodando a mao, entao a falha e do agendamento. Depender de
+        // uma engrenagem que nao gira seria deixar a sugestao envelhecer
+        // em silencio — e, pior, deixar de gravar o ponto do dia no
+        // historico, que e o dado que nao da para buscar depois.
+        //
+        // Ela nao espera: quem abre o aplicativo recebe o gravado e a
+        // proxima visita ja pega o novo.
+        if (guardado.velho && contexto && typeof contexto.waitUntil === 'function') {
+          contexto.waitUntil((async () => {
+            const id = await comecouExecucao(env, 'ao-abrir').catch(() => null)
+            try {
+              const { token } = await obterTokenParaLeitura(env)
+              const r = await montarSugestoes(env, { token })
+              await terminouExecucao(env, id, 'ok', `${r.sugestoes.length} sugestões, reconstruído ao abrir`)
+            } catch (falha) {
+              await terminouExecucao(env, id, 'falhou', falha.message)
+            }
+          })())
+        }
+        return Response.json({ ...guardado, doCache: true, reconstruindo: Boolean(guardado.velho) })
       }
       let token = null
       try { token = (await obterTokenParaLeitura(env)).token } catch (falha) {
