@@ -222,3 +222,28 @@ test('a ordem das notas bate com o que um humano escolheria', async () => {
   assert.ok(bolsa.nota > chuveiro.nota, 'dois vendedores livres ganham de vinte e sete')
   assert.ok(chuveiro.nota > capacete.nota, 'briga difícil ainda é melhor que ficha fechada da marca')
 })
+
+test('um vendedor que é loja oficial é ficha da marca, mesmo com fração abaixo de 1', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  // Caso real da tela: "capacete feminino", 1 vendedor, loja oficial entre
+  // eles, e ainda assim 89/100 com "bom lugar para entrar". A regra
+  // comparava FRAÇÃO de anúncios oficiais; quando a lista traz mais linhas
+  // que vendedores, a fração cai abaixo de 1 e a trava não dispara — sem
+  // que nada tenha mudado no mercado.
+  const r = notaDoNicho({
+    visitasPorAnuncio: 39846, vendedores: 1, temLojaOficial: true,
+    fracaoOficial: 0.5, anunciosOficiais: 1, tendencia: null,
+  })
+  assert.equal(r.fichaDeMarca, true)
+  assert.ok(r.nota <= 30, `tirou ${r.nota}`)
+})
+
+test('uma oficial entre vinte e sete continua sendo só concorrência', async () => {
+  const { notaDoNicho } = await import('../servidor/nichos.js')
+  const r = notaDoNicho({
+    visitasPorAnuncio: 1313, vendedores: 27, temLojaOficial: true,
+    fracaoOficial: 0.1, anunciosOficiais: 1, tendencia: 'subindo',
+  })
+  assert.equal(r.fichaDeMarca, false)
+  assert.ok(r.nota > 60)
+})

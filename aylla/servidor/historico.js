@@ -135,3 +135,40 @@ export function alertasDoHistorico(evolucao) {
   }
   return avisos
 }
+
+/* ------------------------------------------------- execucoes do cron */
+
+// Saber se o cron rodou por deducao — "a data na tela nao mudou" — custou
+// uma manha. Agora ele deixa rastro: escreve ANTES de comecar o trabalho,
+// entao mesmo uma execucao que estoura no meio aparece como tentativa.
+
+async function prepararExecucoes(env) {
+  await env.DB.exec(
+    'CREATE TABLE IF NOT EXISTS ml_execucao (id INTEGER PRIMARY KEY AUTOINCREMENT, quando TEXT, origem TEXT, estado TEXT, detalhe TEXT)',
+  )
+}
+
+export async function comecouExecucao(env, origem) {
+  if (!env || !env.DB) return null
+  await prepararExecucoes(env)
+  const r = await env.DB.prepare(
+    'INSERT INTO ml_execucao (quando, origem, estado, detalhe) VALUES (?, ?, ?, ?) RETURNING id',
+  ).bind(new Date().toISOString(), origem, 'comecou', null).first()
+  return r ? r.id : null
+}
+
+export async function terminouExecucao(env, id, estado, detalhe) {
+  if (!env || !env.DB || !id) return
+  await prepararExecucoes(env)
+  await env.DB.prepare('UPDATE ml_execucao SET estado = ?, detalhe = ? WHERE id = ?')
+    .bind(estado, detalhe ? String(detalhe).slice(0, 400) : null, id).run()
+}
+
+export async function ultimasExecucoes(env, limite = 10) {
+  if (!env || !env.DB) return []
+  await prepararExecucoes(env)
+  const r = await env.DB.prepare(
+    'SELECT quando, origem, estado, detalhe FROM ml_execucao ORDER BY id DESC LIMIT ?',
+  ).bind(limite).all()
+  return (r && r.results) || []
+}

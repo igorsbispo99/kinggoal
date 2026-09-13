@@ -267,9 +267,21 @@ export async function depurarFunil(env, { token, termo = null }) {
 //
 // Menos sugestoes e mais fundo e a troca certa: uma sugestao onde ela
 // consegue competir vale mais que cinco onde ela nao consegue.
-// Quatro sugestoes. Por termo: dominio, categoria, campeoes, tres produtos,
-// visitas em lote e tarifa — oito chamadas. Quatro vezes oito mais as
-// tendencias da trinta e tres, dentro do teto de 50 do Worker gratuito.
+// Quatro sugestoes, e a conta do pior caso por termo:
+//
+//   1  domain_discovery
+//   1  categoria (do cache do D1 quase sempre, entao costuma ser zero)
+//   1  highlights
+//   2  /products/{id}/items, um por produto
+//   4  visitas: tres anuncios do campeao mais um da alternativa
+//   1  tarifa
+//  --
+//  10, mais 1 das tendencias: quarenta e uma no total.
+//
+// O teto do Worker gratuito e cinquenta por execucao, e estourar nao da
+// erro claro — a execucao simplesmente morre no meio. Por isso a segunda
+// via das visitas tem limite de uma tentativa: sem ele o bloco de visitas
+// ia a oito e o total passava de cinquenta.
 export async function montarSugestoes(env, { token, quantas = 4 }) {
   const { termos } = await tendencias(env, { token })
   const sugestoes = []
@@ -316,6 +328,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       vendedores: melhor.vendedores,
       temLojaOficial: melhor.temLojaOficial,
       fracaoOficial: melhor.fracaoOficial,
+      anunciosOficiais: melhor.anunciosOficiais,
       tendencia: melhor.serie ? melhor.serie.tendencia : null,
     })
 

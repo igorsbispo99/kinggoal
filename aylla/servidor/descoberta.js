@@ -177,6 +177,12 @@ async function visitasDeAnuncios(ids, token, limite = 4) {
   // quem esta decidindo se vale colocar o dela no meio.
   const medidas = {}
   const series = {}
+  // A segunda via custa uma requisicao a mais por anuncio, e no pior caso
+  // isso dobrava o gasto: quatro anuncios viravam oito chamadas, e com
+  // quatro sugestoes o total passava das cinquenta que o Worker gratuito
+  // permite por execucao. Uma tentativa extra, no maximo — as duas vias
+  // estao medidas e funcionando, entao a segunda e rede, nao rotina.
+  let tentativasExtras = 0
   for (const id of ids.slice(0, limite)) {
     // A janela vem PRIMEIRO agora, e nao como segunda via. Ela custa a
     // mesma requisicao que /visits/items e devolve duas coisas em vez de
@@ -189,6 +195,8 @@ async function visitasDeAnuncios(ids, token, limite = 4) {
       if (janela.json && Array.isArray(janela.json.results)) series[id] = janela.json.results
       continue
     }
+    if (tentativasExtras >= 1) continue
+    tentativasExtras += 1
     const r = await pegar(`/visits/items?ids=${id}`, token, { cacheSegundos: 3600 })
     const valor = r.ok && r.json ? Number(r.json[id]) : NaN
     if (Number.isFinite(valor)) medidas[id] = valor
@@ -394,6 +402,7 @@ export async function nichosDaCategoria(env, { categoria, token, quantosProdutos
       precoMediano: medianaDe(p.precos),
       temLojaOficial: p.temLojaOficial,
       fracaoOficial: p.fracaoOficial,
+      anunciosOficiais: p.anunciosOficiais,
       anuncios: p.anuncios,
     })
   }

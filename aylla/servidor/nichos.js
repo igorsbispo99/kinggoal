@@ -217,7 +217,9 @@ export function explicarEntrada({ nota, anuncios, visitasPorAnuncio, lojasOficia
  *   topo sem loja oficial .... marca com loja própria na ficha ganha a
  *                              caixa de compra quase sempre.
  */
-export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fracaoOficial, tendencia }) {
+export function notaDoNicho({
+  visitasPorAnuncio, vendedores, temLojaOficial, fracaoOficial, anunciosOficiais, tendencia,
+}) {
   const vpv = numeroOuNulo(visitasPorAnuncio)
   const n = numeroOuNulo(vendedores)
 
@@ -237,12 +239,20 @@ export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fra
     ? Math.max(0, (1 - fo) * 100)
     : (temLojaOficial === null || temLojaOficial === undefined ? null : (temLojaOficial ? 25 : 100))
 
-  // A ficha e da marca: todos os vendedores vistos sao loja oficial. Aqui
-  // "poucos concorrentes" deixa de ser boa noticia e vira o contrario —
-  // ninguem mais vende porque ninguem mais consegue. Sem este limite,
-  // "capacete feminino" com um vendedor oficial e muita visita tirava 89 e
-  // aparecia como o melhor negocio da tela.
-  const fichaDeMarca = fo !== null && fo >= 1
+  // A ficha e da marca. Conta anuncios oficiais contra numero de
+  // vendedores, nao fracao dos anuncios vistos — foi por comparar fracao
+  // que "capacete feminino" escapou: UM vendedor, loja oficial entre eles,
+  // e ainda assim 89 de 100 com "bom lugar para entrar". Se ha um vendedor
+  // so e ele e loja oficial, a marca e dona da ficha; a lista de anuncios
+  // pode trazer mais linhas que vendedores e derrubar a fracao abaixo de 1
+  // sem que nada tenha mudado no mercado.
+  const oficiais = numeroOuNulo(anunciosOficiais)
+  const nVend = numeroOuNulo(vendedores)
+  const fichaDeMarca = Boolean(
+    (fo !== null && fo >= 1)
+    || (oficiais !== null && oficiais > 0 && nVend !== null && oficiais >= nVend)
+    || (temLojaOficial && nVend !== null && nVend <= 1),
+  )
 
   // A tendencia entrou depois de a tela mostrar a contradicao: nota 95
   // "bom lugar para entrar" logo acima de "procura caindo 42%". A nota

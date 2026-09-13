@@ -15,6 +15,7 @@ import { categoria, raizes } from './categorias.js'
 import { tendencias, ondeIssoVive, maisVendidos, buscarNoCatalogo, comissaoReal } from './descoberta.js'
 import { montarSugestoes, lerDoCache, depurarFunil } from './sugestoes.js'
 import { estressar } from './estresse.js'
+import { comecouExecucao, terminouExecucao, ultimasExecucoes } from './historico.js'
 
 const OLINDA = 'https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata'
 
@@ -156,13 +157,15 @@ export default {
   async scheduled(evento, env, contexto) {
     if (!temCredenciais(env) || !temBanco(env)) return
     contexto.waitUntil((async () => {
+      // O registro vem antes do trabalho: uma execucao que estoura no meio
+      // ainda aparece como tentativa, e "nao rodou" deixa de ser deducao.
+      const id = await comecouExecucao(env, `cron:${evento && evento.cron}`).catch(() => null)
       try {
         const { token } = await obterTokenParaLeitura(env)
-        await montarSugestoes(env, { token })
+        const r = await montarSugestoes(env, { token })
+        await terminouExecucao(env, id, 'ok', `${r.sugestoes.length} sugestões de ${r.termosLidos} tendências`)
       } catch (falha) {
-        // Sem ninguem para avisar aqui: a tela mostra a data do que esta
-        // gravado, entao sugestao velha aparece como velha.
-        console.error('cron de sugestoes falhou:', falha.message)
+        await terminouExecucao(env, id, 'falhou', falha.message)
       }
     })())
   },
@@ -288,6 +291,34 @@ export default {
     // As sugestoes prontas. Ler vem do banco — quem abre o aplicativo nao
     // espera cinquenta chamadas a API. Montar so acontece quando nao ha nada
     // gravado ou quando o cron da madrugada roda.
+    // O cron deixou rastro? A tela mostrava so a data do resultado, e data
+    // velha nao distingue "nao rodou" de "rodou e falhou".
+    if (caminho === '/api/ml/cron') {
+      if (!temBanco(env)) return erro('Sem banco.', 503)
+      const execucoes = await ultimasExecucoes(env, 10)
+      return Response.json({
+        agora: new Date().toISOString(),
+        cronConfigurado: '0 6 * * * (UTC) = 03:00 em São Paulo',
+        execucoes,
+        // Rodar agora, a pedido, para nao esperar a madrugada para saber.
+        comoTestar: 'acrescente ?rodar=1 para executar o trabalho do cron agora',
+      })
+    }
+
+    if (caminho === '/api/ml/cron/rodar') {
+      if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
+      const id = await comecouExecucao(env, 'manual').catch(() => null)
+      try {
+        const { token } = await obterTokenParaLeitura(env)
+        const r = await montarSugestoes(env, { token })
+        await terminouExecucao(env, id, 'ok', `${r.sugestoes.length} sugestões de ${r.termosLidos} tendências`)
+        return Response.json({ ok: true, sugestoes: r.sugestoes.length, descartadas: r.descartadas.length })
+      } catch (falha) {
+        await terminouExecucao(env, id, 'falhou', falha.message)
+        return Response.json({ ok: false, erro: falha.message }, { status: 502 })
+      }
+    }
+
     // Estresse: todo caminho possivel para medir procura, de uma vez.
     if (caminho === '/api/ml/estresse') {
       if (!temCredenciais(env) || !temBanco(env)) return erro('Radar não configurado.', 503)
