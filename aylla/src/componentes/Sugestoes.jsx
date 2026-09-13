@@ -100,6 +100,28 @@ export default function Sugestoes({ config, aoCadastrar }) {
               </div>
             ) : null}
 
+            {/* Tendencia e alertas vem antes dos numeros porque mudam a
+                decisao inteira: procura caindo transforma um bom negocio
+                em prejuizo, e nenhum numero de hoje mostra isso. */}
+            {s.resumoDaSerie && s.serie && s.serie.tendencia ? (
+              <div className={`faixa-tendencia ${s.serie.tendencia === 'subindo' ? 'sobe' : s.serie.tendencia === 'caindo' ? 'desce' : 'plana'}`}>
+                <span className="seta">
+                  {s.serie.tendencia === 'subindo' ? '↑' : s.serie.tendencia === 'caindo' ? '↓' : '→'}
+                </span>
+                <span>{s.resumoDaSerie}</span>
+              </div>
+            ) : null}
+
+            {s.alertas && s.alertas.length ? (
+              <div className="linhas">
+                {s.alertas.map((a) => (
+                  <Aviso key={a.texto} nivel={a.grave ? 'critico' : 'info'} titulo={a.grave ? 'Mudou desde a última vez' : 'Observação'}>
+                    {a.texto}
+                  </Aviso>
+                ))}
+              </div>
+            ) : null}
+
             <div className="linhas">
               {/* O numero do nicho vem primeiro porque e ele que decide. A
                   categoria inteira e so contexto: "Bolsas" tem 421 mil
@@ -163,6 +185,40 @@ export default function Sugestoes({ config, aoCadastrar }) {
 
             {aberta ? (
               <>
+                {/* Ha quanto tempo o app observa este nicho. Com uma
+                    anotacao so nao ha evolucao, e dizer "estavel" com um
+                    ponto seria inventar. */}
+                {s.evolucao ? (
+                  <div className="linhas">
+                    {s.evolucao.suficiente ? (
+                      <>
+                        <Linha
+                          rotulo="Preço"
+                          detalhe={`de ${s.evolucao.desde} até hoje`}
+                          valor={s.evolucao.variacaoDePreco !== null
+                            ? `${s.evolucao.variacaoDePreco > 0 ? '+' : ''}${Math.round(s.evolucao.variacaoDePreco * 100)}%`
+                            : '—'}
+                          tom={s.evolucao.variacaoDePreco !== null && s.evolucao.variacaoDePreco < 0 ? 'desconta' : undefined}
+                        />
+                        <Linha
+                          rotulo="Vendedores"
+                          detalhe={`${s.evolucao.vendedoresAntes} quando comecei a olhar`}
+                          valor={s.evolucao.entraram !== null
+                            ? `${s.evolucao.entraram > 0 ? '+' : ''}${s.evolucao.entraram}`
+                            : '—'}
+                          tom={s.evolucao.entraram > 0 ? 'desconta' : undefined}
+                        />
+                      </>
+                    ) : (
+                      <p className="dica">
+                        Observando este nicho desde {s.evolucao.desde || 'hoje'}. A partir da segunda
+                        medição aparece aqui se o preço caiu e quantos vendedores entraram —
+                        é o que diz se ele está sendo descoberto.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
                 {s.alternativas && s.alternativas.length ? (
                   <>
                     <div className="separa-secao"><span>outros produtos desta categoria</span></div>

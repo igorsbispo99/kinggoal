@@ -19,6 +19,7 @@
 // uma pergunta que ela precisa saber responder.
 
 import { analisarBusca } from './analise.js'
+import { lerSerie, explicarSerie } from './serie.js'
 
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
@@ -175,16 +176,24 @@ async function visitasDeAnuncios(ids, token, limite = 4) {
   // um anuncio tipico recebe nesta ficha" —, que e a pergunta certa para
   // quem esta decidindo se vale colocar o dela no meio.
   const medidas = {}
+  const series = {}
   for (const id of ids.slice(0, limite)) {
-    const r = await pegar(`/visits/items?ids=${id}`, token, { cacheSegundos: 3600 })
-    const valor = r.ok && r.json ? Number(r.json[id]) : NaN
-    if (Number.isFinite(valor)) { medidas[id] = valor; continue }
-    // Segunda via, medida e funcionando: a janela de 30 dias do anuncio.
+    // A janela vem PRIMEIRO agora, e nao como segunda via. Ela custa a
+    // mesma requisicao que /visits/items e devolve duas coisas em vez de
+    // uma: o total e a visita dia a dia. Eu vinha pagando o mesmo preco
+    // pela metade da informacao.
     const janela = await pegar(`/items/${id}/visits/time_window?last=30&unit=day`, token, { cacheSegundos: 3600 })
     const total = janela.ok && janela.json ? Number(janela.json.total_visits) : NaN
-    if (Number.isFinite(total)) medidas[id] = total
+    if (Number.isFinite(total)) {
+      medidas[id] = total
+      if (janela.json && Array.isArray(janela.json.results)) series[id] = janela.json.results
+      continue
+    }
+    const r = await pegar(`/visits/items?ids=${id}`, token, { cacheSegundos: 3600 })
+    const valor = r.ok && r.json ? Number(r.json[id]) : NaN
+    if (Number.isFinite(valor)) medidas[id] = valor
   }
-  return medidas
+  return { medidas, series }
 }
 
 /**
@@ -355,10 +364,19 @@ export async function nichosDaCategoria(env, { categoria, token, quantosProdutos
   for (let i = 0; i < produtos.length; i += 1) {
     const p = produtos[i]
     const limite = i === 0 ? 3 : 1
-    const visitas = await visitasDeAnuncios(p.anuncios.map((a) => a.id).filter(Boolean), token, limite)
+    const { medidas: visitas, series } = await visitasDeAnuncios(
+      p.anuncios.map((a) => a.id).filter(Boolean), token, limite,
+    )
 
     const medidas = p.anuncios.map((a) => visitas[a.id]).filter((v) => Number.isFinite(v))
     const soma = medidas.reduce((t, v) => t + v, 0)
+
+    // A serie do anuncio mais visitado da ficha: e o que melhor representa
+    // o movimento do produto, e um so basta para dizer se sobe ou cai.
+    const maisVisitado = p.anuncios
+      .filter((a) => series[a.id])
+      .sort((a, b) => (visitas[b.id] ?? 0) - (visitas[a.id] ?? 0))[0]
+    const serie = maisVisitado ? lerSerie(series[maisVisitado.id]) : null
 
     nichos.push({
       produtoId: p.produtoId,
@@ -370,6 +388,8 @@ export async function nichosDaCategoria(env, { categoria, token, quantosProdutos
       // anúncios medidos, a conta antiga diria que cada um recebe um décimo
       // do que recebe de verdade — e um mercado bom passaria por ruim.
       visitasPorAnuncio: medidas.length ? soma / medidas.length : null,
+      serie,
+      resumoDaSerie: serie ? explicarSerie(serie) : null,
       precoMin: p.precos.length ? Math.min(...p.precos) : null,
       precoMediano: medianaDe(p.precos),
       temLojaOficial: p.temLojaOficial,

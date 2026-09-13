@@ -115,7 +115,7 @@ test('sem visitas medidas, a nota sai parcial e não zerada', async () => {
   const { notaDoNicho } = await import('../servidor/nichos.js')
   const r = notaDoNicho({ visitasPorAnuncio: null, vendedores: 2, temLojaOficial: false })
   assert.equal(r.completo, false)
-  assert.deepEqual(r.faltando, ['atenção por anúncio'])
+  assert.deepEqual(r.faltando, ['atenção por anúncio', 'para onde a procura vai'])
   assert.ok(r.nota > 0, 'o que foi medido continua valendo')
 })
 

@@ -23,6 +23,7 @@
 import { nichosDaCategoria, tendencias, comissaoReal, ondeIssoVive } from './descoberta.js'
 import { categoria as lerCategoria } from './categorias.js'
 import { notaDoNicho, explicarNicho } from './nichos.js'
+import { anotar, lerHistorico, compararHistorico, alertasDoHistorico } from './historico.js'
 
 const API = 'https://api.mercadolibre.com'
 const SITE = 'MLB'
@@ -315,6 +316,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       vendedores: melhor.vendedores,
       temLojaOficial: melhor.temLojaOficial,
       fracaoOficial: melhor.fracaoOficial,
+      tendencia: melhor.serie ? melhor.serie.tendencia : null,
     })
 
     // A comissao real da categoria, no preco que esse produto pratica.
@@ -329,8 +331,32 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
       } catch { /* a sugestao vale sem a tarifa; a tela diz que e estimada */ }
     }
 
+    // Anota o estado de hoje ANTES de qualquer outra coisa: o dado de hoje
+    // nao da para buscar amanha, e se a montagem falhar depois daqui o
+    // registro ja esta salvo.
+    const chave = `nicho:${melhor.produtoId}`
+    await anotar(env, chave, {
+      preco: melhor.precoMediano,
+      vendedores: melhor.vendedores,
+      visitasPorAnuncio: melhor.visitasPorAnuncio,
+      categoria: cat.id,
+      termo: t.termo,
+    }).catch(() => {})
+
+    const evolucao = compararHistorico(await lerHistorico(env, chave).catch(() => []))
+
     sugestoes.push({
       termo: t.termo,
+      evolucao,
+      alertas: alertasDoHistorico(evolucao),
+      serie: melhor.serie ? {
+        tendencia: melhor.serie.tendencia,
+        variacao: melhor.serie.variacao ?? null,
+        dias: melhor.serie.dias,
+        mediaDiaria: melhor.serie.mediaDiaria ?? null,
+        porque: melhor.serie.porque ?? null,
+      } : null,
+      resumoDaSerie: melhor.resumoDaSerie,
       posicaoNaTendencia: t.posicao,
       linkDaBusca: t.link,
       categoria: cat.nome,
@@ -361,6 +387,7 @@ export async function montarSugestoes(env, { token, quantas = 4 }) {
         vendedores: melhor.vendedores,
         temLojaOficial: melhor.temLojaOficial,
         fichaDeMarca: nota.fichaDeMarca,
+        emQueda: nota.emQueda,
       }),
       // Os outros produtos medidos, para ela comparar dentro da categoria.
       alternativas: achados.nichos.slice(1, 3).map((n) => ({

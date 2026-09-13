@@ -551,3 +551,15 @@ details.dobra > div { padding-top: 10px; }
 .frase-entrada.tenue { opacity: .8; font-size: .74rem; }
 .faixa-entrada.incerta { background: var(--afundado); border-color: var(--linha-forte); }
 .faixa-entrada.incerta .nota-entrada { color: var(--tinta-3); }
+
+/* ---------- tendencia ---------- */
+
+.faixa-tendencia {
+  display: flex; align-items: flex-start; gap: 8px;
+  border-radius: 8px; padding: 8px 10px;
+  font-size: .82rem; line-height: 1.4; font-weight: 600;
+}
+.faixa-tendencia .seta { font-size: 1.05rem; line-height: 1.2; }
+.faixa-tendencia.sobe { background: var(--verde-fundo); color: var(--verde); }
+.faixa-tendencia.desce { background: var(--negativo-fundo); color: var(--negativo); }
+.faixa-tendencia.plana { background: var(--afundado); color: var(--tinta-3); }

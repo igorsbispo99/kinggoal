@@ -217,7 +217,7 @@ export function explicarEntrada({ nota, anuncios, visitasPorAnuncio, lojasOficia
  *   topo sem loja oficial .... marca com loja própria na ficha ganha a
  *                              caixa de compra quase sempre.
  */
-export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fracaoOficial }) {
+export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fracaoOficial, tendencia }) {
   const vpv = numeroOuNulo(visitasPorAnuncio)
   const n = numeroOuNulo(vendedores)
 
@@ -244,10 +244,21 @@ export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fra
   // aparecia como o melhor negocio da tela.
   const fichaDeMarca = fo !== null && fo >= 1
 
+  // A tendencia entrou depois de a tela mostrar a contradicao: nota 95
+  // "bom lugar para entrar" logo acima de "procura caindo 42%". A nota
+  // media se ha espaco HOJE. Entre pagar o fornecedor e vender passam
+  // sessenta dias, entao o que decide e se ainda havera espaco quando a
+  // mercadoria chegar — e isso a nota ignorava.
+  const porTendencia = tendencia === 'subindo' ? 100
+    : tendencia === 'estável' ? 70
+      : tendencia === 'caindo' ? 15
+        : null
+
   const sinais = [
-    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.5 },
-    { nome: 'quantos disputam', valor: fichaDeMarca ? null : porConcorrentes, peso: 0.25 },
-    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.25 },
+    { nome: 'atenção por anúncio', valor: porAtencao, peso: 0.4 },
+    { nome: 'para onde a procura vai', valor: porTendencia, peso: 0.2 },
+    { nome: 'quantos disputam', valor: fichaDeMarca ? null : porConcorrentes, peso: 0.2 },
+    { nome: 'loja oficial na ficha', valor: porMarca, peso: 0.2 },
   ]
   const presentes = sinais.filter((s) => s.valor !== null)
   const faltando = sinais.filter((s) => s.valor === null).map((s) => s.nome)
@@ -265,22 +276,32 @@ export function notaDoNicho({ visitasPorAnuncio, vendedores, temLojaOficial, fra
   // le sabe que falta o principal, e a ordenacao poe essas atras.
   const semProcura = porAtencao === null
 
-  // Teto de 30: por melhor que seja a atencao, entrar numa ficha que e da
-  // marca nao e oportunidade para quem esta comecando.
+  // Dois tetos, e os dois existem porque um peso a mais nao bastava: com a
+  // atencao muito alta, a media continuava dando nota de convite.
+  //
+  //   ficha da marca .... 30. Nao e oportunidade, e porta fechada.
+  //   procura em queda .. 55, abaixo do limiar de "bom lugar para entrar".
+  //                       Ha espaco hoje e o numero diz isso; o que ele
+  //                       nao pode fazer e convidar, porque quem compra
+  //                       hoje vende daqui a dois meses.
   const bruta = Math.round(Math.min(100, Math.max(0, nota)))
+  const comTeto = fichaDeMarca ? Math.min(30, bruta)
+    : tendencia === 'caindo' ? Math.min(55, bruta)
+      : bruta
   return {
-    nota: fichaDeMarca ? Math.min(30, bruta) : bruta,
+    nota: comTeto,
     fichaDeMarca,
     semProcura,
     completo: faltando.length === 0 && !fichaDeMarca,
     cobertura: Math.round(soma * 100) / 100,
     faltando,
-    motivos: { porAtencao, porConcorrentes, porMarca },
+    emQueda: tendencia === 'caindo',
+    motivos: { porAtencao, porTendencia, porConcorrentes, porMarca },
   }
 }
 
 /** A frase do nicho. Números sem porquê não ensinam ninguém a escolher. */
-export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, fichaDeMarca, semProcura }) {
+export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vendedores, temLojaOficial, fichaDeMarca, semProcura, emQueda }) {
   const pedacos = []
   if (Number.isFinite(visitasPorAnuncio)) {
     pedacos.push(`${Math.round(visitasPorAnuncio).toLocaleString('pt-BR')} visitas por anúncio em 30 dias`)
@@ -306,6 +327,12 @@ export function explicarNicho({ nota, visitasPorAnuncio, anunciosMedidos, vended
 
   if (fichaDeMarca) {
     return `Não é lugar para entrar — ${pedacos.join('; ')}. Você estaria criando um anúncio para disputar com a própria marca.`
+  }
+
+  // Procura em queda nao permite convite, por melhor que seja o resto: ela
+  // paga hoje e recebe em sessenta dias, e o numero que importa e o de la.
+  if (emQueda) {
+    return `A procura está caindo — ${pedacos.join('; ')}. Há espaço hoje, mas ele está encolhendo, e a mercadoria só chega daqui a dois meses.`
   }
 
   const veredito = nota >= 65 ? 'Esse é um bom lugar para entrar'
