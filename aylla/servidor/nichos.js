@@ -139,8 +139,10 @@ export function notaDoNicho({
   const n = numeroOuNulo(vendedores)
 
   // 50 visitas por anúncio por mês já é sinal; 2.000 é excelente.
+  // Math.max(0, ...) porque log10 de negativo é NaN, e NaN passa por toda
+  // a média sem reclamar até sair como nota na tela.
   const porAtencao = vpv === null ? null
-    : Math.min(100, (Math.log10(1 + vpv) / Math.log10(1 + 2000)) * 100)
+    : Math.min(100, (Math.log10(1 + Math.max(0, vpv)) / Math.log10(1 + 2000)) * 100)
 
   // 2 vendedores é ótimo; 40 é guerra de centavo.
   const porConcorrentes = n === null ? null

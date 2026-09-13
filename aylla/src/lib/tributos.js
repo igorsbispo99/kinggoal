@@ -22,8 +22,24 @@ export const ICMS_POR_ESTADO = {
   BA: 0.2, PE: 0.2, CE: 0.2, GO: 0.19, DF: 0.2, ES: 0.17,
 }
 
+/**
+ * A cotação com IOF e spread embutidos.
+ *
+ * Coage os três porque uma cotação inválida não para aqui: ela é gravada
+ * na configuração dela, sincronizada para o outro aparelho e usada em todo
+ * cálculo dali em diante. Um NaN atravessa soma, multiplicação e
+ * comparação sem reclamar — e sai na tela como "R$ NaN" no lugar do custo
+ * do lote, em todos os produtos de uma vez.
+ *
+ * Zero é o padrão certo aqui: cotação zero deixa o custo do lote zerado, e
+ * custo zerado é impossível de não notar. NaN também aparece, mas parece
+ * defeito do aplicativo; zero parece — e é — falta de cotação, que é o que
+ * o aviso de "cotação velha" na tela de Ajustes já sabe explicar.
+ */
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
+
 export function cambioEfetivo({ ptax, spread = 0, iof = 0 }) {
-  return ptax * (1 + spread) * (1 + iof)
+  return num(ptax) * (1 + num(spread)) * (1 + num(iof))
 }
 
 /**
@@ -44,9 +60,9 @@ export function calcularImportacao(entrada) {
     regime = REGIME_PADRAO,
   } = entrada
 
-  const qtd = Math.max(1, Number(quantidade) || 1)
-  const mercadoriaUSD = (Number(produtoUSD) || 0) * qtd
-  const valorAduaneiroUSD = mercadoriaUSD + (Number(freteUSD) || 0) + (Number(seguroUSD) || 0)
+  const qtd = Math.max(1, num(quantidade) || 1)
+  const mercadoriaUSD = num(produtoUSD) * qtd
+  const valorAduaneiroUSD = mercadoriaUSD + num(freteUSD) + num(seguroUSD)
 
   // O limite da faixa considera a remessa inteira (produto + frete + seguro).
   // Ha divergência de leitura sobre isso, por isso é um parâmetro.
@@ -65,7 +81,7 @@ export function calcularImportacao(entrada) {
 
   const totalUSD = valorAduaneiroUSD + iiUSD + icmsUSD
   const cambio = cambioEfetivo({ ptax, spread, iof })
-  const totalBRL = totalUSD * cambio + (Number(outrosCustosBRL) || 0)
+  const totalBRL = totalUSD * cambio + num(outrosCustosBRL)
 
   return {
     quantidade: qtd,
@@ -83,8 +99,8 @@ export function calcularImportacao(entrada) {
     custoUnitarioBRL: totalBRL / qtd,
     memoria: [
       { rotulo: `Mercadoria (${qtd} un.)`, usd: mercadoriaUSD },
-      { rotulo: 'Frete internacional', usd: Number(freteUSD) || 0 },
-      { rotulo: 'Seguro', usd: Number(seguroUSD) || 0, ocultarSeZero: true },
+      { rotulo: 'Frete internacional', usd: num(freteUSD) },
+      { rotulo: 'Seguro', usd: num(seguroUSD), ocultarSeZero: true },
       { rotulo: 'Valor aduaneiro', usd: valorAduaneiroUSD, destaque: true },
       {
         rotulo: dentroDaFaixaBaixa

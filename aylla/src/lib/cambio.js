@@ -8,12 +8,28 @@
 // Fora da Cloudflare (no desenvolvimento, por exemplo) essa rota não existe e
 // a busca cai para a alternativa. O sistema nunca trava por causa de cotação.
 
+// Uma cotação que não é um número positivo não é cotação.
+//
+// Isto não é paranoia: o valor buscado é GRAVADO na configuração dela e
+// sincronizado para o outro aparelho. Uma resposta estranha da API entrava
+// como NaN e envenenava todo cálculo dali em diante, em todos os produtos,
+// sem nenhuma mensagem de erro — e a única saída seria digitar o dólar à
+// mão sem saber por quê. Recusar aqui faz a busca cair para a próxima
+// fonte, que é exatamente para isso que ela existe.
+const cotacaoValida = (c) => {
+  if (!c) return false
+  const v = Number(c.valor)
+  // Teto grosso de sanidade: o dólar não vai a R$ 1.000, e se for, o
+  // problema dela não é mais este aplicativo.
+  return Number.isFinite(v) && v > 0 && v < 1000
+}
+
 async function buscarPeloServidor() {
   const resposta = await fetch('/api/ptax', { headers: { accept: 'application/json' } })
   if (!resposta.ok) throw new Error('Rota do servidor indisponível')
   const cotacao = await resposta.json()
-  if (!cotacao || !cotacao.valor) throw new Error('Servidor sem cotação')
-  return cotacao
+  if (!cotacaoValida(cotacao)) throw new Error('Servidor sem cotação')
+  return { ...cotacao, valor: Number(cotacao.valor) }
 }
 
 async function buscarAlternativa() {
@@ -21,12 +37,15 @@ async function buscarAlternativa() {
   if (!resposta.ok) throw new Error('AwesomeAPI indisponível')
   const json = await resposta.json()
   const cotacao = json.USDBRL
-  if (!cotacao || !cotacao.ask) throw new Error('AwesomeAPI sem cotação')
-  return {
+  const pronta = cotacao ? {
     valor: Number(cotacao.ask),
     fonte: 'AwesomeAPI',
-    dataCotacao: new Date(Number(cotacao.timestamp) * 1000).toISOString(),
-  }
+    dataCotacao: Number.isFinite(Number(cotacao.timestamp))
+      ? new Date(Number(cotacao.timestamp) * 1000).toISOString()
+      : new Date().toISOString(),
+  } : null
+  if (!cotacaoValida(pronta)) throw new Error('AwesomeAPI sem cotação')
+  return pronta
 }
 
 export async function buscarCotacao() {

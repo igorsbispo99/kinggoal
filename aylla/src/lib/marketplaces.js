@@ -74,6 +74,25 @@ export const ORDEM_MARKETPLACES = ['mercadolivre', 'amazon', 'shopee']
  */
 export const ausente = (v) => v === null || v === undefined || v === '' || Number.isNaN(Number(v))
 
+/**
+ * O número, ou o padrão — nunca NaN, nunca Infinity.
+ *
+ * Existe porque o motor de dinheiro recebe número de três lugares e só um
+ * deles é confiável. Do teclado dela vem limpo (paraNumero já cuida). Mas
+ * também vem da API do Mercado Livre e do cache no banco — e cache guarda
+ * JSON de uma versão anterior do código, onde um campo que hoje existe
+ * simplesmente não estava lá. `undefined` entra na conta, vira NaN, e o
+ * NaN atravessa tudo em silêncio até aparecer na tela dela como
+ * "US$ NaN" no lugar de quanto pagar pelo produto.
+ *
+ * Coagir aqui, num lugar só, em vez de em cada chamada: foi duplicar uma
+ * regra em dois arquivos que quebrou o cofre de sincronização.
+ */
+export const numero = (v, padrao = 0) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : padrao
+}
+
 function custoFixoDoPreco(mp, preco, tipoId) {
   if (mp.custoFixoPorPlano && tipoId in mp.custoFixoPorPlano) {
     return mp.custoFixoPorPlano[tipoId]
@@ -100,6 +119,7 @@ function custoFixoDoPreco(mp, preco, tipoId) {
  */
 export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null, freteMedido = null } = {}) {
   const tipo = (mp.tipos || []).find((t) => t.id === tipoId) || (mp.tipos || [])[0]
+  preco = numero(preco)
   // Sem ausente() aqui a comissao viraria 0% sempre que nao houvesse medicao.
   const medida = ausente(comissaoMedida) ? null : Number(comissaoMedida)
 
@@ -120,7 +140,9 @@ export function custosDaVenda(mp, preco, tipoId, { comissaoMedida = null, freteM
   // /items/{id}/shipping_options, e frete e o que mais come margem em
   // produto leve e barato: o chute contaminava margem, preco alvo, ponto
   // de equilibrio e ranking de uma vez.
-  const porUnidade = ausente(freteMedido) ? (mp.freteEstimado || 0) : Math.max(0, Number(freteMedido))
+  const porUnidade = ausente(freteMedido)
+    ? numero(mp.freteEstimado)
+    : Math.max(0, numero(freteMedido, numero(mp.freteEstimado)))
   const frete = mp.freteGratisAcimaDe
     ? (preco >= mp.freteGratisAcimaDe ? porUnidade : 0)
     : porUnidade

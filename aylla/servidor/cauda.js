@@ -43,7 +43,9 @@ export function caudaLonga(termoGenerico, termosDaCategoria, { quantos = 8 } = {
   const vistos = new Set()
   const fora = []
 
-  const dentro = (termosDaCategoria || [])
+  // Array.isArray, nao `|| []`: se /trends devolver um objeto de erro em vez
+  // da lista, `|| []` deixa passar e o .map estoura no meio do funil.
+  const dentro = (Array.isArray(termosDaCategoria) ? termosDaCategoria : [])
     .map((t) => (typeof t === 'string' ? { termo: t } : t))
     .filter((t) => t && t.termo)
     .map((t) => {
@@ -74,7 +76,7 @@ export function caudaLonga(termoGenerico, termosDaCategoria, { quantos = 8 } = {
 
   return {
     // O termo genérico existe e é o problema: fica registrado, não sugerido.
-    generico: termoGenerico,
+    generico: String(termoGenerico ?? ''),
     recortes: dentro.slice(0, quantos),
     // Termos de uma palavra só da mesma categoria: tão amplos quanto a
     // semente, servem de contexto e não de nicho.

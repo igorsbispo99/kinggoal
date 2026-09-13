@@ -1,29 +1,34 @@
-import { custosDaVenda } from './marketplaces.js'
+import { custosDaVenda, numero } from './marketplaces.js'
 
 /** Resultado de uma venda a um preco dado, por unidade e pelo lote inteiro. */
 export function calcularVenda({
   mp, tipoId, preco, custoUnitario, quantidade = 1, outrosPorUnidade = 0,
   comissaoMedida = null, freteMedido = null,
 }) {
-  const p = Number(preco) || 0
-  const qtd = Math.max(1, Number(quantidade) || 1)
+  const p = numero(preco)
+  const qtd = Math.max(1, numero(quantidade, 1))
+  // Custo e outros custos vinham crus. Um `undefined` aqui — de um cache do
+  // banco gravado por uma versao anterior do codigo — virava NaN no lucro,
+  // na margem e no lote inteiro, e chegava na tela dela como "R$ NaN".
+  const custo = numero(custoUnitario)
+  const outros = numero(outrosPorUnidade)
   const custos = custosDaVenda(mp, p, tipoId, { comissaoMedida, freteMedido })
-  const lucroUnitario = p - custos.total - custoUnitario - outrosPorUnidade
+  const lucroUnitario = p - custos.total - custo - outros
   const margem = p > 0 ? lucroUnitario / p : 0
-  const retorno = custoUnitario > 0 ? lucroUnitario / custoUnitario : 0
+  const retorno = custo > 0 ? lucroUnitario / custo : 0
   return {
     preco: p,
     custos,
     comissaoMedida: comissaoMedida === null || comissaoMedida === undefined || comissaoMedida === ''
       ? null
       : Number(comissaoMedida),
-    custoUnitario,
+    custoUnitario: custo,
     lucroUnitario,
     margem,
     retorno,
     receitaLote: p * qtd,
     lucroLote: lucroUnitario * qtd,
-    investimentoLote: custoUnitario * qtd,
+    investimentoLote: custo * qtd,
   }
 }
 
