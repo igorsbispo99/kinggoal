@@ -93,3 +93,34 @@ test('o resumo conta o que entrou, para a tela não precisar afirmar sem provar'
   const depois = { produtos: [reg('a', 'x', '2026-09-13T10:00:00Z'), reg('b', 'y', '2026-09-13T11:00:00Z')], fornecedores: [], lotes: [], vendas: [] }
   assert.deepEqual(resumirFusao(antes, depois), { produtos: 1 })
 })
+
+test('toda chave gerada passa pela validação do servidor', async () => {
+  // Este teste existe por causa de um bug real: o padrão do servidor
+  // copiava o alfabeto base32 (A-Z e 2-7) de uma versão anterior do
+  // gerador. Troquei o alfabeto por um sem vogais, que usa 8 e 9, e não
+  // atualizei o padrão — 151 de cada 200 chaves eram recusadas no primeiro
+  // clique da pessoa.
+  //
+  // O gerador vive no cliente e a validação no servidor. Nada os obrigava a
+  // concordar, então este teste obriga.
+  globalThis.localStorage = globalThis.localStorage
+    || { getItem: () => null, setItem: () => {}, length: 0, key: () => null }
+  const { gerarChave } = await import('../src/lib/sincronia.js')
+  const { CHAVES_VALIDAS } = await import('../servidor/cofre.js')
+
+  for (let i = 0; i < 300; i += 1) {
+    const chave = gerarChave()
+    assert.ok(CHAVES_VALIDAS.test(chave), `o servidor recusaria "${chave}"`)
+  }
+})
+
+test('a chave gerada não tem vogal nem caractere que se confunde', async () => {
+  globalThis.localStorage = globalThis.localStorage
+    || { getItem: () => null, setItem: () => {}, length: 0, key: () => null }
+  const { gerarChave } = await import('../src/lib/sincronia.js')
+  for (let i = 0; i < 100; i += 1) {
+    const chave = gerarChave().replace(/-/g, '')
+    assert.ok(!/[AEIOU]/.test(chave), 'sem vogal não se forma palavra')
+    assert.ok(!/[01IL]/.test(chave), 'nada que se confunda ditando em voz alta')
+  }
+})

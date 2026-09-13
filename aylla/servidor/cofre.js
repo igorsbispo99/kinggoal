@@ -15,7 +15,16 @@
 // o RESUMO da chave, nunca a chave: quem invadir o banco não consegue
 // abrir o cofre, e nem eu consigo.
 
-const CHAVES_VALIDAS = /^[A-Z2-7-]{10,60}$/
+// O servidor nao conhece o alfabeto do gerador, e nao deve conhecer: ele
+// so confere que a chave e um pedaco de texto razoavel. A primeira versao
+// deste padrao copiava o alfabeto base32 (A-Z e 2-7) de um gerador que eu
+// troquei em seguida por um sem vogais — e o novo usa 8 e 9. Resultado:
+// 151 de cada 200 chaves geradas eram recusadas como invalidas, no
+// primeiro clique da pessoa.
+//
+// Duplicar uma regra em dois lugares e o erro; a licao e que o lado que
+// valida nao pode repetir o que o lado que gera decidiu.
+export const CHAVES_VALIDAS = /^[A-Z0-9-]{10,80}$/
 
 async function resumo(texto) {
   const bytes = new TextEncoder().encode(String(texto))
@@ -40,7 +49,9 @@ async function preparar(env) {
 /** Cria um cofre. Quem cria escolhe a chave; o servidor nunca a vê inteira. */
 export async function criarCofre(env, chave) {
   if (!CHAVES_VALIDAS.test(String(chave || ''))) {
-    const erro = new Error('Chave inválida.')
+    const erro = new Error(
+      'Chave inválida: use letras maiúsculas, números e hífens, de 10 a 80 caracteres.',
+    )
     erro.status = 400
     throw erro
   }
