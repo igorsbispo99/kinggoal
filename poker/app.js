@@ -136,6 +136,7 @@
   const MODS = C.MODULES;
   const FLAT = []; MODS.forEach((m, mi) => m.lessons.forEach((l, li) => FLAT.push({ m, mi, l, li })));
   const findLesson = (id) => FLAT.find((x) => x.l.id === id);
+  const LVL = (n) => C.LEVELS.find((L) => L[0] === n) || [n, 'Nível ' + n, ''];
   const passed = (m) => !!(S.exams[m.id] && S.exams[m.id].best >= 0.8);
   const moduleOpen = (mi) => mi === 0 || passed(MODS[mi - 1]);
   const lessonOpen = (mi, li) => moduleOpen(mi) && (li === 0 || !!S.lessons[MODS[mi].lessons[li - 1].id] || passed(MODS[mi]));
@@ -193,7 +194,7 @@
   const rangeOf = (profile) => (eqCache[profile] = eqCache[profile] || P.topRange((P.PROFILES[profile] || P.PROFILES.tag).range));
 
   const DRILLS = {
-    ranking: { name: 'Quem vence?', domain: 'fund', lesson: 'l1_2', desc: 'Compare duas mãos no showdown.', err: 'calc',
+    ranking: { name: 'Quem vence?', domain: 'fund', lesson: 'z3_5', desc: 'Compare duas mãos no showdown.', err: 'calc',
       gen() {
         const d = P.deck(); const board = d.splice(0, 5), a = d.splice(0, 2), b = d.splice(0, 2);
         const sa = P.evaluate(a.concat(board)), sb = P.evaluate(b.concat(board));
@@ -201,7 +202,7 @@
           options: ['Jogador A', 'Jogador B', 'Empate'], a: sa > sb ? 0 : sb > sa ? 1 : 2,
           exp: `A tem ${describe(sa)}. B tem ${describe(sb)}.${P.category(sa) === P.category(sb) ? ' Mesma categoria: o desempate é pelas cartas mais altas e pelo kicker.' : ''}` };
       } },
-    besthand: { name: 'Qual é a sua mão?', domain: 'fund', lesson: 'l1_2', desc: 'Encontre a melhor combinação de 5 cartas.', err: 'calc',
+    besthand: { name: 'Qual é a sua mão?', domain: 'fund', lesson: 'z3_5', desc: 'Encontre a melhor combinação de 5 cartas.', err: 'calc',
       gen() {
         const d = P.deck(); const hero = d.splice(0, 2), board = d.splice(0, 5);
         const sc = P.evaluate(hero.concat(board)), cat = P.category(sc);
@@ -394,7 +395,7 @@
     const it = (label, r, extra) => ({ label, ok: r.ok, txt: r.txt, practical: !!extra });
     return [
       { lvl: 1, name: 'Iniciante', items: [
-        it('Provas dos módulos do nível 1', examOk(['m1', 'm2', 'm3', 'm4', 'lab1'])),
+        it('Provas dos módulos dos níveis 0 e 1', examOk(['z1', 'z2', 'z3', 'z4', 'z5', 'm1', 'm2', 'm3', 'm4', 'lab1'])),
         it('Treinos de base com 85% (quem vence, sua mão, abertura, outs, pot odds)', (() => { const r = ['ranking', 'besthand', 'rfi', 'outs', 'potodds'].map((id) => drillOk(id, 0.85)); return { ok: r.every((y) => y.ok), txt: `${r.filter((y) => y.ok).length}/5 treinos na meta` }; })(), 1),
         it('Mesa de treino: 300 mãos com qualidade de 70%', { ok: table.hands >= 300 && tq >= 0.7, txt: `${table.hands} mãos, ${pct(tq)}` }, 1),
       ] },
@@ -601,15 +602,16 @@ ${defense}`;
 
   VIEWS.onboard = () => `<div class="wrap narrow">
     <div class="eyebrow">Bem-vindo à mesa</div><h1>Do zero à elite, uma decisão de cada vez.</h1>
-    ${mentorHTML(`<p>Eu sou o <b>Ás</b>, seu mentor. Você não precisa saber nada de poker. Vou ensinar as regras, a matemática, a estratégia, a cabeça e a carreira de um profissional, em lições curtas seguidas de prática.</p>
-      <p>O app tem três partes: <b>Formação</b> (a trilha de 5 níveis, do iniciante à elite), <b>Laboratório</b> (o nosso software: equity, ranges, solver, push/fold, ICM, database e mais) e <b>Alto rendimento</b> (treino de decisões, mapa de leaks e fase Grandmaster).</p>
+    ${mentorHTML(`<p>Eu sou o <b>Ás</b>, seu mentor. Você não precisa saber nada de poker, nem conhecer as cartas do baralho. Começamos do zero absoluto e vamos devagar: cada ideia é explicada com calma, com exemplos e perguntas para você pensar antes de ler a resposta. O objetivo não é decorar jogadas, e sim entender o porquê de cada uma.</p>
+      <p>O app tem três partes: <b>Formação</b> (a trilha que começa no Nível 0, para quem nunca jogou, e vai até a elite), <b>Laboratório</b> (o nosso software: equity, ranges, solver, push/fold, ICM, database e mais) e <b>Alto rendimento</b> (treino de decisões, mapa de leaks e fase Grandmaster).</p>
       <p>Três números acompanham você: o <b>XP</b> mede esforço; o <b>IPP</b> (0 a 100) mede competência; e a <b>carteira profissional</b> (níveis 1 a 5) só avança com provas teóricas e práticas.</p>`)}
     <form class="panel stack" id="onboardForm">
       <label class="field">Como quer ser chamado?<input type="text" id="ob-name" maxlength="24" placeholder="Seu nome" required></label>
+      <label class="field">Qual a sua experiência com poker?<select id="ob-exp"><option value="never">Nunca joguei ou não conheço as regras</option><option value="some">Conheço as regras e já joguei um pouco</option><option value="regular">Jogo com frequência</option></select></label>
       <label class="field">Qual o seu objetivo?<select id="ob-goal"><option value="cash">Jogar cash game online com lucro</option><option value="mtt">Jogar torneios online</option><option value="both">Os dois</option></select></label>
       <label class="field">Quanto tempo por semana você pode estudar e jogar?<select id="ob-time"><option value="3">Até 3 horas</option><option value="6" selected>3 a 6 horas</option><option value="10">6 a 12 horas</option><option value="20">Mais de 12 horas</option></select></label>
-      <div class="row"><button class="btn primary" type="submit">Começar com o diagnóstico (3 min)</button><button class="btn ghost" type="button" data-act="ob-skip">Pular diagnóstico</button></div>
-      <p class="small muted">O diagnóstico registra o seu ponto de partida. Refaça depois para ver, em números, quanto você evoluiu.</p>
+      <div class="row"><button class="btn primary" type="submit">Começar</button><button class="btn ghost" type="button" data-act="ob-skip">Ir para o início</button></div>
+      <p class="small muted">Se você nunca jogou, vamos direto à primeira lição, sem teste nenhum. Se já joga, um diagnóstico de 3 minutos registra o seu ponto de partida para medir a sua evolução depois.</p>
     </form></div>`;
 
   VIEWS.home = () => {
@@ -617,7 +619,7 @@ ${defense}`;
     const h = new Date().getHours(), greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
     let msg;
     const tree = E.leakTree(S.decisions.slice(-400)); const topLeak = tree.find((n) => n.bad >= 3);
-    if (!Object.keys(S.lessons).length) msg = `<p>Vamos começar pelo começo: como um profissional ganha dinheiro. A primeira lição leva 6 minutos e muda o jeito de olhar para cada mão.</p>`;
+    if (!Object.keys(S.lessons).length) msg = S.profile.exp === 'never' || !S.profile.exp ? `<p>Vamos começar do zero absoluto: o que é poker, as cartas do baralho e como uma partida funciona. Não há pressa. Leia cada parte com calma, tente responder as perguntas <b>Pense antes de ler</b> antes de abrir a resposta e toque nas palavras sublinhadas sempre que uma delas for nova.</p>` : `<p>Você já conhece o jogo. A trilha começa no Nível 0 (regras e combinações); se ele for fácil para você, faça as provas dos cinco módulos sem ler as lições e siga para o Nível 1. Entender bem a base é o que sustenta tudo o que vem depois.</p>`;
     else if (due >= 10) msg = `<p>Você tem <b>${due} cartões</b> para revisar. A revisão espaçada é o que transforma a lição de ontem em memória de longo prazo. Comece por ela.</p>`;
     else if (ns && ns.type === 'exam') msg = `<p>Você concluiu as lições de <b>${esc(ns.m.title)}</b>. Hora da prova: 80% para avançar.</p>`;
     else if (topLeak) msg = `<p>O seu mapa de leaks aponta <b>${esc(E.SPOTNAME(topLeak.t))}</b> como o spot onde você mais perde EV (${pct(topLeak.acc)} de precisão). Dez minutos focados ali rendem mais do que uma hora no que você já domina.</p>`;
@@ -631,7 +633,7 @@ ${defense}`;
       ${mentorHTML(msg)}
       <div class="hero-stats">
         <div class="stat"><span class="eyebrow">IPP</span><span class="v num">${num(v.total, 0)}<span class="muted" style="font-size:1rem">/100</span></span><div class="bar"><i style="width:${v.total}%"></i></div></div>
-        <div class="stat"><span class="eyebrow">Carteira profissional</span><span class="v num">${cl}<span class="muted" style="font-size:1rem">/5</span></span><span class="small muted">${cl ? C.LEVELS[cl - 1][1] : 'Rumo ao nível 1'}</span></div>
+        <div class="stat"><span class="eyebrow">Carteira profissional</span><span class="v num">${cl}<span class="muted" style="font-size:1rem">/5</span></span><span class="small muted">${cl ? LVL(cl)[1] : 'Rumo ao nível 1'}</span></div>
         <div class="stat"><span class="eyebrow">Sequência</span><span class="v num">${S.streak.last === todayStr() || S.streak.last === addDays(todayStr(), -1) ? S.streak.count : 0}</span><span class="small muted">dias · recorde ${S.streak.best} · XP nível ${lv}</span></div>
         <div class="stat"><span class="eyebrow">Revisões pendentes</span><span class="v num">${due}</span><button class="btn ghost" data-act="nav" data-v="review" ${due ? '' : 'disabled'}>Revisar</button></div>
       </div>
@@ -665,14 +667,14 @@ ${defense}`;
   };
 
   VIEWS.trail = () => {
-    let lastLvl = 0;
+    let lastLvl = -1;
     return `<div class="wrap narrow">
-    <div><div class="eyebrow">Trilha</div><h1>Cinco níveis, do zero à elite</h1><p class="muted">27 módulos em 5 níveis: Iniciante, Competente, Reg, Pro e Elite. Cada módulo termina com uma prova (80% para avançar). Se já domina um assunto, faça a prova direto. A carteira de cada nível também exige provas práticas (aba Evolução).</p></div>
+    <div><div class="eyebrow">Trilha</div><h1>Do zero absoluto à elite</h1><p class="muted">${MODS.length} módulos em ${C.LEVELS.length} níveis: ${C.LEVELS.map((L) => L[1]).join(', ')}. Cada módulo termina com uma prova (80% para avançar). Se já domina um assunto, pode fazer a prova sem ler as lições. A carteira de cada nível também exige provas práticas (aba Evolução).</p></div>
     ${!S.diag.baseline ? `<div class="panel row" style="justify-content:space-between"><span>Você ainda não fez o diagnóstico inicial.</span><button class="btn" data-act="diag">Fazer diagnóstico</button></div>` : ''}
     ${MODS.map((m, mi) => {
       const open = moduleOpen(mi), done = m.lessons.filter((l) => S.lessons[l.id]).length, ex = S.exams[m.id];
       let head = '';
-      if (m.level !== lastLvl) { lastLvl = m.level; const L = C.LEVELS[m.level - 1]; head = `<div class="level-head"><span class="pill gold">Nível ${L[0]}</span><h2>${L[1]}</h2><p class="small muted">${L[2]}</p></div>`; }
+      if (m.level !== lastLvl) { lastLvl = m.level; const L = LVL(m.level); head = `<div class="level-head"><span class="pill gold">Nível ${L[0]}</span><h2>${L[1]}</h2><p class="small muted">${L[2]}</p></div>`; }
       return `${head}<section class="panel module"><div class="module-head"><div><div class="eyebrow">${esc(C.DOMAINS[m.domain])}</div><h2>${esc(m.title)}</h2></div>${passed(m) ? `<span class="pill good">Aprovado · ${pct(ex.best)}</span>` : open ? `<span class="pill gold">${done}/${m.lessons.length} lições</span>` : '<span class="pill">Bloqueado</span>'}</div>
       <p class="muted small">${esc(m.desc)}</p>
       ${open ? m.lessons.map((l, li) => { const ok = lessonOpen(mi, li), d = S.lessons[l.id]; return `<button class="lesson-row ${d ? 'done' : ''}" data-act="lesson" data-id="${l.id}" ${ok ? '' : 'disabled'}><span class="n">${d ? '✓' : li + 1}</span><span>${esc(l.title)}<br><span class="small muted">${l.min} min${l.drill ? ' · com treino' : ''}${l.lab ? ' · no Laboratório' : ''}</span></span>${ok ? (d ? `<span class="small muted num">${pct(d.score)}</span>` : '<span class="small">›</span>') : '<span class="lock">bloqueada</span>'}</button>`; }).join('') : `<p class="small muted">${m.lessons.length} lições · libera ao passar na prova anterior.</p>`}
@@ -681,21 +683,71 @@ ${defense}`;
     }).join('')}</div>`;
   };
 
+  // Lições em passos: o corpo é dividido nos subtítulos (h4) e revelado parte por parte.
+  const lessonSteps = (body) => body.split(/(?=<h4>)/).map((x) => x.trim()).filter(Boolean);
   VIEWS.lesson = ({ id }) => {
     const x = findLesson(id); if (!x) return VIEWS.trail();
-    const { l, m, li } = x, nxt = m.lessons[li + 1];
+    const { l, m, li } = x, nxt = m.lessons[li + 1], steps = lessonSteps(l.body), all = !!S.lessons[l.id] || steps.length < 2;
     return `<div class="wrap narrow">
       <div class="row small"><button class="btn ghost" data-act="nav" data-v="trail">‹ Trilha</button><span class="muted">${esc(m.tag)} · ${esc(m.title)} · lição ${li + 1} · ${l.min} min</span></div>
       <h1>${esc(l.title)}</h1>
       ${mentorHTML(`<p>${colorize(l.why)}</p>`, 'Por que isso importa')}
-      <article class="lesson-body">${colorize(l.body)}</article>
+      <article class="lesson-body">${steps.map((p, i) => `<section class="lstep" ${!all && i > 0 ? 'hidden' : ''}>${colorize(p)}</section>`).join('')}</article>
+      ${all ? '' : `<div class="step-nav" id="step-nav"><div class="bar"><i id="step-bar" style="width:${100 / steps.length}%"></i></div><div class="row" style="justify-content:space-between"><button class="btn primary" id="step-next">Continuar · parte 2 de ${steps.length}</button><button class="btn ghost small" id="step-all">Mostrar a lição inteira</button></div><p class="small muted" style="margin:0">Leia com calma. Quando houver uma pergunta <b>Pense antes de ler</b>, tente responder antes de abrir.</p></div>`}
+      <div id="after-steps" class="stack" ${all ? '' : 'hidden'}>
       <div class="callout example"><span class="eyebrow">Na prática</span>${colorize(l.example)}</div>
       <div class="callout"><span class="eyebrow">Dica do mentor</span>${colorize(l.tip)}</div>
       ${l.lab ? `<div class="callout lab"><span class="eyebrow">No Laboratório</span>${colorize(esc(l.lab[1]))}<div style="margin-top:8px"><button class="btn" data-act="nav" data-v="${l.lab[0]}">Abrir ${esc((Lab.tools.find((t) => t[0] === l.lab[0]) || E.drills.find((t) => t[0] === l.lab[0]) || [0, l.lab[0] === 'elite-leaks' ? 'Mapa de leaks' : 'ferramenta'])[1])}</button></div></div>` : ''}
       <div class="panel stack"><h3>Verifique o que aprendeu</h3><p class="muted small">Perguntas sem consultar o texto. Buscar a resposta na memória é o que fixa o conteúdo.</p>
       <div class="row"><button class="btn primary" data-act="lessonquiz" data-id="${l.id}">Começar o quiz</button>${l.drill ? `<button class="btn" data-act="drill" data-id="${l.drill}">Treino: ${DRILLS[l.drill].name}</button>` : ''}${S.lessons[l.id] && nxt ? `<button class="btn ghost" data-act="lesson" data-id="${nxt.id}">Próxima lição ›</button>` : ''}</div></div>
+      </div>
     </div>`;
   };
+  MOUNTS.lesson = (root) => {
+    const secs = [...root.querySelectorAll('.lstep')], nav = root.querySelector('#step-nav'), after = root.querySelector('#after-steps');
+    markTerms([...root.querySelectorAll('.lesson-body, .callout, .mentor .bubble')]);
+    if (!nav) return;
+    const next = root.querySelector('#step-next'), bar = root.querySelector('#step-bar');
+    const finish = () => { secs.forEach((x) => (x.hidden = false)); nav.remove(); after.hidden = false; };
+    next.addEventListener('click', () => {
+      const k = secs.findIndex((x) => x.hidden); if (k < 0) return finish();
+      secs[k].hidden = false;
+      if (k === secs.length - 1) finish(); else { next.textContent = `Continuar · parte ${k + 2} de ${secs.length}`; bar.style.width = ((k + 1) / secs.length) * 100 + '%'; }
+      secs[k].scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+    });
+    root.querySelector('#step-all').addEventListener('click', finish);
+  };
+
+  // ---------- glossário ao toque ----------
+  // Marca a primeira ocorrência de cada termo do glossário; tocar mostra a definição logo abaixo.
+  const TERMS = C.TERMS || {};
+  const TERM_RX = Object.keys(TERMS).sort((a, b) => b.length - a.length).map((k) => ({ k, rx: new RegExp('(^|[^\\p{L}\\p{N}])(' + k.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + ')(?![\\p{L}\\p{N}])', /[A-Z]/.test(k) || k.length <= 3 ? 'u' : 'iu') }));
+  const TERM_SKIP = 'button, a, summary, h1, h2, h3, h4, .term-def, .eyebrow, .who, .rangeset, .formula, table, input, textarea, select';
+  function markTerms(roots) {
+    const used = new Set();
+    for (const { k, rx } of TERM_RX) {
+      if (used.has(k)) continue;
+      outer: for (const r of roots) {
+        const w = document.createTreeWalker(r, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          if (!n.nodeValue.trim() || (n.parentElement && n.parentElement.closest(TERM_SKIP))) continue;
+          const mm = rx.exec(n.nodeValue); if (!mm) continue;
+          const at = mm.index + mm[1].length, rest = n.splitText(at); rest.splitText(mm[2].length);
+          const b = document.createElement('button'); b.type = 'button'; b.className = 'term'; b.dataset.term = k; b.setAttribute('aria-expanded', 'false'); b.title = 'Toque para ver o significado';
+          b.textContent = rest.nodeValue; rest.replaceWith(b); used.add(k); break outer;
+        }
+      }
+    }
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('button.term'); if (!b) return;
+    const open = b.nextElementSibling && b.nextElementSibling.classList.contains('term-def');
+    if (open) { b.nextElementSibling.remove(); b.setAttribute('aria-expanded', 'false'); return; }
+    const d = document.createElement('span'); d.className = 'term-def'; d.setAttribute('role', 'note');
+    d.innerHTML = `<b>${esc(b.dataset.term)}</b>: ${colorize(esc(TERMS[b.dataset.term] || ''))}`;
+    b.after(d); b.setAttribute('aria-expanded', 'true');
+  });
 
   // ---------- runner genérico ----------
   let runTimer = null;
@@ -801,7 +853,7 @@ ${defense}`;
   const toItem = (q) => ({ text: q.text, options: q.options, a: q.a, exp: q.exp });
   const examItems = (m) => shuffle(m.exam.concat(...m.lessons.map((l) => l.quiz))).slice(0, 10).map(toItem);
   function finalItems() {
-    const mods = MODS.filter((m) => m.level <= 4), per = Math.max(1, Math.ceil(30 / mods.length)), out = [];
+    const mods = MODS.filter((m) => m.level >= 1 && m.level <= 4), per = Math.max(1, Math.ceil(30 / mods.length)), out = [];
     mods.forEach((m) => out.push(...shuffle(m.exam.concat(...m.lessons.map((l) => l.quiz))).slice(0, per)));
     return shuffle(out).slice(0, 30).map(toItem);
   }
@@ -1155,7 +1207,7 @@ ${defense}`;
   function portfolioText() {
     const v = ipp(), cl = carteiraLevel(), q = E.iq(S.decisions), jr = journalStats(), gto = decAcc((d) => d.src === 'gto', 1000), tree = E.leakTree(S.decisions);
     const studyH = S.study.reduce((a, s) => a + s.min, 0) / 60;
-    return `PORTFÓLIO DO JOGADOR — ${S.profile.name}\nGerado em ${todayStr().split('-').reverse().join('/')} pela Escola do Ás\n\nFORMAÇÃO\n- Carteira profissional: nível ${cl} de 5${cl ? ' (' + C.LEVELS[cl - 1][1] + ')' : ''}\n- Índice de Proficiência (IPP): ${Math.round(v.total)}/100\n- Lições concluídas: ${Object.keys(S.lessons).length} de ${FLAT.length}; provas aprovadas: ${MODS.filter(passed).length} de ${MODS.length}\n- Certificação teórica: ${S.exams.final && S.exams.final.best >= 0.85 ? 'aprovado (' + pct(S.exams.final.best) + ')' : 'pendente'}\n\nCOMPETÊNCIAS (scorecard de Poker IQ, 0 a 100)\n${E.COMPS.map(([k, n]) => `- ${n}: ${q[k].n ? Math.round(q[k].v * 100) : 'sem dados'} (${q[k].n} decisões)`).join('\n')}\n\nDECISÕES REGISTRADAS\n- Total: ${S.decisions.length}\n- Treinador GTO: ${gto.n} decisões, EV perdido médio ${(gto.loss * 100).toFixed(1)}% do pote\n- Leaks corrigidos em andamento: ${tree.slice(0, 3).map((n) => `${E.SPOTNAME(n.t)} (${pct(n.acc)} de precisão${n.trend != null ? ', tendência ' + (n.trend >= 0 ? '+' : '') + Math.round(n.trend * 100) + ' pts' : ''})`).join('; ') || '—'}\n\nRESULTADOS REAIS\n- Mãos registradas: ${num(jr.hands, 0)}\n- Taxa: ${num(jr.bb100, 2)} bb/100 (intervalo de 95%: ${num(jr.bb100 - jr.ci, 1)} a ${num(jr.bb100 + jr.ci, 1)})\n- Sessões: ${S.journal.length}; disciplina média: ${S.journal.filter((s) => s.discipline != null).length ? pct(S.journal.filter((s) => s.discipline != null).reduce((a, s) => a + s.discipline, 0) / S.journal.filter((s) => s.discipline != null).length) : '—'}\n\nESTUDO\n- Horas registradas: ${num(studyH, 1)}\n- Revisões espaçadas: ${S.reviews}\n- Princípios escritos: ${S.principles.length}\n- Defesas no júri: ${S.jury.length}; problemas Grandmaster: ${S.gm.length}\n`;
+    return `PORTFÓLIO DO JOGADOR — ${S.profile.name}\nGerado em ${todayStr().split('-').reverse().join('/')} pela Escola do Ás\n\nFORMAÇÃO\n- Carteira profissional: nível ${cl} de 5${cl ? ' (' + LVL(cl)[1] + ')' : ''}\n- Índice de Proficiência (IPP): ${Math.round(v.total)}/100\n- Lições concluídas: ${Object.keys(S.lessons).length} de ${FLAT.length}; provas aprovadas: ${MODS.filter(passed).length} de ${MODS.length}\n- Certificação teórica: ${S.exams.final && S.exams.final.best >= 0.85 ? 'aprovado (' + pct(S.exams.final.best) + ')' : 'pendente'}\n\nCOMPETÊNCIAS (scorecard de Poker IQ, 0 a 100)\n${E.COMPS.map(([k, n]) => `- ${n}: ${q[k].n ? Math.round(q[k].v * 100) : 'sem dados'} (${q[k].n} decisões)`).join('\n')}\n\nDECISÕES REGISTRADAS\n- Total: ${S.decisions.length}\n- Treinador GTO: ${gto.n} decisões, EV perdido médio ${(gto.loss * 100).toFixed(1)}% do pote\n- Leaks corrigidos em andamento: ${tree.slice(0, 3).map((n) => `${E.SPOTNAME(n.t)} (${pct(n.acc)} de precisão${n.trend != null ? ', tendência ' + (n.trend >= 0 ? '+' : '') + Math.round(n.trend * 100) + ' pts' : ''})`).join('; ') || '—'}\n\nRESULTADOS REAIS\n- Mãos registradas: ${num(jr.hands, 0)}\n- Taxa: ${num(jr.bb100, 2)} bb/100 (intervalo de 95%: ${num(jr.bb100 - jr.ci, 1)} a ${num(jr.bb100 + jr.ci, 1)})\n- Sessões: ${S.journal.length}; disciplina média: ${S.journal.filter((s) => s.discipline != null).length ? pct(S.journal.filter((s) => s.discipline != null).reduce((a, s) => a + s.discipline, 0) / S.journal.filter((s) => s.discipline != null).length) : '—'}\n\nESTUDO\n- Horas registradas: ${num(studyH, 1)}\n- Revisões espaçadas: ${S.reviews}\n- Princípios escritos: ${S.principles.length}\n- Defesas no júri: ${S.jury.length}; problemas Grandmaster: ${S.gm.length}\n`;
   }
   MOUNTS.career = (root) => {
     const gen = root.querySelector('#pf-gen'); if (!gen) return;
@@ -1175,7 +1227,7 @@ ${defense}`;
   // ---------- método e fontes ----------
   VIEWS.library = () => {
     const q = (PARAMS.q || '').toLowerCase();
-    const gl = Object.values(ALLCARDS).filter((c) => !q || (c.f + c.b).toLowerCase().includes(q)).sort((a, b) => a.f.localeCompare(b.f, 'pt'));
+    const gl = Object.entries(TERMS).map(([f, b]) => ({ f: f.charAt(0).toUpperCase() + f.slice(1), b })).concat(Object.values(ALLCARDS)).filter((c) => !q || (c.f + c.b).toLowerCase().includes(q)).sort((a, b) => a.f.localeCompare(b.f, 'pt'));
     return `<div class="wrap narrow">
       <div><div class="eyebrow">Método e fontes</div><h1>Como este curso ensina</h1><p class="muted">O conteúdo segue a literatura de referência do poker e o app foi desenhado com base em pesquisas sobre como adultos aprendem habilidades complexas e como especialistas decidem sob pressão.</p></div>
       <div class="panel"><h3>Ciência da aprendizagem e da decisão aplicada</h3><table class="t">${C.SOURCES.learning.map(([a, t]) => `<tr><td><b>${a}</b></td><td>${t}</td></tr>`).join('')}</table></div>
@@ -1240,14 +1292,14 @@ ${defense}`;
   function saveProfile() {
     const name = (document.getElementById('ob-name').value || '').trim();
     if (!name) { toast('Digite um nome para continuar.'); document.getElementById('ob-name').focus(); return false; }
-    S.profile = { name, goal: document.getElementById('ob-goal').value, hours: +document.getElementById('ob-time').value, created: todayStr() };
+    S.profile = { name, exp: document.getElementById('ob-exp').value, goal: document.getElementById('ob-goal').value, hours: +document.getElementById('ob-time').value, created: todayStr() };
     touch(); save(); return true;
   }
   document.addEventListener('submit', (e) => {
     const id = e.target.id;
     if (!['onboardForm', 'journalForm', 'weeklyForm', 'bankForm'].includes(id)) return;
     e.preventDefault();
-    if (id === 'onboardForm') { if (saveProfile()) ACTS.diag(); }
+    if (id === 'onboardForm') { if (saveProfile()) { if (S.profile.exp === 'never') go('lesson', { id: MODS[0].lessons[0].id }); else ACTS.diag(); } }
     if (id === 'journalForm') {
       const g = (x) => document.getElementById(x).value;
       const hands = parseInt(g('jr-hands'), 10), result = parseFloat(String(g('jr-result')).replace(',', '.'));
