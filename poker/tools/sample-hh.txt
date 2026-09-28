@@ -1,0 +1,71 @@
+PokerStars Hand #243962847362:  Hold'em No Limit ($0.02/$0.05 USD) - 2024/03/05 12:34:56 ET
+Table 'Aase II' 6-max Seat #3 is the button
+Seat 1: villain1 ($5.12 in chips)
+Seat 2: Hero ($5 in chips)
+Seat 3: btnGuy ($4.80 in chips)
+Seat 4: sbGuy ($5 in chips)
+Seat 5: bbGuy ($6.20 in chips)
+Seat 6: utgGuy ($2.35 in chips)
+sbGuy: posts small blind $0.02
+bbGuy: posts big blind $0.05
+*** HOLE CARDS ***
+Dealt to Hero [Ah Kd]
+utgGuy: folds
+villain1: calls $0.05
+Hero: raises $0.15 to $0.20
+btnGuy: folds
+sbGuy: folds
+bbGuy: folds
+villain1: calls $0.15
+*** FLOP *** [2c 7d Ts]
+villain1: checks
+Hero: bets $0.25
+villain1: calls $0.25
+*** TURN *** [2c 7d Ts] [Qh]
+villain1: checks
+Hero: checks
+*** RIVER *** [2c 7d Ts Qh] [Ac]
+villain1: bets $0.50
+Hero: calls $0.50
+*** SHOW DOWN ***
+villain1: shows [Qc 9c] (a pair of Queens)
+Hero: shows [Ah Kd] (a pair of Aces)
+Hero collected $1.91 from pot
+*** SUMMARY ***
+Total pot $1.97 | Rake $0.06
+Board [2c 7d Ts Qh Ac]
+Seat 1: villain1 showed [Qc 9c] and lost with a pair of Queens
+Seat 2: Hero showed [Ah Kd] and won ($1.91) with a pair of Aces
+Seat 3: btnGuy (button) folded before Flop (didn't bet)
+
+
+
+PokerStars Hand #243962847363:  Hold'em No Limit ($0.02/$0.05 USD) - 2024/03/05 12:35:40 ET
+Table 'Aase II' 6-max Seat #4 is the button
+Seat 1: villain1 ($4.12 in chips)
+Seat 2: Hero ($5.96 in chips)
+Seat 3: btnGuy ($4.80 in chips)
+Seat 4: sbGuy ($4.98 in chips)
+Seat 5: bbGuy ($6.15 in chips)
+Seat 6: utgGuy ($2.35 in chips)
+bbGuy: posts small blind $0.02
+utgGuy: posts big blind $0.05
+*** HOLE CARDS ***
+Dealt to Hero [Jc Jd]
+villain1: raises $0.10 to $0.15
+Hero: raises $0.35 to $0.50
+btnGuy: folds
+sbGuy: folds
+bbGuy: folds
+utgGuy: folds
+villain1: raises $3.62 to $4.12 and is all-in
+Hero: calls $3.62
+*** FLOP *** [3c 8d Kh]
+*** TURN *** [3c 8d Kh] [5s]
+*** RIVER *** [3c 8d Kh 5s] [2d]
+*** SHOW DOWN ***
+villain1: shows [Ac Kc] (a pair of Kings)
+Hero: shows [Jc Jd] (a pair of Jacks)
+villain1 collected $8.07 from pot
+*** SUMMARY ***
+Total pot $8.31 | Rake $0.24

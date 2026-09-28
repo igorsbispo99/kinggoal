@@ -22,6 +22,13 @@
   --suit-h: #c8302c;
   --suit-d: #2360c4;
   --suit-c: #1d8a45;
+  --suit-d-l: #7fb0ff;
+  --act-fold: #5b8def;
+  --act-pass: #4fb383;
+  --act-bet1: #e0ab47;
+  --act-bet2: #e27a3c;
+  --act-bet3: #d9534a;
+  --act-allin: #a8456b;
   --font-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
   --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -47,7 +54,7 @@ p { margin: 0.6em 0; }
 
 /* Shell */
 .shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100%; }
-.rail { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; padding: 22px 16px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 22px; background: var(--felt); }
+.rail { position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; overflow-y: auto; padding: 22px 16px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 16px; background: var(--felt); }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-mark { width: 38px; height: 50px; border-radius: 6px; background: var(--card-face); color: var(--suit-s); display: grid; place-items: center; font: 800 1.3rem/1 var(--font-display); box-shadow: 3px 3px 0 var(--brass); flex: none; }
 .brand-mark small { display: block; font-size: 0.9rem; margin-top: -4px; }
@@ -246,6 +253,58 @@ svg text { font-family: var(--font-mono); }
 .toast.badge { background: var(--ivory); }
 @keyframes pop { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .toast { animation: none; } * { transition: none !important; } }
+
+/* Três menus */
+.secs { display: flex; gap: 4px; background: var(--felt-2); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+.secs button { flex: 1 1 0; min-width: 0; white-space: normal; overflow-wrap: anywhere; background: none; border: 0; border-radius: 7px; padding: 7px 4px; font: 700 0.74rem/1.15 var(--font-body); color: var(--muted); cursor: pointer; }
+.grid3, .grid2 { align-items: start; }
+.secs button[aria-pressed="true"] { background: var(--brass); color: var(--brass-ink); }
+.tool-card { text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.tool-card:hover { border-color: var(--brass); }
+.level-head { display: grid; gap: 4px; margin-top: 14px; }
+.btn.small, .small .btn { padding: 5px 10px; font-size: 0.85rem; }
+.bar.clock i { background: var(--red); }
+.callout.lab { border-left-color: var(--act-pass); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; }
+details.carteira, details.leak { border-top: 1px solid var(--line); padding: 8px 0; }
+details.carteira > summary, details.leak > summary { display: flex; gap: 10px; align-items: center; cursor: pointer; list-style: none; flex-wrap: wrap; }
+details > summary::-webkit-details-marker { display: none; }
+.leak-row { display: grid; gap: 6px; padding: 10px 0; border-top: 1px dashed var(--line); }
+table.t input[type=text] { min-width: 90px; }
+table.dash td { vertical-align: middle; }
+
+/* Laboratório: editor de range e cartas */
+.re { display: grid; gap: 8px; }
+.re-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.re-bar select { flex: 1 1 180px; width: auto; }
+.re-brush { display: flex; gap: 4px; }
+.re-brush button { background: var(--felt); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; cursor: pointer; font: 600 0.75rem/1 var(--font-mono); }
+.re-brush button[aria-pressed="true"] { border-color: var(--brass); color: var(--brass); }
+.re-grid span { cursor: pointer; user-select: none; touch-action: none; }
+.ci-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ci-row input { flex: 1 1 140px; width: auto; }
+.ci-preview { min-height: 46px; margin: 6px 0; display: flex; align-items: center; }
+.ci-deck { display: grid; gap: 4px; }
+.ci-deck > div { display: flex; flex-wrap: wrap; gap: 3px; }
+.ci-card { font: 700 0.75rem/1 var(--font-mono); padding: 6px 5px; min-width: 32px; border-radius: 5px; border: 1px solid var(--line); background: var(--card-face); cursor: pointer; }
+.ci-card.s { color: var(--suit-s); } .ci-card.h { color: var(--suit-h); } .ci-card.d { color: var(--suit-d); } .ci-card.c { color: var(--suit-c); }
+.ci-card.on { outline: 3px solid var(--brass); }
+.ci-card:disabled { opacity: 0.25; cursor: not-allowed; }
+.freqbar { display: flex; height: 16px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); gap: 2px; background: var(--felt); }
+.freqbar span { display: block; min-width: 2px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.act-btn { gap: 4px; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.solver-grid .off { background: var(--felt); color: var(--faint); }
+.sv-cell { cursor: pointer; color: #101614 !important; font-weight: 700; }
+.turn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(54px, 1fr)); gap: 6px; }
+.tg { display: grid; justify-items: center; gap: 2px; padding: 5px 2px; border-radius: 8px; border: 1px solid var(--line); background: var(--felt); }
+.tg.up { border-color: var(--good); box-shadow: inset 0 0 0 1px var(--good); }
+.tg.down { border-color: var(--red); }
+.tg.sel { border-color: var(--brass); box-shadow: 0 0 0 2px var(--brass); }
+.btnlike { cursor: pointer; font: inherit; color: inherit; }
+@media (max-width: 560px) { .table-wrap.hu { aspect-ratio: 4 / 5; min-height: 380px; } }
 </style>
 
 <div class="shell">
@@ -254,6 +313,7 @@ svg text { font-family: var(--font-mono); }
       <div class="brand-mark" aria-hidden="true">A<small>♠</small></div>
       <div><b>Escola do Ás</b><span>do zero ao profissional</span></div>
     </div>
+    <div class="secs" id="secs" role="group" aria-label="Menus"></div>
     <nav class="tabs" id="tabs" aria-label="Seções"></nav>
     <div class="rail-foot" id="railfoot"></div>
   </aside>
@@ -262,5 +322,20 @@ svg text { font-family: var(--font-mono); }
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script src="engine.js"></script>
+<script src="preflop-matrix.js"></script>
+<script src="icm.js"></script>
+<script src="solver-core.js"></script>
 <script src="content.js"></script>
+<script src="content-a.js"></script>
+<script src="content-b.js"></script>
+<script src="content-c.js"></script>
+<script src="content-d.js"></script>
+<script src="tracker.js"></script>
+<script src="lab-core.js"></script>
+<script src="lab-solver.js"></script>
+<script src="lab-mtt.js"></script>
+<script src="lab-db.js"></script>
+<script src="lab-misc.js"></script>
+<script src="elite-core.js"></script>
+<script src="elite-drills.js"></script>
 <script src="app.js"></script>

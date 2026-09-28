@@ -31,7 +31,7 @@
 <h4>Decisão não é resultado</h4>
 <p>Annie Duke, ex-profissional e autora de <i>Thinking in Bets</i>, chama de <b>resulting</b> o hábito de julgar uma decisão pelo resultado. Se você colocou todas as fichas com A♠A♥ contra 7♦2♣ e perdeu, a decisão foi excelente: você ganharia cerca de 87% das vezes.</p>
 <h4>O que é "vencer" no poker</h4>
-<p>O objetivo não é ganhar a maioria das mãos. Um bom jogador desiste da maioria das mãos antes do flop. O objetivo é uma <b>taxa de ganho positiva</b>, medida em <b>bb/100</b>: quantos big blinds você ganha, em média, a cada 100 mãos. Você vai aprender a calcular e acompanhar isso no módulo 8.</p>`,
+<p>O objetivo não é ganhar a maioria das mãos. Um bom jogador desiste da maioria das mãos antes do flop. O objetivo é uma <b>taxa de ganho positiva</b>, medida em <b>bb/100</b>: quantos big blinds você ganha, em média, a cada 100 mãos. Você vai aprender a calcular e acompanhar isso no nível 4.</p>`,
           example: 'Um jogador de NL10 (blinds de $0,05/$0,10) com taxa de 6 bb/100 que joga 40 mil mãos por mês lucra em média 6 × 400 = 2.400 bb, ou $240, antes do rakeback. O mesmo jogador pode ter um mês inteiro negativo por puro azar.',
           tip: 'A partir de hoje, depois de cada mão perdida, pergunte: "eu faria de novo, com a mesma informação?" Se a resposta for sim, a mão foi bem jogada.',
           quiz: [
@@ -123,7 +123,7 @@
 <li><b>Spin & Go</b> (e similares): torneios rápidos de 3 jogadores com prêmio sorteado. Variância altíssima.</li>
 <li><b>Fast-fold</b> (Zoom, Rush, Fast Forward): você troca de mesa ao desistir. Mais mãos por hora, adversários mais difíceis de ler.</li></ul>
 <h4>Por onde começar</h4>
-<p>Este curso usa cash game 6-max com 100bb como trilha principal. Motivo: o feedback é rápido e mensurável (bb/100), a estrutura é constante e os conceitos transferem bem para torneios. O módulo 6 cobre o que muda em torneios.</p>`,
+<p>Este curso usa cash game 6-max com 100bb como trilha principal. Motivo: o feedback é rápido e mensurável (bb/100), a estrutura é constante e os conceitos transferem bem para torneios. Os módulos de torneios (níveis 2 e 3) cobrem o que muda nesse formato.</p>`,
           example: 'NL2: blinds $0,01/$0,02, entrada de $2. NL25: blinds $0,10/$0,25, entrada de $25.',
           tip: 'Comece nos menores limites que a sala oferece. O custo de aprender lá é pequeno e os erros dos adversários são os mais fáceis de explorar.',
           quiz: [
