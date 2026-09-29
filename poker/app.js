@@ -703,10 +703,11 @@ ${defense}`;
       let o; try { o = JSON.parse(el.dataset.spot); } catch (e) { return; }
       const key = lid + ':' + i;
       el.className = 'spot panel stack';
-      el.innerHTML = `<div class="eyebrow">Mão interativa${o.title ? ' · ' + esc(o.title) : ''}</div>
-        <div class="spot-table"><div><span class="lbl">Você${o.pos ? ' · ' + esc(o.pos) : ''}</span><div class="board">${o.hero ? cardsHTML(parseCards(o.hero)) : ''}</div></div>
+      const table = !!(o.hero || o.board || o.pot != null);
+      el.innerHTML = `<div class="eyebrow">${table ? 'Mão interativa' : 'Situação'}${o.title ? ' · ' + esc(o.title) : ''}</div>
+        ${table ? `<div class="spot-table"><div><span class="lbl">Você${o.pos ? ' · ' + esc(o.pos) : ''}</span><div class="board">${o.hero ? cardsHTML(parseCards(o.hero)) : ''}</div></div>
         <div><span class="lbl">Mesa</span><div class="board">${o.board ? cardsHTML(parseCards(o.board)) : '<span class="small muted">ainda sem cartas</span>'}</div></div>
-        <div class="spot-nums">${o.pot != null ? `<span class="lbl">Pote</span><b class="num">${bbTxt(o.pot)}</b>` : ''}${o.stack != null ? `<span class="lbl">Stack efetivo</span><b class="num">${bbTxt(o.stack)}</b>` : ''}</div></div>
+        <div class="spot-nums">${o.pot != null ? `<span class="lbl">Pote</span><b class="num">${bbTxt(o.pot)}</b>` : ''}${o.stack != null ? `<span class="lbl">Stack efetivo</span><b class="num">${bbTxt(o.stack)}</b>` : ''}</div></div>` : ''}
         ${o.hist ? `<p class="small muted" style="margin:0">${colorize(o.hist)}</p>` : ''}
         <p class="spot-q">${colorize(o.q)}</p>
         <div class="opts">${o.opts.map((x, k) => `<button type="button" class="opt" data-k="${k}"><span class="k">${k + 1}</span>${colorize(x[0])}</button>`).join('')}</div>
