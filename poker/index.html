@@ -100,6 +100,7 @@ main { padding-block: 32px 64px; padding-inline: clamp(16px, 4vw, 48px); min-wid
 .pill.gold { border-color: var(--brass); color: var(--brass); }
 .pill.good { border-color: var(--good); color: var(--good); }
 .pill.bad { border-color: var(--red); color: var(--red); }
+.pill.bad { border-color: var(--red); color: var(--red); }
 .pill.warn { border-color: var(--warn); color: var(--warn); }
 .bar { height: 8px; background: var(--felt); border-radius: 99px; overflow: hidden; border: 1px solid var(--line); }
 .bar > i { display: block; height: 100%; background: var(--brass); border-radius: 99px; }
@@ -176,6 +177,15 @@ button.term:hover, button.term[aria-expanded="true"] { color: var(--brass); }
 .term-def { display: block; margin: 6px 0 8px; padding: 8px 12px; border-left: 3px solid var(--brass); background: var(--felt); border-radius: 0 8px 8px 0; font-size: 0.92rem; font-weight: 400; color: var(--ivory); }
 .term-def b { color: var(--brass); }
 .glossary dt { font-weight: 700; margin-top: 10px; }
+/* pacote 2: pistas socráticas e mapa de domínio */
+.socratic .hint { margin: 0; padding: 8px 12px; border-left: 3px solid var(--brass); background: var(--felt); border-radius: 0 8px 8px 0; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.6fr) auto; gap: 10px 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.mrow:first-of-type { border-top: 0; }
+.mrow.locked { opacity: 0.55; }
+.mbars { display: grid; gap: 4px; }
+.mbar { display: grid; grid-template-columns: 96px minmax(0, 1fr) 44px; gap: 8px; align-items: center; }
+.mbar .bar { margin: 0; }
+@media (max-width: 720px) { .mrow { grid-template-columns: 1fr; } }
 .spot, .worked { margin: 1.2em 0; border-color: var(--brass); }
 .spot-table { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; padding: 12px; border-radius: 10px; background: var(--felt); border: 1px solid var(--line); }
 .spot-table .lbl { display: block; margin-bottom: 6px; }
@@ -370,6 +380,8 @@ table.dash td { vertical-align: middle; }
 <script src="content-n3.js"></script>
 <script src="content-n4.js"></script>
 <script src="content-n5.js"></script>
+<script src="content-diag.js"></script>
+<script src="practice.js"></script>
 <script src="tracker.js"></script>
 <script src="lab-core.js"></script>
 <script src="lab-solver.js"></script>

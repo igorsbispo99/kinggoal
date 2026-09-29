@@ -3,7 +3,7 @@
    plano semanal, mentor por IA e sincronização. */
 (function () {
   'use strict';
-  const P = window.Poker, C = window.Curriculum, Lab = window.Lab, E = window.Elite, T_ = window.Tracker;
+  const P = window.Poker, C = window.Curriculum, Lab = window.Lab, E = window.Elite, T_ = window.Tracker, Pr = window.Practice;
   const main = document.getElementById('main');
   const KEY = 'escola-do-as-v1';
   const DAY = 86400000;
@@ -45,14 +45,14 @@
 
   // ---------- estado persistente ----------
   function fresh() {
-    return { v: 1, profile: null, xp: 0, streak: { count: 0, best: 0, last: null }, lessons: {}, qs: {}, exams: {}, diag: {}, drills: {}, cards: {}, reviews: 0,
+    return { v: 1, profile: null, xp: 0, streak: { count: 0, best: 0, last: null }, lessons: {}, qs: {}, exams: {}, diag: {}, mastery: {}, placement: null, drills: {}, cards: {}, reviews: 0,
       sim: { hands: 0, net: 0, vpip: 0, pfr: 0, good: 0, ok: 0, bad: 0, curve: [0] }, simModes: {}, journal: [], hist: {}, badges: {}, daily: {}, days: {},
       decisions: [], tools: {}, ranges: {}, notes: {}, gto: null, jury: [], gm: [], principles: [], study: [], session: null, plan: {}, planExtra: [], weekly: [], dbexam: null, settings: { drillTime: 0 }, savedAt: 0 };
   }
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
   S = S && S.v === 1 ? Object.assign(fresh(), S) : fresh();
-  S.settings = Object.assign({ drillTime: 0 }, S.settings);
+  S.settings = Object.assign({ drillTime: 0, socratic: true }, S.settings);
   let cloudTimer = null;
   function save() {
     if (S.profile) S.hist[todayStr()] = Math.round(ipp().total);
@@ -138,7 +138,10 @@
   const findLesson = (id) => FLAT.find((x) => x.l.id === id);
   const LVL = (n) => C.LEVELS.find((L) => L[0] === n) || [n, 'Nível ' + n, ''];
   const passed = (m) => !!(S.exams[m.id] && S.exams[m.id].best >= 0.8);
-  const moduleOpen = (mi) => mi === 0 || passed(MODS[mi - 1]);
+  // Nivelamento do diagnóstico: módulos abaixo do nível indicado ficam abertos para revisão, e o primeiro módulo do nível indicado também.
+  const placedOpen = (mi) => { const pl = S.placement; if (pl == null) return false; const m = MODS[mi]; return m.level < pl || (m.level === pl && MODS.findIndex((x) => x.level === pl) === mi); };
+  const placedSkip = (m) => S.placement != null && m.level < S.placement && !passed(m);
+  const moduleOpen = (mi) => mi === 0 || passed(MODS[mi - 1]) || placedOpen(mi);
   const lessonOpen = (mi, li) => moduleOpen(mi) && (li === 0 || !!S.lessons[MODS[mi].lessons[li - 1].id] || passed(MODS[mi]));
   const lessonOpenById = (id) => { const x = findLesson(id); return x && lessonOpen(x.mi, x.li); };
   const lessonTitle = (id) => { const x = findLesson(id); return x ? x.l.title : id; };
@@ -146,6 +149,7 @@
     for (let mi = 0; mi < MODS.length; mi++) {
       if (!moduleOpen(mi)) break;
       const m = MODS[mi], l = m.lessons.find((x) => !S.lessons[x.id]);
+      if (placedSkip(m)) continue;
       if (l && !passed(m)) return { type: 'lesson', m, l };
       if (!passed(m)) return { type: 'exam', m };
       if (m.id === 'm8' && !(S.exams.final && S.exams.final.best >= 0.85)) return { type: 'final' };
@@ -156,6 +160,7 @@
   // ---------- registro de decisões ----------
   function logDecision(d) {
     d.t = Date.now(); S.decisions.push(d); dayLog('dec');
+    const ac = Pr.applyConcept(d); if (ac && !String(d.src || '').startsWith('drill:')) observe(ac, 'p', !!d.ok);
     if (d.src === 'gto') { dayLog('gto'); if ((S.gto || {}).n >= 100) award('gto100'); }
     touch();
   }
@@ -339,6 +344,52 @@
   function drillAcc(id) { const d = S.drills[id]; if (!d || !d.h.length) return null; const h = d.h.slice(-30); return { acc: h.reduce((a, b) => a + b, 0) / h.length, n: d.h.length }; }
   const decAcc = (f, last) => { const ds = S.decisions.filter(f).slice(-(last || 200)); return ds.length ? { acc: ds.filter((d) => d.ok).length / ds.length, n: ds.length, loss: ds.reduce((a, d) => a + (d.evLossPct || 0), 0) / ds.length, ds } : { acc: 0, n: 0, loss: 0, ds: [] }; };
 
+  // ---------- modelo de domínio por conceito ----------
+  // Cada conceito tem duas trilhas: conhecimento (quizzes, exercícios, diagnóstico) e aplicação (mesa, Laboratório, Alto rendimento).
+  // Estimativa: média bayesiana com esquecimento das observações antigas (peso 0,9 a cada nova resposta).
+  function observe(cid, track, ok, w) {
+    if (!cid || !Pr.byId[cid]) return;
+    const m = (S.mastery[cid] = S.mastery[cid] || {}), s = (m[track] = m[track] || { a: 0, b: 0, n: 0, t: 0 });
+    w = w || 1; s.a = s.a * 0.9 + (ok ? w : 0); s.b = s.b * 0.9 + (ok ? 0 : w); s.n++; s.t = Date.now();
+  }
+  const observeLesson = (lid, ok, w) => (Pr.byLesson[lid] || []).forEach((c) => observe(c, 'k', ok, w));
+  const estOf = (s) => (!s || s.a + s.b < 0.5 ? null : { p: (s.a + 1) / (s.a + s.b + 2), n: s.a + s.b, days: (Date.now() - s.t) / DAY });
+  function conceptState(cid) {
+    const m = S.mastery[cid] || {}, k = estOf(m.k), a = estOf(m.p);
+    const p = k && a ? (k.p * k.n + a.p * a.n) / (k.n + a.n) : k ? k.p : a ? a.p : null;
+    const n = (k ? k.n : 0) + (a ? a.n : 0), days = Math.min(k ? k.days : 1e9, a ? a.days : 1e9);
+    let st = 'novo';
+    if (p != null) st = p >= 0.8 && n >= 4 ? (days > 21 ? 'revisar' : 'dominado') : p < 0.6 && n >= 2 ? 'fraco' : 'construcao';
+    return { k, a, p, n, st, days, gap: !!(k && a && k.p >= 0.75 && k.n >= 3 && a.p < 0.6 && a.n >= 4) };
+  }
+  const ST = { novo: ['Ainda sem dados', ''], construcao: ['Em construção', 'gold'], fraco: ['Precisa de reforço', 'bad'], dominado: ['Dominado', 'good'], revisar: ['Dominado, hora de revisar', 'gold'] };
+  const conceptOpen = (c) => c.level <= (S.placement || 0) || c.lessons.some((l) => S.lessons[l]);
+  const GH = { cards: (a, sm) => cardsHTML(a, sm), pick, shuffle, pct, num };
+  const quizPoolOf = (c) => c.lessons.filter((l) => S.lessons[l] || (findLesson(l) && findLesson(l).m.level < (S.placement || 0))).flatMap((l) => (findLesson(l) ? findLesson(l).l.quiz.map((q) => [q, l]) : []));
+  const practicable = (c) => c.gens.length > 0 || quizPoolOf(c).length > 0;
+  // Um exercício novo do conceito: gerado pelo motor quando há gerador; senão, uma pergunta das lições já feitas.
+  function practiceItem(cid) {
+    const c = Pr.byId[cid], pool = quizPoolOf(c);
+    let it;
+    if (c.gens.length && (!pool.length || Math.random() < 0.75)) { const g = pick(c.gens); it = g.startsWith('drill:') ? DRILLS[g.slice(6)].gen() : Pr.GEN[g](GH); }
+    else if (pool.length) { const [q, l] = pick(pool); it = Object.assign(toItem(q), { lid: l }); }
+    else return null;
+    return Object.assign({}, it, { cid, hints: it.hints || c.hints });
+  }
+  // Escolha adaptativa: mais peso para o que está fraco, com lacuna entre teoria e prática ou esquecido; um pouco do resto para intercalar.
+  function adaptivePick(n) {
+    const open = Pr.CONCEPTS.filter((c) => conceptOpen(c) && practicable(c));
+    if (!open.length) return [];
+    const w = (c) => { const x = conceptState(c.id); return { fraco: 4, revisar: 3, construcao: 2.5, novo: 1.5, dominado: 0.4 }[x.st] + (x.gap ? 2 : 0) + Math.random(); };
+    const ranked = open.map((c) => [c.id, w(c)]).sort((a, b) => b[1] - a[1]).map((x) => x[0]), top = ranked.slice(0, 4);
+    return shuffle(Array.from({ length: n }, (_, i) => (i < Math.ceil(n * 0.7) ? top[i % top.length] : pick(ranked))));
+  }
+  function startPractice(cids, meta) {
+    if (!cids.length) { toast('Conclua uma lição para liberar a prática.'); return; }
+    startRunner('practice', cids.map((cid) => () => practiceItem(cid) || Object.assign(DRILLS.ranking.gen(), { cid: 'combinacoes' })), meta);
+  }
+
+
   // ---------- métricas ----------
   function domainScore(dom) {
     const parts = [];
@@ -435,7 +486,14 @@
   // ---------- revisão espaçada (Leitner) ----------
   const INTERVALS = [0, 1, 3, 7, 16, 35];
   const ALLCARDS = {}; FLAT.forEach(({ l, m }) => l.cards.forEach((c, i) => (ALLCARDS[l.id + ':' + i] = { f: c[0], b: c[1], m: m.title })));
-  function unlockCards(l) { l.cards.forEach((c, i) => { const id = l.id + ':' + i; if (!S.cards[id]) S.cards[id] = { box: 1, due: addDays(todayStr(), 1) }; }); }
+  function unlockCards(l) { l.cards.forEach((c, i) => { const id = l.id + ':' + i; if (!S.cards[id]) S.cards[id] = { s: 1, d: 5, reps: 0, lapses: 0, due: addDays(todayStr(), 1) }; }); }
+  // Revisão espaçada adaptativa: cada cartão tem estabilidade (quantos dias a memória dura) e dificuldade (1 a 10).
+  // Cartões antigos, do sistema de caixas, são convertidos na primeira leitura.
+  function cardOf(id) { const c = S.cards[id]; if (c && c.s == null) { c.s = INTERVALS[c.box || 1] || 1; c.d = 5; c.reps = c.reps || 0; c.lapses = c.lapses || 0; } return c; }
+  function lapseCard(id) { const c = cardOf(id); if (!c) return; c.s = Math.max(0.5, c.s * 0.4); c.d = Math.min(10, c.d + 1); c.lapses++; c.due = todayStr(); }
+  // Retenção do próprio aluno nas revisões com cartão vencido; os intervalos se ajustam para mantê-la perto de 90%.
+  const retention = () => { const h = (S.rvHist || []).slice(-60); return h.length >= 10 ? h.reduce((a, b) => a + b, 0) / h.length : null; };
+  const intervalScale = () => { const r = retention(); return r == null ? 1 : Math.max(0.6, Math.min(1.4, 1 + (r - 0.9) * 3)); };
   const dueCards = () => Object.keys(S.cards).filter((id) => S.cards[id].due <= todayStr() && ALLCARDS[id]);
 
   // ---------- missões diárias ----------
@@ -462,6 +520,7 @@
     const ns = nextStep();
     items.push({ id: 'lessons', title: `Estudar ${Math.max(2, Math.round(hours * 0.6))} lições`, v: lessonsWeek, n: Math.max(2, Math.round(hours * 0.6)), go: ns && ns.type === 'lesson' ? ['lesson', ns.l.id] : ['nav', 'trail'] });
     items.push({ id: 'reviews', title: 'Revisão espaçada em 5 dias da semana', v: Object.entries(S.days).filter(([d, v]) => d >= weekStart() && v.reviews).length, n: 5, go: ['nav', 'review'] });
+    items.push({ id: 'adaptive', title: `Prática adaptativa: ${hours * 5} exercícios nos seus conceitos mais fracos`, v: weekSum('practice'), n: hours * 5, go: ['adaptive'] });
     items.push({ id: 'drills', title: `Responder ${hours * 15} questões de treino`, v: weekSum('drills'), n: hours * 15, go: ['nav', 'drills'] });
     items.push({ id: 'hands', title: `Jogar ${hours * 40} mãos na mesa com o mentor`, v: weekSum('hands'), n: hours * 40, go: ['nav', 'table'] });
     if (moduleOpen(5)) items.push({ id: 'gto', title: `${hours * 10} decisões no Treinador GTO`, v: weekSum('gto'), n: hours * 10, go: ['nav', 'lab-trainer'] });
@@ -519,7 +578,7 @@ ${defense}`;
 
   // ---------- roteamento ----------
   const SECTIONS = {
-    form: ['Formação', [['home', 'Início'], ['plan', 'Plano da semana'], ['trail', 'Trilha'], ['drills', 'Treinos'], ['table', 'Mesa'], ['review', 'Revisão'], ['progress', 'Evolução'], ['dashboard', 'Painel de performance'], ['career', 'Carreira'], ['library', 'Método e fontes']]],
+    form: ['Formação', [['home', 'Início'], ['plan', 'Plano da semana'], ['trail', 'Trilha'], ['drills', 'Treinos'], ['table', 'Mesa'], ['review', 'Revisão'], ['mastery', 'Domínio'], ['progress', 'Evolução'], ['dashboard', 'Painel de performance'], ['career', 'Carreira'], ['library', 'Método e fontes']]],
     lab: ['Laboratório', [['lab-home', 'Visão geral']].concat(Lab.tools.map(([id, n]) => [id, n]))],
     elite: ['Alto rendimento', [['elite-home', 'Painel de elite'], ['elite-leaks', 'Mapa de leaks']].concat(E.drills.map(([id, n]) => [id, n]))],
   };
@@ -614,12 +673,37 @@ ${defense}`;
       <p class="small muted">Se você nunca jogou, vamos direto à primeira lição, sem teste nenhum. Se já joga, um diagnóstico de 3 minutos registra o seu ponto de partida para medir a sua evolução depois.</p>
     </form></div>`;
 
+  VIEWS.diagintro = () => {
+    const exp = (S.profile && S.profile.exp) || 'never';
+    const txt = exp === 'never'
+      ? `<p>Antes de começar, um diagnóstico curto, de 1 a 3 minutos. Ele não é uma prova: serve para registrar o seu ponto de partida e, daqui a algumas semanas, mostrar em números o quanto você aprendeu.</p><p>Você disse que nunca jogou. Ótimo: sempre que não souber, marque <b>Não sei</b>. É a resposta certa para quem não sabe, e ela deixa o diagnóstico preciso. Quando as perguntas ficarem difíceis, o diagnóstico para sozinho.</p>`
+      : `<p>O diagnóstico se adapta a você. Ele começa no nível que você indicou, <b>sobe</b> quando você acerta e <b>desce</b> quando erra, até encontrar o seu ponto de partida. Leva de 3 a 8 minutos.</p><p>Se você já domina os níveis iniciais, a trilha libera o nível certo para você começar, sem obrigar a refazer o que já sabe. Na dúvida, marque <b>Não sei</b>: chutar deixa o resultado impreciso.</p>`;
+    return `<div class="wrap narrow"><div class="eyebrow">Diagnóstico</div><h1>${exp === 'never' ? 'Um ponto de partida, sem pressão' : 'Encontrando o seu nível'}</h1>${mentorHTML(txt)}
+      <div class="row"><button class="btn primary" data-act="diag">Fazer o diagnóstico</button>${exp === 'never' ? `<button class="btn ghost" data-act="lesson" data-id="${MODS[0].lessons[0].id}">Pular e ir para a primeira lição</button>` : '<button class="btn ghost" data-act="nav" data-v="home">Pular por enquanto</button>'}</div></div>`;
+  };
+
+  VIEWS.mastery = () => {
+    const rows = Pr.CONCEPTS.map((c) => ({ c, x: conceptState(c.id), open: conceptOpen(c) }));
+    const gaps = rows.filter((r) => r.x.gap), weak = rows.filter((r) => r.open && (r.x.st === 'fraco' || r.x.st === 'revisar'));
+    const cnt = (st) => rows.filter((r) => r.x.st === st).length;
+    const bar = (e, lbl) => (e ? `<div class="mbar" title="${lbl}: ${pct(e.p)}"><span class="small muted">${lbl}</span><div class="bar"><i style="width:${e.p * 100}%"></i></div><span class="small num">${pct(e.p)}</span></div>` : `<div class="mbar"><span class="small muted">${lbl}</span><span class="small muted">sem dados</span></div>`);
+    return `<div class="wrap"><div><div class="eyebrow">Formação · Domínio</div><h1>O que você domina, conceito por conceito</h1><p class="muted">O mentor acompanha ${Pr.CONCEPTS.length} conceitos. Cada resposta em quizzes, exercícios e diagnóstico mede o <b>conhecimento</b>; cada decisão na Mesa de treino, no Laboratório e no Alto rendimento mede a <b>aplicação</b>. Respostas recentes pesam mais que as antigas, e o que fica muito tempo sem prática volta para revisão.</p></div>
+      <div class="hero-stats"><div class="stat"><span class="eyebrow">Dominados</span><span class="v num">${cnt('dominado')}</span></div><div class="stat"><span class="eyebrow">Em construção</span><span class="v num">${cnt('construcao')}</span></div><div class="stat"><span class="eyebrow">Precisam de reforço</span><span class="v num">${cnt('fraco')}</span></div><div class="stat"><span class="eyebrow">Hora de revisar</span><span class="v num">${cnt('revisar')}</span></div></div>
+      <div class="panel row" style="justify-content:space-between"><span><b>Prática adaptativa</b><br><span class="small muted">10 exercícios criados na hora, concentrados no que está mais fraco${gaps.length ? ' e nas lacunas entre saber e aplicar' : ''}.</span></span><button class="btn primary" data-act="adaptive">Praticar agora</button></div>
+      ${gaps.length ? mentorHTML(`<p><b>Sabe na teoria, erra na prática:</b> ${gaps.map((r) => esc(r.c.name)).join(', ')}. Você acerta esses conceitos nos exercícios, mas não nas decisões de jogo. Treine-os na Mesa de treino e no Laboratório, pensando no conceito antes de agir.</p>`, 'Mentor Ás') : ''}
+      ${weak.length ? `<p class="small muted">Precisam de atenção agora: ${weak.map((r) => esc(r.c.name)).join(' · ')}.</p>` : ''}
+      ${[0, 1, 2, 3, 4, 5].map((L) => `<section class="panel stack"><div class="eyebrow">Nível ${L} · ${esc(LVL(L)[1])}</div>${rows.filter((r) => r.c.level === L).map((r) => { const st = ST[r.x.st]; const lesson = r.c.lessons.find((l) => findLesson(l)); return `<div class="mrow ${r.open ? '' : 'locked'}"><div><b>${esc(r.c.name)}</b> <span class="pill ${st[1]}">${r.open ? st[0] : 'Ainda não liberado'}</span>${r.x.gap ? ' <span class="pill bad">sabe, mas erra na prática</span>' : ''}</div><div class="mbars">${bar(r.x.k, 'Conhecimento')}${bar(r.x.a, 'Aplicação')}</div><div class="row">${r.open && practicable(r.c) ? `<button class="btn small" data-act="practice" data-c="${r.c.id}">Praticar</button>` : ''}${lesson ? `<button class="btn ghost small" data-act="lesson" data-id="${lesson}">Lição</button>` : ''}</div></div>`; }).join('')}</section>`).join('')}
+    </div>`;
+  };
+
   VIEWS.home = () => {
     const v = ipp(), r = rankFor(v.total), lv = level(), ns = nextStep(), due = dueCards().length, ms = missions(), cl = carteiraLevel();
     const h = new Date().getHours(), greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
     let msg;
     const tree = E.leakTree(S.decisions.slice(-400)); const topLeak = tree.find((n) => n.bad >= 3);
+    const gapC = Pr.CONCEPTS.find((c) => conceptState(c.id).gap);
     if (!Object.keys(S.lessons).length) msg = S.profile.exp === 'never' || !S.profile.exp ? `<p>Vamos começar do zero absoluto: o que é poker, as cartas do baralho e como uma partida funciona. Não há pressa. Leia cada parte com calma, tente responder as perguntas <b>Pense antes de ler</b> antes de abrir a resposta e toque nas palavras sublinhadas sempre que uma delas for nova.</p>` : `<p>Você já conhece o jogo. A trilha começa no Nível 0 (regras e combinações); se ele for fácil para você, faça as provas dos cinco módulos sem ler as lições e siga para o Nível 1. Entender bem a base é o que sustenta tudo o que vem depois.</p>`;
+    else if (gapC) msg = `<p>Você acerta <b>${esc(gapC.name)}</b> nos exercícios (${pct(conceptState(gapC.id).k.p)}), mas erra na hora de aplicar (${pct(conceptState(gapC.id).a.p)}). É a diferença entre saber e fazer. Vamos praticar esse conceito em situações de jogo.</p><div><button class="btn" data-act="practice" data-c="${gapC.id}">Praticar agora</button></div>`;
     else if (due >= 10) msg = `<p>Você tem <b>${due} cartões</b> para revisar. A revisão espaçada é o que transforma a lição de ontem em memória de longo prazo. Comece por ela.</p>`;
     else if (ns && ns.type === 'exam') msg = `<p>Você concluiu as lições de <b>${esc(ns.m.title)}</b>. Hora da prova: 80% para avançar.</p>`;
     else if (topLeak) msg = `<p>O seu mapa de leaks aponta <b>${esc(E.SPOTNAME(topLeak.t))}</b> como o spot onde você mais perde EV (${pct(topLeak.acc)} de precisão). Dez minutos focados ali rendem mais do que uma hora no que você já domina.</p>`;
@@ -662,7 +746,7 @@ ${defense}`;
       ${lastW.length ? `<div class="panel"><div class="eyebrow">Revisões anteriores</div>${lastW.map((w) => `<div class="crit" style="grid-template-columns:1fr"><div class="small"><b>${esc(w.week)}</b> · meta: ${esc(w.goal || '—')}<div class="muted">${esc(w.leak || '')}</div></div></div>`).join('')}</div>` : ''}</div>`;
   };
   MOUNTS.plan = (root) => {
-    root.querySelectorAll('[data-plango]').forEach((b) => b.addEventListener('click', () => { const g = JSON.parse(b.dataset.plango); if (g[0] === 'nav') go(g[1]); else if (g[0] === 'lesson') go('lesson', { id: g[1] }); else if (g[0] === 'drill') startDrill(g[1]); else if (g[0] === 'diag') ACTS.diag(); else if (g[0] === 'weekly') go('plan', { weekly: 1 }); }));
+    root.querySelectorAll('[data-plango]').forEach((b) => b.addEventListener('click', () => { const g = JSON.parse(b.dataset.plango); if (g[0] === 'nav') go(g[1]); else if (g[0] === 'lesson') go('lesson', { id: g[1] }); else if (g[0] === 'drill') startDrill(g[1]); else if (g[0] === 'diag') ACTS.diag(); else if (g[0] === 'adaptive') ACTS.adaptive(); else if (g[0] === 'weekly') go('plan', { weekly: 1 }); }));
     root.querySelectorAll('[data-pdone]').forEach((b) => b.addEventListener('click', () => { const x = S.planExtra.find((y) => y.key === b.dataset.pdone); if (x) x.done = true; save(); render(); }));
   };
 
@@ -675,7 +759,7 @@ ${defense}`;
       const open = moduleOpen(mi), done = m.lessons.filter((l) => S.lessons[l.id]).length, ex = S.exams[m.id];
       let head = '';
       if (m.level !== lastLvl) { lastLvl = m.level; const L = LVL(m.level); head = `<div class="level-head"><span class="pill gold">Nível ${L[0]}</span><h2>${L[1]}</h2><p class="small muted">${L[2]}</p></div>`; }
-      return `${head}<section class="panel module"><div class="module-head"><div><div class="eyebrow">${esc(C.DOMAINS[m.domain])}</div><h2>${esc(m.title)}</h2></div>${passed(m) ? `<span class="pill good">Aprovado · ${pct(ex.best)}</span>` : open ? `<span class="pill gold">${done}/${m.lessons.length} lições</span>` : '<span class="pill">Bloqueado</span>'}</div>
+      return `${head}<section class="panel module"><div class="module-head"><div><div class="eyebrow">${esc(C.DOMAINS[m.domain])}</div><h2>${esc(m.title)}</h2></div>${passed(m) ? `<span class="pill good">Aprovado · ${pct(ex.best)}</span>` : placedSkip(m) ? '<span class="pill">Liberado pelo diagnóstico · revisão opcional</span>' : open ? `<span class="pill gold">${done}/${m.lessons.length} lições</span>` : '<span class="pill">Bloqueado</span>'}</div>
       <p class="muted small">${esc(m.desc)}</p>
       ${open ? m.lessons.map((l, li) => { const ok = lessonOpen(mi, li), d = S.lessons[l.id]; return `<button class="lesson-row ${d ? 'done' : ''}" data-act="lesson" data-id="${l.id}" ${ok ? '' : 'disabled'}><span class="n">${d ? '✓' : li + 1}</span><span>${esc(l.title)}<br><span class="small muted">${l.min} min${l.drill ? ' · com treino' : ''}${l.lab ? ' · no Laboratório' : ''}</span></span>${ok ? (d ? `<span class="small muted num">${pct(d.score)}</span>` : '<span class="small">›</span>') : '<span class="lock">bloqueada</span>'}</button>`; }).join('') : `<p class="small muted">${m.lessons.length} lições · libera ao passar na prova anterior.</p>`}
       <div class="row"><button class="btn ${open && done === m.lessons.length && !passed(m) ? 'primary' : ''}" data-act="exam" data-id="${m.id}" ${open ? '' : 'disabled'}>${passed(m) ? 'Refazer a prova' : 'Prova do módulo'}</button>${ex ? `<span class="small muted">Melhor nota: ${pct(ex.best)} em ${ex.n} tentativa(s)</span>` : ''}</div></section>
@@ -721,6 +805,7 @@ ${defense}`;
           + o.opts.map((x, j) => j === k ? '' : `<div class="whynot"><b>${x[1] === 1 ? 'Por que sim' : x[1] > 0 ? 'Também possível' : 'Por que não'}: ${colorize(esc(x[0]))}.</b> ${colorize(x[2])}</div>`).join('');
         fb.hidden = false;
         if (!(key in S.spots)) { S.spots[key] = sc; if (sc === 1) addXP(5); }
+        observeLesson(lid, sc === 1, 0.7);
         const dom = (findLesson(lid) || {}).m; if (dom) { S.qs[dom.domain] = S.qs[dom.domain] || { n: 0, c: 0 }; S.qs[dom.domain].n++; if (sc === 1) S.qs[dom.domain].c++; }
         save();
       }));
@@ -747,6 +832,7 @@ ${defense}`;
           const k = +b.dataset.k, ok = k === st.ask.a;
           box.querySelectorAll('.opt').forEach((y) => { y.disabled = true; if (+y.dataset.k === st.ask.a) y.classList.add('right'); else if (+y.dataset.k === k) y.classList.add('wrong'); });
           box.insertAdjacentHTML('beforeend', `<div><b>${ok ? 'Isso.' : 'Não exatamente.'}</b> ${colorize(st.a)}</div>`);
+          observeLesson(lid, ok, 0.5); save();
           done();
         }));
       };
@@ -771,7 +857,7 @@ ${defense}`;
       <div class="callout"><span class="eyebrow">Dica do mentor</span>${colorize(l.tip)}</div>
       ${l.lab ? `<div class="callout lab"><span class="eyebrow">No Laboratório</span>${colorize(esc(l.lab[1]))}<div style="margin-top:8px"><button class="btn" data-act="nav" data-v="${l.lab[0]}">Abrir ${esc((Lab.tools.find((t) => t[0] === l.lab[0]) || E.drills.find((t) => t[0] === l.lab[0]) || [0, l.lab[0] === 'elite-leaks' ? 'Mapa de leaks' : 'ferramenta'])[1])}</button></div></div>` : ''}
       <div class="panel stack"><h3>Verifique o que aprendeu</h3><p class="muted small">Perguntas sem consultar o texto. Buscar a resposta na memória é o que fixa o conteúdo.</p>
-      <div class="row"><button class="btn primary" data-act="lessonquiz" data-id="${l.id}">Começar o quiz</button>${l.drill ? `<button class="btn" data-act="drill" data-id="${l.drill}">Treino: ${DRILLS[l.drill].name}</button>` : ''}${S.lessons[l.id] && nxt ? `<button class="btn ghost" data-act="lesson" data-id="${nxt.id}">Próxima lição ›</button>` : ''}</div></div>
+      <div class="row"><button class="btn primary" data-act="lessonquiz" data-id="${l.id}">Começar o quiz</button>${l.drill ? `<button class="btn" data-act="drill" data-id="${l.drill}">Treino: ${DRILLS[l.drill].name}</button>` : ''}${(Pr.byLesson[l.id] || []).map((cid) => Pr.byId[cid]).filter((c) => c.gens.length).map((c) => `<button class="btn" data-act="practice" data-c="${c.id}">Praticar: ${esc(c.name)}</button>`).join('')}${S.lessons[l.id] && nxt ? `<button class="btn ghost" data-act="lesson" data-id="${nxt.id}">Próxima lição ›</button>` : ''}</div></div>
       </div>
     </div>`;
   };
@@ -822,6 +908,77 @@ ${defense}`;
     b.after(d); b.setAttribute('aria-expanded', 'true');
   });
 
+  // ---------- mentor socrático ----------
+  function itemHints(it) {
+    if (it.hints && it.hints.length) return it.hints;
+    const cid = (it.lid && (Pr.byLesson[it.lid] || [])[0]) || (R.kind === 'lesson' && (Pr.byLesson[R.id] || [])[0]) || (R.kind === 'drill' && (Pr.byDrill[R.drill] || [])[0]);
+    const c = cid && Pr.byId[cid];
+    return c && c.hints.length ? c.hints : ['Releia a pergunta devagar: o que exatamente ela pede?', 'Que ideia da lição se aplica aqui?', 'Elimine primeiro as alternativas que você tem certeza de que estão erradas.'];
+  }
+  function socraticHTML(it) {
+    const hs = itemHints(it), r = R.retry;
+    return `<div class="feedback no stack socratic"><div><b>Ainda não.</b> Antes de ver a resposta, pense:</div>${hs.slice(0, r.h + 1).map((x) => `<p class="hint">${colorize(esc(x))}</p>`).join('')}
+      <div class="row">${r.h + 1 < hs.length ? '<button class="btn small" data-act="hint-more">Outra pista</button>' : ''}<button class="btn small" data-act="hint-ai">Conversar com o mentor (IA)</button><button class="btn ghost small" data-act="reveal">Ver a resposta</button></div>
+      <div id="socr" class="stack">${r.ai.map(([w, t]) => `<div class="small"><b>${w === 'mentor' ? 'Mentor Ás' : 'Você'}:</b> ${esc(t)}</div>`).join('')}${r.aiOpen ? '<div class="row"><input type="text" id="socr-in" placeholder="Responda ao mentor" style="flex:1;min-width:0"><button class="btn small" data-act="hint-send">Enviar</button></div>' : ''}</div>
+      <p class="small muted" style="margin:0">Escolha outra alternativa quando tiver uma nova ideia.</p></div>`;
+  }
+  const stripTags = (x) => String(x || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  async function socraticAI(userText) {
+    const r = R && R.retry; if (!r || R.answered) return;
+    const sample = await getSample();
+    if (!sample) { r.ai.push(['mentor', 'A conversa com o mentor por IA funciona quando o app é aberto dentro do Claude. As pistas acima funcionam sempre.']); render(); return; }
+    if (userText) r.ai.push(['aluno', userText]);
+    if (r.ai.filter((x) => x[0] === 'mentor').length >= 4) { r.ai.push(['mentor', 'Vamos parar por aqui: tente responder agora, ou veja a resposta.']); r.aiOpen = false; render(); return; }
+    const it = R.cur;
+    const prompt = `Você é o Mentor Ás, professor de poker que usa o método socrático. Um aluno (nível ${S.placement || 0} de 5 do curso) errou uma questão. NÃO revele a resposta correta e não diga qual alternativa é a certa. Faça UMA pergunta curta (no máximo duas frases) que leve o aluno a perceber sozinho o erro, partindo da alternativa que ele escolheu. Use linguagem simples, em português do Brasil. Se o aluno responder, avalie o raciocínio dele com uma frase e faça a próxima pergunta.
+
+QUESTÃO: ${stripTags(it.text || it.html)}
+ALTERNATIVAS: ${it.options.join(' | ')}
+O ALUNO ESCOLHEU: ${it.options[r.first]}
+RESPOSTA CORRETA (só para você; não revele): ${it.options[it.a]}
+EXPLICAÇÃO (só para você): ${stripTags(it.exp)}
+${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n') : ''}`;
+    r.aiOpen = false; render();
+    const box = document.getElementById('socr'), el = document.createElement('div'); el.className = 'small'; el.textContent = 'O mentor está pensando…'; if (box) box.appendChild(el);
+    let out = '';
+    try { await sample(prompt, { modelTier: 'default', cache: false, onText: ({ text }) => { out = text; el.innerHTML = `<b>Mentor Ás:</b> ${esc(text)}`; } }); r.ai.push(['mentor', out.trim() || '…']); r.aiOpen = true; dayLog('ai'); }
+    catch (e) { r.ai.push(['mentor', sampleErr(e)]); }
+    if (R && R.retry === r && !R.answered) render();
+  }
+
+  // ---------- diagnóstico adaptativo ----------
+  // Começa no nível da experiência declarada; bloco de até 3 questões por nível; 2 acertos = nível dominado (sobe), 2 erros = não dominado (desce, se ainda não testou o de baixo).
+  function diagItem(L) {
+    const d = R.diag, bank = C.PLACEMENT[L], free = bank.map((x, i) => i).filter((i) => !d.used[L + ':' + i]);
+    const i = free.length ? pick(free) : Math.floor(Math.random() * bank.length); d.used[L + ':' + i] = 1;
+    const src = bank[i], it = src.gen ? Pr.GEN[src.gen](GH) : src.drill ? DRILLS[src.drill].gen() : toItem(src);
+    return Object.assign({}, it, { cid: src.cid, lvl: L });
+  }
+  function diagRecord(ok) {
+    const d = R.diag, L = R.cur.lvl, b = (d.blocks[L] = d.blocks[L] || { n: 0, c: 0 });
+    b.n++; if (ok) b.c++;
+    let next = null;
+    if (b.c >= 2) { b.pass = true; if (L < 5 && !d.blocks[L + 1]) next = L + 1; }
+    else if (b.n - b.c >= 2) { b.pass = false; if (L > 0 && !d.blocks[L - 1]) next = L - 1; }
+    else next = L;
+    if (next != null) R.items.push(() => diagItem(next));
+  }
+  function startDiag() {
+    const exp = S.profile && S.profile.exp, again = !!S.diag.baseline;
+    const start = again ? Math.min(5, Math.max(S.placement || 0, (nextStep() && nextStep().m ? nextStep().m.level : 0))) : exp === 'regular' ? 2 : exp === 'some' ? 1 : 0;
+    const d = { start, blocks: {}, used: {} };
+    startRunner('diag', [() => diagItem(start)], { title: again ? 'Rediagnóstico' : 'Diagnóstico', diag: d });
+  }
+  function diagResult() {
+    const d = R.diag, levels = Object.keys(d.blocks).map(Number);
+    const failed = levels.filter((L) => d.blocks[L].pass === false), ok = levels.filter((L) => d.blocks[L].pass);
+    const P = failed.length ? Math.min(...failed) : ok.length ? Math.max(...ok) + 1 : 0;
+    const fb = d.blocks[P], ability = Math.min(6, P + (fb && fb.pass === false ? fb.c / fb.n : 0));
+    return { score: ability / 6, ability, level: Math.min(P, 5), date: todayStr(), blocks: d.blocks };
+  }
+  const diagTxt = (x) => (x.ability != null ? `Nível ${num(x.ability, 1)}` : pct(x.score));
+  const diagAbility = (x) => (x.ability != null ? x.ability : x.score * 6);
+
   // ---------- runner genérico ----------
   let runTimer = null;
   function startRunner(kind, items, meta) { R = Object.assign({ kind, items, i: 0, correct: 0, answered: false, results: [] }, meta || {}); prepItem(); go('runner'); }
@@ -829,24 +986,29 @@ ${defense}`;
     let it = R.items[R.i];
     if (typeof it === 'function') it = R.items[R.i] = it();
     R.cur = it; R.order = it.keep ? it.options.map((_, i) => i) : shuffle(it.options.map((_, i) => i));
-    R.answered = false; R.picked = null; R.t0 = performance.now();
+    R.answered = false; R.picked = null; R.retry = null; R.t0 = performance.now();
   }
   VIEWS.runner = () => {
     if (!R) return VIEWS.home();
     if (R.done) return runnerResult();
     const it = R.cur, n = R.items.length;
     const optsHTML = R.order.map((oi, k) => {
-      let cls = ''; if (R.answered) { if (oi === it.a) cls = 'right'; else if (oi === R.picked) cls = 'wrong'; }
-      return `<button class="opt ${cls}" data-act="answer" data-o="${oi}" ${R.answered ? 'disabled' : ''}><span class="k">${k + 1}</span><span>${colorize(esc(it.options[oi]))}</span></button>`;
+      const first = R.retry && oi === R.retry.first;
+      let cls = ''; if (R.answered) { if (oi === it.a) cls = 'right'; else if (oi === R.picked || first) cls = 'wrong'; } else if (first) cls = 'wrong';
+      return `<button class="opt ${cls}" data-act="answer" data-o="${oi}" ${R.answered || first ? 'disabled' : ''}><span class="k">${k + 1}</span><span>${colorize(esc(it.options[oi]))}</span></button>`;
     }).join('');
-    const ok = R.picked === it.a;
+    const ok = R.picked === it.a, isDiag = R.kind === 'diag';
+    const headTxt = R.picked === -1 ? 'O tempo acabou.' : R.picked === -2 ? 'Tudo bem.' : R.retry && R.retry.revealed ? 'Esta é a resposta.' : R.retry ? (ok ? 'Você chegou lá com a pista.' : 'Ainda não era essa.') : ok ? pick(['Correto.', 'Isso mesmo.', 'Exato.']) : 'Não foi dessa vez.';
+    const tailTxt = R.picked === -2 ? ' Marcar "Não sei" é melhor do que chutar: deixa o diagnóstico preciso. ' : R.retry && ok ? ' No placar conta como erro, mas agora o raciocínio é seu. ' : ' ';
     return `<div class="wrap narrow runner">
-      <div class="runner-top"><div><div class="eyebrow">${esc(R.title)}</div><span class="small muted num">Questão ${R.i + 1} de ${n} · ${R.correct} acerto(s)</span></div><button class="btn ghost" data-act="quit">Sair</button></div>
-      <div class="bar"><i style="width:${(R.i / n) * 100}%"></i></div>
+      <div class="runner-top"><div><div class="eyebrow">${esc(R.title)}</div><span class="small muted num">${isDiag ? `Questão ${R.i + 1} · nível ${R.cur.lvl} · ${R.correct} acerto(s)` : `Questão ${R.i + 1} de ${n} · ${R.correct} acerto(s)`}</span></div><button class="btn ghost" data-act="quit">Sair</button></div>
+      <div class="bar"><i style="width:${isDiag ? (R.cur.lvl / 6) * 100 + 8 : (R.i / n) * 100}%"></i></div>
       ${R.kind === 'drill' && S.settings.drillTime && !R.answered ? '<div class="bar clock"><i id="run-clock" style="width:100%"></i></div>' : ''}
       <div class="panel prompt">${it.html || `<p class="lead">${colorize(esc(it.text))}</p>`}</div>
       <div class="opts ${it.two ? 'two' : ''}">${optsHTML}</div>
-      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${R.picked === -1 ? 'O tempo acabou.' : ok ? pick(['Correto.', 'Isso mesmo.', 'Exato.']) : 'Não foi dessa vez.'}</b> ${it.html ? it.exp : colorize(esc(it.exp))}</div><div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
+      ${isDiag && !R.answered ? '<div class="row"><button class="btn ghost" data-act="answer" data-o="-2">Não sei</button><span class="small muted">Não sabe? Marque "Não sei". Chutar deixa o diagnóstico impreciso.</span></div>' : ''}
+      ${R.retry && !R.answered ? socraticHTML(it) : ''}
+      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div><div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
     </div>`;
   };
   MOUNTS.runner = () => {
@@ -855,13 +1017,24 @@ ${defense}`;
     const t0 = performance.now(), lim = S.settings.drillTime * 1000;
     runTimer = setInterval(() => { const el = document.getElementById('run-clock'); if (!el || !R || R.answered) return clearInterval(runTimer); const left = 1 - (performance.now() - t0) / lim; el.style.width = Math.max(0, left * 100) + '%'; if (left <= 0) { clearInterval(runTimer); answer(-1); } }, 100);
   };
+  const socraticOn = () => S.settings.socratic !== false && ['lesson', 'practice', 'drill'].includes(R.kind) && (R.cur.options || []).length > 2;
+  const focusNext = () => { const nb = document.getElementById('nextBtn'); if (nb) nb.focus(); };
   function answer(o) {
     if (!R || R.answered) return;
     clearInterval(runTimer);
+    // Segunda tentativa, depois das pistas: já foi registrada como erro na primeira.
+    if (R.retry) { if (o === R.retry.first) return; R.picked = o; R.answered = true; R.retry.second = o; render(); focusNext(); return; }
+    const ok = o === R.cur.a;
+    record(o, ok);
+    // Método socrático: antes de mostrar a resposta, pistas e uma nova tentativa.
+    if (!ok && o >= 0 && socraticOn()) { R.retry = { first: o, h: 0, ai: [] }; render(); return; }
     R.picked = o; R.answered = true;
-    const ok = o === R.cur.a; if (ok) R.correct++;
+    render(); focusNext();
+  }
+  function record(o, ok) {
+    if (ok) R.correct++;
     R.results.push(ok);
-    const ms = performance.now() - R.t0;
+    const ms = performance.now() - R.t0, cur = R.cur;
     if (R.kind === 'drill') {
       if (R.mixed) R.drill = R.mixed[R.i];
       const st = drillStat(R.drill); st.h.push(ok ? 1 : 0); if (st.h.length > 100) st.h.shift(); st.n++; if (ok) st.c++;
@@ -873,8 +1046,13 @@ ${defense}`;
       checkMissions(); save();
     }
     if (R.kind === 'lesson') { const dom = R.domain; S.qs[dom] = S.qs[dom] || { n: 0, c: 0 }; S.qs[dom].n++; if (ok) S.qs[dom].c++; }
-    render();
-    const nb = document.getElementById('nextBtn'); if (nb) nb.focus();
+    if (R.kind === 'lesson') observeLesson(R.id, ok);
+    else if (cur.cid) observe(cur.cid, 'k', ok, R.kind === 'diag' ? 1.5 : 1);
+    else if (cur.lid) observeLesson(cur.lid, ok);
+    if (R.kind === 'drill') (Pr.byDrill[R.drill] || []).forEach((c) => observe(c, 'k', ok));
+    if (R.kind === 'practice') { daily().drills++; dayLog('drills'); dayLog('practice'); S.xp += ok ? 4 : 1; checkMissions(); }
+    if (R.kind === 'diag') diagRecord(ok);
+    save();
   }
   function nextQ() { if (R.i + 1 < R.items.length) { R.i++; prepItem(); render(); return; } R.done = true; finishRunner(); render(); }
   function finishRunner() {
@@ -890,9 +1068,12 @@ ${defense}`;
       if (score >= R.pass && !wasPassed) { addXP(R.kind === 'final' ? 500 : 150); if (R.kind === 'final') award('pro'); }
       if (score === 1) award('perfect');
     } else if (R.kind === 'diag') {
-      if (!S.diag.baseline) S.diag.baseline = { score, date: todayStr() };
-      else { S.diag.latest = { score, date: todayStr() }; if (score - S.diag.baseline.score >= 0.25) award('diag_up'); }
+      const res = (R.diagRes = diagResult());
+      if (!S.diag.baseline) { S.diag.baseline = res; R.diagFirst = true; }
+      else { S.diag.latest = res; if (res.ability - diagAbility(S.diag.baseline) >= 1) award('diag_up'); }
+      S.placement = Math.max(S.placement || 0, res.level);
     } else if (R.kind === 'drill') addXP(R.correct >= 8 ? 20 : 0);
+    else if (R.kind === 'practice') addXP(R.correct >= 8 ? 15 : 0);
     const cl = carteiraLevel(); for (let k = 1; k <= cl; k++) award('lvl' + k);
     checkMissions(); save();
   }
@@ -906,36 +1087,51 @@ ${defense}`;
       actions = (nxt ? `<button class="btn primary" data-act="lesson" data-id="${nxt.id}">Próxima lição</button>` : `<button class="btn primary" data-act="exam" data-id="${x.m.id}">Fazer a prova do módulo</button>`) + (x.l.drill ? `<button class="btn" data-act="drill" data-id="${x.l.drill}">Treinar agora</button>` : '') + (x.l.lab ? `<button class="btn" data-act="nav" data-v="${x.l.lab[0]}">Praticar no Laboratório</button>` : '') + `<button class="btn ghost" data-act="lessonquiz" data-id="${R.id}">Refazer quiz</button>`;
       const weak = weakPre(x.l.id);
       if (sc < 0.67 && weak.length) body += `<p>Quando um quiz fica abaixo de 67%, muitas vezes o que falta é a base. Esta lição depende de: ${weak.map((w) => `<button class="btn ghost small" data-act="lesson" data-id="${w.l.id}">${esc(w.l.title)}</button>`).join(' ')}</p>`;
-      if (sc < 1) R.results.forEach((ok, i) => { if (!ok) { const cid = R.id + ':' + Math.min(i, x.l.cards.length - 1); if (S.cards[cid]) S.cards[cid] = { box: 1, due: todayStr() }; } });
+      if (sc < 1) R.results.forEach((ok, i) => { if (!ok) { const cid = R.id + ':' + Math.min(i, x.l.cards.length - 1); if (S.cards[cid]) lapseCard(cid); } });
     } else if (R.kind === 'exam' || R.kind === 'final') {
       const ok = sc >= R.pass;
       head = ok ? (R.kind === 'final' ? 'Certificação teórica concluída.' : 'Aprovado. Próximo módulo liberado.') : `Ainda não. Você precisa de ${pct(R.pass)}.`;
       body = ok ? '<p>Domínio comprovado. Confira na aba Evolução as provas práticas da carteira deste nível.</p>' : '<p>Revise as lições do módulo, treine os pontos que errou e tente de novo. A prova sorteia questões diferentes a cada tentativa.</p>';
       actions = `<button class="btn primary" data-act="nav" data-v="${ok ? 'home' : 'trail'}">${ok ? 'Continuar' : 'Voltar à trilha'}</button><button class="btn ghost" data-act="${R.kind === 'final' ? 'final' : 'exam'}" data-id="${R.id || ''}">Tentar de novo</button>`;
     } else if (R.kind === 'diag') {
-      const b = S.diag.baseline;
-      head = S.diag.latest && S.diag.latest.date === todayStr() && b.date !== todayStr() ? `Rediagnóstico: ${pct(sc)} (início: ${pct(b.score)})` : `Ponto de partida registrado: ${pct(sc)}`;
-      body = '<p>Este número fica guardado. Refaça o diagnóstico todo mês pelo plano da semana para medir a sua evolução.</p>';
-      actions = `<button class="btn primary" data-act="nav" data-v="home">Começar</button>`;
+      const res = R.diagRes, Lx = LVL(res.level), firstMod = MODS.find((m) => m.level === res.level), b = S.diag.baseline;
+      const table = `<table class="t"><tr><th>Nível</th><th>Acertos</th><th>Resultado</th></tr>${Object.keys(res.blocks).map(Number).sort((a, z) => a - z).map((L) => `<tr><td>${L} · ${esc(LVL(L)[1])}</td><td class="num">${res.blocks[L].c} de ${res.blocks[L].n}</td><td>${res.blocks[L].pass ? '<span class="pill good">domina</span>' : '<span class="pill">a construir</span>'}</td></tr>`).join('')}</table>`;
+      if (R.diagFirst) {
+        head = res.level === 0 ? 'O Nível 0 foi feito para você.' : `Você começa no Nível ${res.level} · ${Lx[1]}.`;
+        body = (res.level === 0 ? '<p>Começamos do zero absoluto, sem pressa. Cada pergunta que você não soube agora vai ser ensinada, com calma, nas próximas lições.</p>' : `<p>${(() => { const tested = Object.keys(res.blocks).map(Number).filter((L) => res.blocks[L].pass), lo = Math.min(...tested); return tested.length ? `Você demonstrou domínio ${lo === res.level - 1 ? `do Nível ${lo}` : `dos níveis ${lo} a ${res.level - 1}`}${lo > 0 ? `; pela sua experiência, os níveis abaixo do ${lo} foram considerados conhecidos` : ''}.` : ''; })()} Recomendamos começar em <b>${esc(firstMod.title)}</b>. Os módulos anteriores ficam liberados para revisão; as provas deles continuam valendo para a carteira quando você quiser fazê-las.</p>`) + table + '<p class="small muted">O diagnóstico começa no nível que você indicou, sobe quando você acerta e desce quando erra. As respostas também alimentam o seu mapa de domínio. Refaça todo mês para medir a evolução.</p>';
+        actions = res.level === 0 ? `<button class="btn primary" data-act="lesson" data-id="${MODS[0].lessons[0].id}">Começar a primeira lição</button>` : `<button class="btn primary" data-act="lesson" data-id="${firstMod.lessons[0].id}">Começar pelo Nível ${res.level}</button><button class="btn ghost" data-act="place-zero">Prefiro começar do Nível 0</button>`;
+      } else {
+        const diff = res.ability - diagAbility(b);
+        head = `Rediagnóstico: nível ${num(res.ability, 1)} (início: ${num(diagAbility(b), 1)})`;
+        body = `<p>${diff > 0.05 ? `Você avançou ${num(diff, 1)} nível(is) desde o primeiro diagnóstico.` : diff < -0.05 ? 'O resultado ficou abaixo do início. Isso acontece: um diagnóstico curto tem variação. Revise o mapa de domínio e refaça daqui a algumas semanas.' : 'Resultado parecido com o do início. Veja no mapa de domínio o que praticar.'}</p>${table}`;
+        actions = '<button class="btn primary" data-act="nav" data-v="mastery">Ver o mapa de domínio</button><button class="btn ghost" data-act="nav" data-v="home">Início</button>';
+      }
+    } else if (R.kind === 'practice') {
+      const by = {}; R.results.forEach((ok, i) => { const it = R.items[i]; if (!it || !it.cid) return; const x = (by[it.cid] = by[it.cid] || { n: 0, c: 0 }); x.n++; if (ok) x.c++; });
+      head = `${R.correct} de ${n} ${R.single ? 'em ' + esc(Pr.byId[R.single].name) : 'na prática adaptativa'}`;
+      body = `<table class="t"><tr><th>Conceito</th><th>Acertos</th><th>Estado agora</th></tr>${Object.entries(by).map(([cid, x]) => { const st = ST[conceptState(cid).st]; return `<tr><td>${esc(Pr.byId[cid].name)}</td><td class="num">${x.c} de ${x.n}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join('')}</table><p class="small muted">Os exercícios são criados na hora pelo motor do app: você nunca fica sem prática.</p>`;
+      actions = `<button class="btn primary" data-act="${R.single ? 'practice' : 'adaptive'}" data-c="${R.single || ''}">Mais 10</button><button class="btn ghost" data-act="nav" data-v="mastery">Mapa de domínio</button>`;
     } else {
       const a = drillAcc(R.drill);
       head = R.mixed ? `${R.correct} de ${n} no treino misto` : `${R.correct} de ${n} no treino "${DRILLS[R.drill].name}"`;
       body = R.mixed ? '<p>Cada resposta foi somada ao treino de origem e ao seu mapa de leaks.</p>' : `<p>Precisão nas últimas ${Math.min(30, a.n)} respostas: <b>${pct(a.acc)}</b>. A meta é 85% ou mais com pelo menos 30 respostas.</p>`;
       actions = `<button class="btn primary" data-act="${R.mixed ? 'mixed' : 'drill'}" data-id="${R.drill}">Mais 10</button><button class="btn ghost" data-act="nav" data-v="drills">Outros treinos</button>`;
     }
-    return `<div class="wrap narrow runner"><div class="eyebrow">${esc(R.title)}</div><h1 class="num">${pct(sc)}</h1><h2>${head}</h2>${mentorHTML(body)}<div class="row">${actions}</div></div>`;
+    return `<div class="wrap narrow runner"><div class="eyebrow">${esc(R.title)}</div><h1 class="num">${R.kind === 'diag' ? `Nível ${R.diagRes.level}` : pct(sc)}</h1><h2>${head}</h2>${mentorHTML(body)}<div class="row">${actions}</div></div>`;
   }
   const toItem = (q) => ({ text: q.text, options: q.options, a: q.a, exp: q.exp });
-  const examItems = (m) => shuffle(m.exam.concat(...m.lessons.map((l) => l.quiz))).slice(0, 10).map(toItem);
+  const examItems = (m) => shuffle(m.exam.map((q) => [q, null]).concat(...m.lessons.map((l) => l.quiz.map((q) => [q, l.id])))).slice(0, 10).map(([q, lid]) => Object.assign(toItem(q), { lid }));
   function finalItems() {
     const mods = MODS.filter((m) => m.level >= 1 && m.level <= 4), per = Math.max(1, Math.ceil(30 / mods.length)), out = [];
-    mods.forEach((m) => out.push(...shuffle(m.exam.concat(...m.lessons.map((l) => l.quiz))).slice(0, per)));
-    return shuffle(out).slice(0, 30).map(toItem);
+    mods.forEach((m) => out.push(...shuffle(m.exam.map((q) => [q, null]).concat(...m.lessons.map((l) => l.quiz.map((q) => [q, l.id])))).slice(0, per)));
+    return shuffle(out).slice(0, 30).map(([q, lid]) => Object.assign(toItem(q), { lid }));
   }
   function startDrill(id, n) { const d = DRILLS[id]; startRunner('drill', Array.from({ length: n || 10 }, () => () => d.gen()), { drill: id, title: 'Treino · ' + d.name }); }
 
   VIEWS.drills = () => `<div class="wrap">
     <div><div class="eyebrow">Treinos</div><h1>Prática deliberada</h1><p class="muted">Rodadas de 10 questões geradas na hora, com feedback imediato. Cada resposta entra no mapa de leaks com tempo e tipo de erro. A meta de cada treino é 85% nas últimas 30 respostas.</p></div>
+    <div class="panel row" style="justify-content:space-between"><span><b>Prática adaptativa</b><br><span class="small muted">Exercícios novos a cada rodada, escolhidos pelo seu mapa de domínio.</span></span><button class="btn primary" data-act="adaptive">Praticar</button></div>
+    <div class="panel row" style="justify-content:space-between"><span><b>Pistas antes da resposta</b><br><span class="small muted">Quando você erra, o mentor dá pistas e uma nova chance antes de mostrar a resposta (método socrático).</span></span><button class="btn ${S.settings.socratic === false ? '' : 'primary'}" data-act="socratic-toggle">${S.settings.socratic === false ? 'Desligado' : 'Ligado'}</button></div>
     <div class="panel row" style="justify-content:space-between"><span><b>Treino misto</b><br><span class="small muted">Intercala todos os treinos liberados.</span></span><label class="field" style="width:180px">Relógio por questão<select id="dr-time">${[[0, 'Sem relógio'], [15, '15 segundos'], [7, '7 segundos'], [3, '3 segundos']].map(([v, t]) => `<option value="${v}" ${S.settings.drillTime === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label><button class="btn primary" data-act="mixed">Começar</button></div>
     <div class="grid3">${Object.entries(DRILLS).map(([id, d]) => {
       const a = drillAcc(id), open = lessonOpenById(d.lesson), x = findLesson(d.lesson);
@@ -1117,20 +1313,28 @@ ${defense}`;
   let RV = null;
   VIEWS.review = () => {
     const due = dueCards(), total = Object.keys(S.cards).length;
-    const boxes = [1, 2, 3, 4, 5].map((b) => Object.values(S.cards).filter((c) => c.box === b).length);
+    const cs = Object.keys(S.cards).map(cardOf), ret = retention(), sc = intervalScale();
+    const bands = [['Memória de até 3 dias', 0, 3], ['4 a 14 dias', 3, 14], ['15 a 60 dias', 14, 60], ['Mais de 60 dias', 60, 1e9]].map(([t, lo, hi]) => [t, cs.filter((c) => c.s > lo && c.s <= hi).length]);
     if (!RV || !RV.queue.length) {
-      return `<div class="wrap narrow"><div><div class="eyebrow">Revisão espaçada</div><h1>${due.length ? `${due.length} cartões para hoje` : 'Nada pendente hoje'}</h1><p class="muted">Cada cartão volta em intervalos crescentes (1, 3, 7, 16 e 35 dias) se você acertar, e volta para o início se errar. É o sistema de Leitner, baseado na curva do esquecimento.</p></div>
-      <div class="panel stack"><div class="eyebrow">Suas caixas</div><div class="grid3">${boxes.map((n, i) => `<div><div class="small muted">Caixa ${i + 1} · ${INTERVALS[i + 1]} dia(s)</div><b class="num" style="font-size:1.4rem">${n}</b></div>`).join('')}</div><p class="small muted">${total} cartões desbloqueados. Novos cartões entram a cada lição concluída.</p></div>
+      return `<div class="wrap narrow"><div><div class="eyebrow">Revisão espaçada</div><h1>${due.length ? `${due.length} cartões para hoje` : 'Nada pendente hoje'}</h1><p class="muted">Cada cartão tem uma <b>estabilidade</b> (por quantos dias a memória dura) e uma <b>dificuldade</b>. Acertar aumenta a estabilidade, mais ainda quando você lembra depois de muito tempo; errar a reduz. Os intervalos também se ajustam à sua memória: o objetivo é você lembrar cerca de 90% dos cartões quando eles voltam.</p></div>
+      <div class="panel stack"><div class="eyebrow">Sua memória</div><div class="grid3">${bands.map(([t, n]) => `<div><div class="small muted">${t}</div><b class="num" style="font-size:1.4rem">${n}</b></div>`).join('')}</div><p class="small muted">${total} cartões desbloqueados. ${ret == null ? 'A sua taxa de retenção aparece depois de 10 revisões.' : `A sua retenção: <b>${pct(ret)}</b> (meta: 90%). Intervalos ajustados em ×${num(sc, 2)}.`}</p></div>
       <div class="row"><button class="btn primary" data-act="rv-start" ${due.length ? '' : 'disabled'}>Revisar agora</button><button class="btn" data-act="rv-free" ${total ? '' : 'disabled'}>Revisão livre (10 cartões)</button></div></div>`;
     }
     const id = RV.queue[0], card = ALLCARDS[id];
     return `<div class="wrap narrow"><div class="runner-top"><div><div class="eyebrow">Revisão · ${esc(card.m)}</div><span class="small muted">${RV.queue.length} restante(s)</span></div><button class="btn ghost" data-act="rv-quit">Sair</button></div>
       <div class="panel flash"><div><div class="front">${colorize(esc(card.f))}</div>${RV.show ? `<hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><div>${colorize(esc(card.b))}</div>` : '<p class="small muted">Responda mentalmente antes de virar.</p>'}</div></div>
-      <div class="row" style="justify-content:center">${RV.show ? `<button class="btn danger" data-act="rv-grade" data-g="0">Errei</button><button class="btn" data-act="rv-grade" data-g="1">Difícil</button><button class="btn primary" data-act="rv-grade" data-g="2">Acertei</button>` : '<button class="btn primary" data-act="rv-show" id="rvShow">Mostrar resposta</button>'}</div></div>`;
+      <div class="row" style="justify-content:center">${RV.show ? `<button class="btn danger" data-act="rv-grade" data-g="0">Errei</button><button class="btn" data-act="rv-grade" data-g="1">Difícil</button><button class="btn primary" data-act="rv-grade" data-g="2">Acertei</button><button class="btn" data-act="rv-grade" data-g="3">Fácil</button>` : '<button class="btn primary" data-act="rv-show" id="rvShow">Mostrar resposta</button>'}</div></div>`;
   };
   function rvGrade(g) {
     const id = RV.queue.shift(), c = S.cards[id];
-    if (!RV.free) { if (g === 0) c.box = 1; else if (g === 2) c.box = Math.min(5, c.box + 1); c.due = addDays(todayStr(), g === 0 ? 1 : INTERVALS[c.box]); }
+    if (!RV.free) {
+      cardOf(id);
+      const t = c.last ? Math.max(0, (new Date(todayStr()) - new Date(c.last)) / DAY) : c.s, ret = Math.exp((Math.log(0.9) * t) / Math.max(0.5, c.s));
+      S.rvHist = (S.rvHist || []).concat(g > 0 ? 1 : 0).slice(-100);
+      if (g === 0) lapseCard(id);
+      else { const f = g === 1 ? 1.2 : g === 2 ? 2.5 - (c.d - 5) * 0.15 : 3.3 - (c.d - 5) * 0.15; c.s = Math.max(c.s + 1, c.s * f * (1 + (1 - ret))); c.d = Math.max(1, Math.min(10, c.d + (g === 1 ? 1 : g === 3 ? -1 : 0))); }
+      c.reps++; c.last = todayStr(); c.due = addDays(todayStr(), g === 0 ? 1 : Math.max(1, Math.round(c.s * intervalScale())));
+    }
     S.reviews++; daily().reviews++; dayLog('reviews'); S.xp += 2; touch();
     if (S.reviews >= 100) award('reviews100');
     RV.show = false; checkMissions(); save();
@@ -1157,7 +1361,7 @@ ${defense}`;
         <div class="panel"><div class="eyebrow">Competência por área</div>${radar(doms)}</div></div>
       <div class="panel stack"><div class="eyebrow">IPP ao longo do tempo</div>${lineChart(hist, { label: 'IPP por dia', min: 0, empty: 'O gráfico aparece a partir do segundo dia de estudo.' })}</div>
       <div class="grid2">
-        <div class="panel stack"><div class="eyebrow">Diagnóstico</div>${b ? `<div class="row"><div><div class="small muted">Início · ${b.date.split('-').reverse().join('/')}</div><b class="num" style="font-size:1.6rem">${pct(b.score)}</b></div>${lt ? `<div><div class="small muted">Último · ${lt.date.split('-').reverse().join('/')}</div><b class="num" style="font-size:1.6rem">${pct(lt.score)}</b></div><div><div class="small muted">Evolução</div><b class="num" style="font-size:1.6rem;color:${lt.score >= b.score ? 'var(--good)' : 'var(--red)'}">${lt.score >= b.score ? '+' : ''}${Math.round((lt.score - b.score) * 100)} pts</b></div>` : ''}</div>` : '<p class="muted">Você ainda não fez o diagnóstico inicial.</p>'}<div><button class="btn" data-act="diag">${b ? 'Refazer diagnóstico' : 'Fazer diagnóstico'}</button></div></div>
+        <div class="panel stack"><div class="eyebrow">Diagnóstico</div>${b ? `<div class="row"><div><div class="small muted">Início · ${b.date.split('-').reverse().join('/')}</div><b class="num" style="font-size:1.6rem">${diagTxt(b)}</b></div>${lt ? `<div><div class="small muted">Último · ${lt.date.split('-').reverse().join('/')}</div><b class="num" style="font-size:1.6rem">${diagTxt(lt)}</b></div><div><div class="small muted">Evolução</div><b class="num" style="font-size:1.6rem;color:${diagAbility(lt) >= diagAbility(b) ? 'var(--good)' : 'var(--red)'}">${diagAbility(lt) >= diagAbility(b) ? '+' : ''}${num(diagAbility(lt) - diagAbility(b), 1)} nível</b></div>` : ''}</div>` : '<p class="muted">Você ainda não fez o diagnóstico inicial.</p>'}<div><button class="btn" data-act="diag">${b ? 'Refazer diagnóstico' : 'Fazer diagnóstico'}</button></div></div>
         <div class="panel stack"><div class="eyebrow">Mesa de treino</div><div class="row"><span class="pill">${num(sm.hands, 0)} mãos</span><span class="pill">${sm.hands ? num((sm.net / sm.hands) * 100, 1) : 0} bb/100</span><span class="pill">VPIP ${sm.hands ? pct(sm.vpip / sm.hands) : '—'}</span><span class="pill">PFR ${sm.hands ? pct(sm.pfr / sm.hands) : '—'}</span></div>
           <div class="small muted">Decisões: ${sm.good} boas · ${sm.ok} aceitáveis · ${sm.bad} erros.</div>
           ${lineChart(sm.curve.map((y, i) => ({ x: 'mão ' + i, y })), { h: 160, zero: true, dec: 0, label: 'Resultado acumulado em bb', fmt: (y) => num(y, 1) + ' bb', empty: 'Jogue algumas mãos para ver o gráfico.' })}</div></div>
@@ -1328,12 +1532,20 @@ ${defense}`;
     lessonquiz: (d) => { const x = findLesson(d.id); startRunner('lesson', x.l.quiz.map(toItem), { id: d.id, domain: x.m.domain, title: 'Quiz · ' + x.l.title }); },
     exam: (d) => { const m = MODS.find((x) => x.id === d.id); if (m) startRunner('exam', examItems(m), { id: m.id, pass: 0.8, title: 'Prova · ' + m.title }); },
     final: () => startRunner('final', finalItems(), { pass: 0.85, title: 'Certificação teórica profissional' }),
-    diag: () => startRunner('diag', C.DIAG.map(([lid, qi]) => toItem(findLesson(lid).l.quiz[qi])), { title: 'Diagnóstico' }),
+    diag: () => startDiag(),
+    'place-zero': () => { S.placement = 0; save(); go('lesson', { id: MODS[0].lessons[0].id }); },
+    adaptive: () => startPractice(adaptivePick(10), { title: 'Prática adaptativa' }),
+    practice: (d) => { if (!d.c) return ACTS.adaptive(); startPractice(Array(10).fill(d.c), { title: 'Prática · ' + Pr.byId[d.c].name, single: d.c }); },
+    'hint-more': () => { if (R && R.retry) { R.retry.h++; render(); } },
+    reveal: () => { if (R && R.retry) { R.retry.revealed = true; R.picked = R.retry.first; R.answered = true; render(); focusNext(); } },
+    'hint-ai': () => socraticAI(),
+    'hint-send': () => { const v = document.getElementById('socr-in'); if (v && v.value.trim()) socraticAI(v.value.trim()); },
+    'socratic-toggle': () => { S.settings.socratic = S.settings.socratic === false; save(); render(); },
     drill: (d) => startDrill(d.id),
     mixed: () => { const ids = Object.keys(DRILLS).filter((id) => lessonOpenById(DRILLS[id].lesson)); const seq = Array.from({ length: 10 }, () => pick(ids)); startRunner('drill', seq.map((id) => () => DRILLS[id].gen()), { drill: seq[0], title: 'Treino misto', mixed: seq }); },
     answer: (d) => answer(+d.o),
     next: () => nextQ(),
-    quit: () => { const k = R && R.kind; clearInterval(runTimer); R = null; go(k === 'drill' ? 'drills' : k === 'lesson' || k === 'exam' || k === 'final' ? 'trail' : 'home'); },
+    quit: () => { const k = R && R.kind; clearInterval(runTimer); R = null; go(k === 'drill' ? 'drills' : k === 'practice' ? 'mastery' : k === 'lesson' || k === 'exam' || k === 'final' ? 'trail' : 'home'); },
     'ob-skip': () => { if (saveProfile()) go('home'); },
     deal: (d) => { if (d.mode && (!T || d.mode !== TMODE)) { TMODE = d.mode; T = null; } if (VIEW !== 'table') go('table'); newHand(); },
     adversarial: () => { TMODE = 'adversarial'; T = null; go('table'); newHand(); },
@@ -1358,6 +1570,7 @@ ${defense}`;
     const fn = ACTS[el.dataset.act]; if (fn) { e.preventDefault(); fn(el.dataset); }
   });
   document.addEventListener('keydown', (e) => {
+    if (e.target.id === 'socr-in' && e.key === 'Enter') { e.preventDefault(); ACTS['hint-send'](); return; }
     if (e.target.matches('input, textarea, select')) return;
     if (VIEW === 'runner' && R && !R.done) {
       if (!R.answered && /^[1-5]$/.test(e.key)) { const oi = R.order[+e.key - 1]; if (oi !== undefined) answer(oi); }
@@ -1374,7 +1587,7 @@ ${defense}`;
     const id = e.target.id;
     if (!['onboardForm', 'journalForm', 'weeklyForm', 'bankForm'].includes(id)) return;
     e.preventDefault();
-    if (id === 'onboardForm') { if (saveProfile()) { if (S.profile.exp === 'never') go('lesson', { id: MODS[0].lessons[0].id }); else ACTS.diag(); } }
+    if (id === 'onboardForm') { if (saveProfile()) go('diagintro'); }
     if (id === 'journalForm') {
       const g = (x) => document.getElementById(x).value;
       const hands = parseInt(g('jr-hands'), 10), result = parseFloat(String(g('jr-result')).replace(',', '.'));
@@ -1393,7 +1606,9 @@ ${defense}`;
   document.addEventListener('change', (e) => { if (e.target.id === 'bk-fmt') { PARAMS = { bank: +document.getElementById('bk-bank').value || 0, fmt: e.target.value }; render(); } });
 
   // ---------- API usada pelo Laboratório e pelo Alto rendimento ----------
-  window.App = { S: () => S, save, render, go, toast, addXP, logDecision, logTool, lessonTitle, cardsHTML, cardHTML, mentorHTML, radar, today: todayStr, daysAgo: (n) => addDays(todayStr(), -n), recordSession, addPlanItem, askMentor, juryCall };
+  window.App = { S: () => S, save, render, go, toast, addXP, logDecision, logTool, lessonTitle, cardsHTML, cardHTML, mentorHTML, radar, today: todayStr, daysAgo: (n) => addDays(todayStr(), -n), recordSession, addPlanItem, askMentor, juryCall, conceptState,
+    // Leitura do estado da questão atual (usada pelos testes automáticos).
+    runnerState: () => (R ? { kind: R.kind, i: R.i, done: !!R.done, answered: !!R.answered, retry: !!R.retry, a: R.cur && R.cur.a, n: R.cur && R.cur.options.length, lvl: R.cur && R.cur.lvl, cid: R.cur && R.cur.cid } : null) };
 
   let startView = 'home';
   try { startView = sessionStorage.getItem('as-view') || 'home'; } catch (e) { /* sem armazenamento */ }
