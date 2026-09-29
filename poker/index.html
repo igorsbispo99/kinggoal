@@ -176,6 +176,19 @@ button.term:hover, button.term[aria-expanded="true"] { color: var(--brass); }
 .term-def { display: block; margin: 6px 0 8px; padding: 8px 12px; border-left: 3px solid var(--brass); background: var(--felt); border-radius: 0 8px 8px 0; font-size: 0.92rem; font-weight: 400; color: var(--ivory); }
 .term-def b { color: var(--brass); }
 .glossary dt { font-weight: 700; margin-top: 10px; }
+.spot, .worked { margin: 1.2em 0; border-color: var(--brass); }
+.spot-table { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-end; padding: 12px; border-radius: 10px; background: var(--felt); border: 1px solid var(--line); }
+.spot-table .lbl { display: block; margin-bottom: 6px; }
+.spot-nums { display: grid; grid-template-columns: auto auto; gap: 4px 10px; align-items: baseline; margin-left: auto; }
+.spot-q { font: 700 1.08rem/1.35 var(--font-display); margin: 0; }
+.opt.meh { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--felt)); }
+.callout.ok { border-left-color: var(--good); }
+.callout.bad { border-left-color: var(--red); }
+.callout.pre { border-left-color: var(--warn); }
+.whynot { padding: 8px 12px; border-left: 3px solid var(--line); font-size: 0.95rem; }
+.wsteps { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.wstep > div { margin-top: 4px; }
+.wstep.ask { padding: 10px 12px; border: 1px dashed var(--brass); border-radius: 10px; }
 .glossary dd { margin: 2px 0 0; color: var(--muted); }
 .callout .eyebrow { display: block; margin-bottom: 6px; }
 
@@ -349,8 +362,10 @@ table.dash td { vertical-align: middle; }
 <script src="content-b.js"></script>
 <script src="content-c.js"></script>
 <script src="content-d.js"></script>
+<script src="content-kit.js"></script>
 <script src="content-zero.js"></script>
 <script src="content-n1.js"></script>
+<script src="content-p01.js"></script>
 <script src="tracker.js"></script>
 <script src="lab-core.js"></script>
 <script src="lab-solver.js"></script>

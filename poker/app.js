@@ -683,6 +683,76 @@ ${defense}`;
     }).join('')}</div>`;
   };
 
+  // ---------- pré-requisitos ----------
+  // Lições de base (C.PRE) ainda não feitas ou com quiz abaixo de 67%. `all` inclui as já concluídas com nota baixa.
+  function weakPre(id) {
+    return (C.PRE[id] || []).map(findLesson).filter((x) => x && (!S.lessons[x.l.id] || S.lessons[x.l.id].score < 0.67));
+  }
+  function preHTML(l) {
+    if (S.lessons[l.id]) return '';
+    const w = weakPre(l.id); if (!w.length) return '';
+    return `<div class="callout pre"><span class="eyebrow">Base recomendada</span><p style="margin:0 0 8px">Esta lição usa ideias de outras lições que você ainda não fez ou em que ficou abaixo de 67% no quiz. Vale revisá-las antes, ou pelo menos ter as duas abertas.</p><div class="row">${w.map((x) => `<button class="btn ghost small" data-act="lesson" data-id="${x.l.id}">${esc(x.l.title)}${S.lessons[x.l.id] ? ` · ${pct(S.lessons[x.l.id].score)}` : ''}</button>`).join('')}</div></div>`;
+  }
+
+  // ---------- mãos interativas e exemplos resolvidos ----------
+  const parseCards = (str) => (str || '').trim().split(/\s+/).filter(Boolean).map((c) => P.parseCard(c.replace(/^10/, 'T')));
+  const bbTxt = (v) => num(v, v % 1 ? 1 : 0) + ' bb';
+  function mountWidgets(root, lid) {
+    S.spots = S.spots || {};
+    root.querySelectorAll('.spot[data-spot]').forEach((el, i) => {
+      let o; try { o = JSON.parse(el.dataset.spot); } catch (e) { return; }
+      const key = lid + ':' + i;
+      el.className = 'spot panel stack';
+      el.innerHTML = `<div class="eyebrow">Mão interativa${o.title ? ' · ' + esc(o.title) : ''}</div>
+        <div class="spot-table"><div><span class="lbl">Você${o.pos ? ' · ' + esc(o.pos) : ''}</span><div class="board">${o.hero ? cardsHTML(parseCards(o.hero)) : ''}</div></div>
+        <div><span class="lbl">Mesa</span><div class="board">${o.board ? cardsHTML(parseCards(o.board)) : '<span class="small muted">ainda sem cartas</span>'}</div></div>
+        <div class="spot-nums">${o.pot != null ? `<span class="lbl">Pote</span><b class="num">${bbTxt(o.pot)}</b>` : ''}${o.stack != null ? `<span class="lbl">Stack efetivo</span><b class="num">${bbTxt(o.stack)}</b>` : ''}</div></div>
+        ${o.hist ? `<p class="small muted" style="margin:0">${colorize(o.hist)}</p>` : ''}
+        <p class="spot-q">${colorize(o.q)}</p>
+        <div class="opts">${o.opts.map((x, k) => `<button type="button" class="opt" data-k="${k}"><span class="k">${k + 1}</span>${colorize(x[0])}</button>`).join('')}</div>
+        <div class="spot-fb stack" hidden></div>`;
+      const fb = el.querySelector('.spot-fb');
+      el.querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => {
+        const k = +b.dataset.k, sc = o.opts[k][1];
+        el.querySelectorAll('.opt').forEach((y) => { y.disabled = true; const s2 = o.opts[+y.dataset.k][1]; if (s2 === 1) y.classList.add('right'); else if (+y.dataset.k === k) y.classList.add(sc > 0 ? 'meh' : 'wrong'); });
+        const verdict = sc === 1 ? 'Boa decisão.' : sc > 0 ? 'Aceitável, mas existe uma opção melhor.' : 'Não é a melhor decisão.';
+        fb.innerHTML = `<div class="callout ${sc === 1 ? 'ok' : sc > 0 ? '' : 'bad'}"><span class="eyebrow">Sua escolha: ${esc(o.opts[k][0])}</span><b>${verdict}</b> ${colorize(o.opts[k][2])}</div>`
+          + o.opts.map((x, j) => j === k ? '' : `<div class="whynot"><b>${x[1] === 1 ? 'Por que sim' : x[1] > 0 ? 'Também possível' : 'Por que não'}: ${colorize(esc(x[0]))}.</b> ${colorize(x[2])}</div>`).join('');
+        fb.hidden = false;
+        if (!(key in S.spots)) { S.spots[key] = sc; if (sc === 1) addXP(5); }
+        const dom = (findLesson(lid) || {}).m; if (dom) { S.qs[dom.domain] = S.qs[dom.domain] || { n: 0, c: 0 }; S.qs[dom.domain].n++; if (sc === 1) S.qs[dom.domain].c++; }
+        save();
+      }));
+    });
+    root.querySelectorAll('.worked[data-worked]').forEach((el) => {
+      let o; try { o = JSON.parse(el.dataset.worked); } catch (e) { return; }
+      const asks = o.steps.filter((s) => s.ask).length;
+      el.className = 'worked panel stack';
+      el.innerHTML = `<div class="eyebrow">Exemplo resolvido${o.title ? ' · ' + esc(o.title) : ''}${asks ? ` · você resolve ${asks} de ${o.steps.length} passos` : ''}</div>${o.setup ? `<div>${colorize(o.setup)}</div>` : ''}<ol class="wsteps"></ol><div><button type="button" class="btn">Ver o passo 1</button></div>`;
+      const ol = el.querySelector('.wsteps'), btn = el.querySelector('.btn');
+      let i = 0;
+      const show = () => {
+        const st = o.steps[i], li = document.createElement('li');
+        li.className = 'wstep' + (st.ask ? ' ask' : '');
+        li.innerHTML = `<b>${st.ask ? '<span class="pill gold">Sua vez</span> ' : ''}${colorize(st.t)}</b>`;
+        ol.appendChild(li); i++;
+        const done = () => { if (i < o.steps.length) { btn.textContent = `Ver o passo ${i + 1}`; btn.hidden = false; } else { btn.hidden = true; const e2 = document.createElement('p'); e2.className = 'small muted'; e2.textContent = 'Exemplo concluído. Tente refazer de cabeça, sem olhar, antes de seguir.'; el.appendChild(e2); } };
+        if (!st.ask) { li.insertAdjacentHTML('beforeend', `<div>${colorize(st.a)}</div>`); done(); return; }
+        btn.hidden = true;
+        const box = document.createElement('div'); box.className = 'stack';
+        box.innerHTML = `<p style="margin:6px 0 0">${colorize(st.ask.q)}</p><div class="opts">${st.ask.opts.map((x, k) => `<button type="button" class="opt" data-k="${k}"><span class="k">${String.fromCharCode(65 + k)}</span>${colorize(x)}</button>`).join('')}</div>`;
+        li.appendChild(box);
+        box.querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => {
+          const k = +b.dataset.k, ok = k === st.ask.a;
+          box.querySelectorAll('.opt').forEach((y) => { y.disabled = true; if (+y.dataset.k === st.ask.a) y.classList.add('right'); else if (+y.dataset.k === k) y.classList.add('wrong'); });
+          box.insertAdjacentHTML('beforeend', `<div><b>${ok ? 'Isso.' : 'Não exatamente.'}</b> ${colorize(st.a)}</div>`);
+          done();
+        }));
+      };
+      btn.addEventListener('click', show);
+    });
+  }
+
   // Lições em passos: o corpo é dividido nos subtítulos (h4) e revelado parte por parte.
   const lessonSteps = (body) => body.split(/(?=<h4>)/).map((x) => x.trim()).filter(Boolean);
   VIEWS.lesson = ({ id }) => {
@@ -692,6 +762,7 @@ ${defense}`;
       <div class="row small"><button class="btn ghost" data-act="nav" data-v="trail">‹ Trilha</button><span class="muted">${esc(m.tag)} · ${esc(m.title)} · lição ${li + 1} · ${l.min} min</span></div>
       <h1>${esc(l.title)}</h1>
       ${mentorHTML(`<p>${colorize(l.why)}</p>`, 'Por que isso importa')}
+      ${preHTML(l)}
       <article class="lesson-body">${steps.map((p, i) => `<section class="lstep" ${!all && i > 0 ? 'hidden' : ''}>${colorize(p)}</section>`).join('')}</article>
       ${all ? '' : `<div class="step-nav" id="step-nav"><div class="bar"><i id="step-bar" style="width:${100 / steps.length}%"></i></div><div class="row" style="justify-content:space-between"><button class="btn primary" id="step-next">Continuar · parte 2 de ${steps.length}</button><button class="btn ghost small" id="step-all">Mostrar a lição inteira</button></div><p class="small muted" style="margin:0">Leia com calma. Quando houver uma pergunta <b>Pense antes de ler</b>, tente responder antes de abrir.</p></div>`}
       <div id="after-steps" class="stack" ${all ? '' : 'hidden'}>
@@ -706,6 +777,7 @@ ${defense}`;
   MOUNTS.lesson = (root) => {
     const secs = [...root.querySelectorAll('.lstep')], nav = root.querySelector('#step-nav'), after = root.querySelector('#after-steps');
     markTerms([...root.querySelectorAll('.lesson-body, .callout, .mentor .bubble')]);
+    mountWidgets(root, PARAMS.id);
     if (!nav) return;
     const next = root.querySelector('#step-next'), bar = root.querySelector('#step-bar');
     const finish = () => { secs.forEach((x) => (x.hidden = false)); nav.remove(); after.hidden = false; };
@@ -831,6 +903,8 @@ ${defense}`;
       head = sc === 1 ? 'Lição dominada.' : sc >= 0.67 ? 'Lição concluída.' : 'Lição concluída, com pontos a reforçar.';
       body = sc < 1 ? '<p>Os conceitos que você errou já entraram na sua fila de revisão. Eles vão voltar nos próximos dias.</p>' : '<p>Os cartões desta lição entraram na sua fila de revisão espaçada.</p>';
       actions = (nxt ? `<button class="btn primary" data-act="lesson" data-id="${nxt.id}">Próxima lição</button>` : `<button class="btn primary" data-act="exam" data-id="${x.m.id}">Fazer a prova do módulo</button>`) + (x.l.drill ? `<button class="btn" data-act="drill" data-id="${x.l.drill}">Treinar agora</button>` : '') + (x.l.lab ? `<button class="btn" data-act="nav" data-v="${x.l.lab[0]}">Praticar no Laboratório</button>` : '') + `<button class="btn ghost" data-act="lessonquiz" data-id="${R.id}">Refazer quiz</button>`;
+      const weak = weakPre(x.l.id);
+      if (sc < 0.67 && weak.length) body += `<p>Quando um quiz fica abaixo de 67%, muitas vezes o que falta é a base. Esta lição depende de: ${weak.map((w) => `<button class="btn ghost small" data-act="lesson" data-id="${w.l.id}">${esc(w.l.title)}</button>`).join(' ')}</p>`;
       if (sc < 1) R.results.forEach((ok, i) => { if (!ok) { const cid = R.id + ':' + Math.min(i, x.l.cards.length - 1); if (S.cards[cid]) S.cards[cid] = { box: 1, due: todayStr() }; } });
     } else if (R.kind === 'exam' || R.kind === 'final') {
       const ok = sc >= R.pass;
