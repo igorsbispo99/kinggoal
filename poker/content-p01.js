@@ -259,9 +259,21 @@
     ],
   })));
 
+  // Lições do Nível 0 que ainda não tinham pergunta nem prática.
+  append('z1_4', `<h4>Experimente o método</h4>${C.kit.think('Por que este curso pede que você tente responder antes de ler a resposta, mesmo quando você não sabe?', '<p>Porque o esforço de buscar a resposta na memória, mesmo errando, é o que fixa o conteúdo. Ler a resposta direto dá a sensação de ter entendido, mas ela some em poucos dias. Errar tentando ensina mais do que acertar lendo.</p>')}`);
+  append('z5_4', pratique(spot({
+    title: 'O primeiro depósito',
+    q: 'Você terminou o Nível 0 e quer jogar a dinheiro pela primeira vez. Qual é o jeito responsável de começar?',
+    opts: [
+      ['Separar um valor que não fará falta, definir um limite de depósito na sala e começar no menor limite', 1, 'Assim o aprendizado continua sem risco para a sua vida. Os limites decididos agora, com a cabeça fria, protegem você depois.'],
+      ['Depositar o máximo possível para jogar mesas maiores', 0, 'Mesas maiores têm jogadores melhores e perdas maiores. Nesta fase, o objetivo é aprender, não arriscar.'],
+      ['Usar o dinheiro das contas do mês e repor depois com os ganhos', 0, 'Nunca jogue com dinheiro de que você precisa. Esse é o primeiro sinal de alerta do jogo problemático.'],
+    ],
+  })));
+
   // ---------------------------------------------------------------- pré-requisitos (níveis 0 e 1)
   Object.assign(C.PRE, {
-    z2_1: ['z1_1'], z3_1: ['z2_2'], z3_2: ['z3_1'], z3_3: ['z3_2'], z3_4: ['z3_3'], z3_5: ['z3_4', 'z2_3'],
+    z1_2: ['z1_1'], z1_3: ['z1_2'], z1_4: ['z1_1'], z2_1: ['z1_1'], z2_2: ['z2_1'], z2_3: ['z2_2'], z2_4: ['z2_1'], z4_1: ['z3_5'], z5_1: ['z4_6'], z5_4: ['z1_3'], l1_8: ['l1_5'], l1_9: ['l1_8'], z3_1: ['z2_2'], z3_2: ['z3_1'], z3_3: ['z3_2'], z3_4: ['z3_3'], z3_5: ['z3_4', 'z2_3'],
     z4_2: ['z4_1'], z4_3: ['z4_2'], z4_4: ['z4_3'], z4_5: ['z4_1', 'z4_4'], z4_6: ['z4_2', 'z4_4', 'z4_5', 'z3_5'],
     z5_2: ['z3_5'], z5_3: ['z1_3'],
     l1_4: ['z4_1', 'z4_5'], l1_5: ['z4_2'], l1_6: ['z4_4', 'z3_5'], l1_1: ['z5_3', 'z1_3'], l1_7: ['l1_4'],

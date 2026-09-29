@@ -2,7 +2,7 @@
 
 Mentoria de poker (No-Limit Texas Hold'em) que leva uma pessoa do zero ao nível elite, com três partes:
 
-- **Formação**: 32 módulos e 168 lições em 6 níveis. O Nível 0 (Primeiros passos) é para quem nunca jogou: o que é poker, o baralho, as combinações, uma rodada completa e as primeiras decisões. Depois vêm Iniciante, Competente, Reg, Pro e Elite. As lições são reveladas em partes, com perguntas "Pense antes de ler" e glossário ao toque. Inclui provas por módulo, certificação teórica, carteira profissional com provas práticas, plano semanal do mentor, painel de performance com 12 áreas, revisão espaçada, mesa de treino (6-max, adversários adaptativos e heads-up) e mentor por IA.
+- **Formação**: 32 módulos e 168 lições em 6 níveis. O Nível 0 (Primeiros passos) é para quem nunca jogou: o que é poker, o baralho, as combinações, uma rodada completa e as primeiras decisões. Depois vêm Iniciante, Competente, Reg, Pro e Elite. Todos os níveis são escritos em linguagem simples, com lições reveladas em partes, perguntas "Pense antes de ler", 64 mãos e situações interativas (com o "por que não" de cada alternativa), 43 exemplos resolvidos em que o aluno assume os passos aos poucos, um mapa de pré-requisitos que sugere revisar a base quando ela está fraca e um glossário de 185 termos ao toque. Inclui provas por módulo, certificação teórica, carteira profissional com provas práticas, plano semanal do mentor, painel de performance com 12 áreas, revisão espaçada, mesa de treino (6-max, adversários adaptativos e heads-up) e mentor por IA.
 - **Laboratório** (o software próprio): equity (range contra range), construtor e treinador de ranges, analisador de flop, solver GTO de turn e river com node locking, Treinador GTO com EV perdido e relógio, push/fold de Nash (heads-up e mesa com ICM), ICM/bubble factor/acordos/bounty, database com importação de históricos (PokerStars, GGPoker), variância, sessão e rotina, seleção de jogos e staking.
 - **Alto rendimento**: registro de todas as decisões, mapa de leaks (spot → erro → causa → correção → drill → reavaliação), scorecard de Poker IQ, 7 níveis de domínio, leitor de spots em 3 camadas, visualização de ranges, blockers, adaptação bayesiana, abstração e generalização, planejamento de ruas, júri e fase Grandmaster.
 
@@ -22,6 +22,6 @@ O progresso fica no `localStorage` do navegador (as mãos, no IndexedDB). Public
 - `solver-core.js`, `solver-worker.js` — solver Discounted CFR de turn e river com remoção de cartas exata.
 - `icm.js`, `preflop-matrix.js` — ICM e push/fold de Nash; matriz de equity 169×169 gerada por `tools/build-preflop-matrix.js`.
 - `tracker.js` — parser de históricos, estatísticas, all-in EV, leaks e perfis.
-- `content*.js` — currículo. `content-zero.js` traz o Nível 0 e o glossário; `content-n1.js` reescreve o Nível 1 em linguagem simples.
+- `content*.js` — currículo. `content.js` e `content-a.js` a `content-d.js` definem a estrutura; `content-kit.js` traz as ferramentas de autoria (mão interativa, exemplo resolvido, pré-requisitos); `content-zero.js` é o Nível 0; `content-n1.js` a `content-n5.js` reescrevem os níveis 1 a 5; `content-p01.js` acrescenta a prática dos níveis 0 e 1.
 - `lab-*.js` — ferramentas do Laboratório. `elite-*.js` — Alto rendimento.
 - `app.js` — navegação, estado, carteira, painel, plano, mesa e mentor.
