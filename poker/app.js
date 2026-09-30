@@ -47,12 +47,12 @@
   function fresh() {
     return { v: 1, profile: null, xp: 0, streak: { count: 0, best: 0, last: null }, lessons: {}, qs: {}, exams: {}, diag: {}, mastery: {}, placement: null, drills: {}, cards: {}, reviews: 0,
       sim: { hands: 0, net: 0, vpip: 0, pfr: 0, good: 0, ok: 0, bad: 0, curve: [0] }, simModes: {}, journal: [], hist: {}, badges: {}, daily: {}, days: {},
-      decisions: [], tools: {}, ranges: {}, notes: {}, gto: null, jury: [], gm: [], principles: [], study: [], session: null, plan: {}, planExtra: [], weekly: [], dbexam: null, replays: [], pressure: {}, settings: { drillTime: 0 }, savedAt: 0 };
+      decisions: [], tools: {}, ranges: {}, notes: {}, gto: null, jury: [], gm: [], principles: [], study: [], session: null, plan: {}, planExtra: [], weekly: [], dbexam: null, replays: [], pressure: {}, mplan: null, settings: { drillTime: 0 }, savedAt: 0 };
   }
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
   S = S && S.v === 1 ? Object.assign(fresh(), S) : fresh();
-  S.settings = Object.assign({ drillTime: 0, socratic: true, tableClock: 0, breath: true }, S.settings);
+  S.settings = Object.assign({ drillTime: 0, socratic: true, tableClock: 0, breath: true, mentor: true }, S.settings);
   let cloudTimer = null;
   function save() {
     if (S.profile) S.hist[todayStr()] = Math.round(ipp().total);
@@ -141,7 +141,7 @@
   // Nivelamento do diagnóstico: módulos abaixo do nível indicado ficam abertos para revisão, e o primeiro módulo do nível indicado também.
   const placedOpen = (mi) => { const pl = S.placement; if (pl == null) return false; const m = MODS[mi]; return m.level < pl || (m.level === pl && MODS.findIndex((x) => x.level === pl) === mi); };
   const placedSkip = (m) => S.placement != null && m.level < S.placement && !passed(m);
-  const moduleOpen = (mi) => mi === 0 || passed(MODS[mi - 1]) || placedOpen(mi);
+  const moduleOpen = (mi) => (mi === 0 || passed(MODS[mi - 1]) || placedOpen(mi)) && !mentorLocked(mi);
   const lessonOpen = (mi, li) => moduleOpen(mi) && (li === 0 || !!S.lessons[MODS[mi].lessons[li - 1].id] || passed(MODS[mi]));
   const lessonOpenById = (id) => { const x = findLesson(id); return x && lessonOpen(x.mi, x.li); };
   const lessonTitle = (id) => { const x = findLesson(id); return x ? x.l.title : id; };
@@ -443,7 +443,7 @@
     const gto = decAcc((d) => d.src === 'gto', 1000), gtoT = decAcc((d) => d.src === 'gto' && d.timed && d.timed <= 7, 1000);
     const adv = simMode('adversarial'), hu = simMode('hu');
     const mastery = E.MASTERY.slice(0, 6).every(([, , f]) => f(q, x));
-    const it = (label, r, extra) => ({ label, ok: r.ok, txt: r.txt, practical: !!extra });
+    const it = (label, r, extra) => ({ label, ok: r.ok, txt: r.txt, practical: !!extra, real: extra === 2 });
     return [
       { lvl: 1, name: 'Iniciante', items: [
         it('Provas dos módulos dos níveis 0 e 1', examOk(['z1', 'z2', 'z3', 'z4', 'z5', 'm1', 'm2', 'm3', 'm4', 'lab1'])),
@@ -466,10 +466,10 @@
       ] },
       { lvl: 4, name: 'Profissional', items: [
         it('Provas dos módulos do nível 4 e certificação teórica (85%)', (() => { const r = examOk(['m7', 'mg', 'pf', 'bf', 'rt', 'gs', 'm8']); const f = !!(S.exams.final && S.exams.final.best >= 0.85); return { ok: r.ok && f, txt: `${r.txt} · certificação ${f ? 'ok' : 'pendente'}` }; })()),
-        it('Disciplina: 20 sessões registradas com rotina de 80%', { ok: sess.length >= 20 && sess.reduce((a, s) => a + s.discipline, 0) / sess.length >= 0.8, txt: `${sess.length} sessões` }, 1),
-        it('Mental: tilt alto em até 15% das sessões (mínimo 20)', { ok: S.journal.length >= 20 && tiltHi / S.journal.length <= 0.15, txt: S.journal.length ? `${pct(tiltHi / S.journal.length)} de ${S.journal.length}` : 'sem sessões' }, 1),
-        it('Estudo: 20 horas registradas', { ok: studyH >= 20, txt: `${num(studyH, 1)} h` }, 1),
-        it('Prova real: 30.000 mãos registradas com taxa positiva', { ok: jr.hands >= 30000 && jr.bb100 > 0, txt: `${num(jr.hands, 0)} mãos, ${num(jr.bb100, 1)} bb/100` }, 1),
+        it('Disciplina: 20 sessões registradas com rotina de 80%', { ok: sess.length >= 20 && sess.reduce((a, s) => a + s.discipline, 0) / sess.length >= 0.8, txt: `${sess.length} sessões` }, 2),
+        it('Mental: tilt alto em até 15% das sessões (mínimo 20)', { ok: S.journal.length >= 20 && tiltHi / S.journal.length <= 0.15, txt: S.journal.length ? `${pct(tiltHi / S.journal.length)} de ${S.journal.length}` : 'sem sessões' }, 2),
+        it('Estudo: 20 horas registradas', { ok: studyH >= 20, txt: `${num(studyH, 1)} h` }, 2),
+        it('Prova real: 30.000 mãos registradas com taxa positiva', { ok: jr.hands >= 30000 && jr.bb100 > 0, txt: `${num(jr.hands, 0)} mãos, ${num(jr.bb100, 1)} bb/100` }, 2),
       ] },
       { lvl: 5, name: 'Elite', items: [
         it('Provas dos módulos do nível 5', examOk(['el', 'hu', 'lv', 'hc', 'ca'])),
@@ -583,6 +583,7 @@ ${defense}`;
     lab: ['Laboratório', [['lab-home', 'Visão geral']].concat(Lab.tools.map(([id, n]) => [id, n]))],
     elite: ['Alto rendimento', [['elite-home', 'Painel de elite'], ['elite-leaks', 'Mapa de leaks']].concat(E.drills.map(([id, n]) => [id, n]))],
   };
+  const MENTOR_NAV = () => [['home', 'Hoje'], ['trail', 'Trilha'], ['review', 'Revisão']].concat(tableOpen() ? [['table', 'Mesa']] : []).concat([['mastery', 'Domínio'], ['progress', 'Evolução']]);
   const sectionOf = (v) => (v.startsWith('lab-') ? 'lab' : v.startsWith('elite-') ? 'elite' : 'form');
   let VIEW = 'home', PARAMS = {}, R = null, tableTimer = null, SECTION = 'form';
   function go(view, params) {
@@ -596,19 +597,25 @@ ${defense}`;
   }
   function renderNav() {
     const due = dueCards().length;
-    const top = { lesson: 'trail', runner: R && R.kind === 'drill' ? 'drills' : 'trail', dbexam: 'progress' }[VIEW] || VIEW;
+    const top = { lesson: 'trail', runner: R && R.kind === 'drill' ? 'drills' : R && R.kind === 'review' ? 'review' : 'trail', dbexam: 'progress', replays: 'table', replay: 'table', mentor: 'home' }[VIEW] || VIEW;
     const nav = document.getElementById('tabs');
     if (!S.profile) { nav.innerHTML = ''; document.getElementById('railfoot').innerHTML = ''; document.getElementById('secs').innerHTML = ''; return; }
-    document.getElementById('secs').innerHTML = Object.entries(SECTIONS).map(([k, [n]]) => `<button data-act="section" data-s="${k}" aria-pressed="${SECTION === k}">${n}</button>`).join('');
-    nav.innerHTML = SECTIONS[SECTION][1].map(([k, t]) => `<button data-act="nav" data-v="${k}" ${top === k ? 'aria-current="page"' : ''}><span>${esc(t)}</span>${k === 'review' && due ? `<span class="badge-count">${due}</span>` : ''}</button>`).join('');
+    const mo = mentorOn(), items = mo ? MENTOR_NAV() : SECTIONS[SECTION][1];
+    document.getElementById('secs').innerHTML = mo ? '' : Object.entries(SECTIONS).map(([k, [n]]) => `<button data-act="section" data-s="${k}" aria-pressed="${SECTION === k}">${n}</button>`).join('');
+    nav.innerHTML = items.map(([k, t]) => `<button data-act="nav" data-v="${k}" ${top === k ? 'aria-current="page"' : ''}><span>${esc(t)}</span>${k === 'review' && due ? `<span class="badge-count">${due}</span>` : ''}</button>`).join('');
     const v = ipp().total, r = rankFor(v), lv = level(), cl = carteiraLevel();
-    document.getElementById('railfoot').innerHTML = `<div class="panel" style="padding:14px"><div class="eyebrow">Seu nível</div><b style="font-family:var(--font-display);font-size:1.1rem">${LADDER[r][1]}</b><div class="small muted">IPP ${num(v, 0)} · Carteira ${cl}/5 · XP nível ${lv}</div><div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, ((S.xp - xpFor(lv)) / (xpFor(lv + 1) - xpFor(lv))) * 100)}%"></i></div>${cloud && cloud.ok ? '<div class="small muted" style="margin-top:6px">Progresso salvo na nuvem</div>' : ''}</div>`;
+    document.getElementById('railfoot').innerHTML = `<div class="panel" style="padding:14px"><div class="eyebrow">Seu nível</div><b style="font-family:var(--font-display);font-size:1.1rem">${LADDER[r][1]}</b><div class="small muted">IPP ${num(v, 0)} · Carteira ${cl}/5 · XP nível ${lv}</div><div class="bar" style="margin-top:8px"><i style="width:${Math.min(100, ((S.xp - xpFor(lv)) / (xpFor(lv + 1) - xpFor(lv))) * 100)}%"></i></div>${cloud && cloud.ok ? '<div class="small muted" style="margin-top:6px">Progresso salvo na nuvem</div>' : ''}</div>
+      <div class="panel mode-toggle" style="padding:12px;margin-top:10px"><div class="row" style="justify-content:space-between"><span class="small"><b>Modo mentor</b><br><span class="muted">${mo ? 'O mentor guia cada passo' : 'Desligado: modo livre'}</span></span><button class="switch ${mo ? 'on' : ''}" data-act="mentor-toggle" role="switch" aria-checked="${mo}" aria-label="Modo mentor"><i></i></button></div></div>`;
   }
   function render() {
     renderNav();
     if (!S.profile && VIEW !== 'runner') VIEW = 'onboard';
     const fn = VIEWS[VIEW] || VIEWS.home;
     main.innerHTML = fn(PARAMS);
+    if (mentorOn() && S.profile && !['home', 'mentor', 'runner', 'lesson', 'onboard', 'diagintro', 'table', 'replays', 'replay'].concat(MENTOR_NAV().map((x) => x[0])).includes(VIEW)) {
+      const t = mentorCurrent();
+      main.insertAdjacentHTML('afterbegin', `<div class="mbanner"><span class="small">${t && t.kind === 'tool' && t.view === VIEW ? `<b>Tarefa do mentor:</b> ${esc(t.what || t.title)}` : 'Você está fora do plano de hoje.'}</span><button class="btn small" data-act="nav" data-v="home">Voltar ao plano de hoje</button></div>`);
+    }
     if (VIEW === 'table') tableAfterRender();
     main.querySelectorAll('.rangeset').forEach(initRangeSet);
     const mount = Lab.mounts[VIEW] || E.mounts[VIEW] || MOUNTS[VIEW];
@@ -661,10 +668,199 @@ ${defense}`;
   // ---------- telas ----------
   const VIEWS = Object.assign({}, Lab.views, E.views), MOUNTS = {};
 
+  // ---------- modo mentor: o método, passo a passo ----------
+  // O mentor decide a sessão de cada dia: revisar (prova), reforçar a base fraca, aprender matéria nova, consolidar,
+  // automatizar, jogar e rever. Uma fase (nível) só abre quando o nível anterior foi aprovado nas provas e no portão prático.
+  function mentorOn() { return S.settings.mentor !== false; }
+  const DAYMIN = { 3: 30, 6: 50, 10: 80, 20: 120 };
+  const dayMin = () => DAYMIN[(S.profile && S.profile.hours) || 6] || 50;
+  const toolName = (v) => { const x = Lab.tools.concat(E.drills).find((t) => t[0] === v); return x ? x[1] : v === 'dbexam' ? 'Prova de database' : v; };
+  const PHASE_MODE = { 0: 'normal', 1: 'normal', 2: 'nl2', 3: 'nl10', 4: 'nl50', 5: 'adversarial' };
+  const tableOpen = () => passed(MODS.find((m) => m.id === 'm2')) || (S.placement || 0) >= 2;
+  // O que cada item do portão pede na prática (índices iguais aos da carteira; o índice 0, das provas, é coberto pela trilha).
+  const GATE_GO = {
+    1: [null, { drills: [['ranking', 0.85], ['besthand', 0.85], ['rfi', 0.85], ['outs', 0.85], ['potodds', 0.85]] }, { table: 'normal' }],
+    2: [null, { drills: [['callfold', 0.85], ['texture', 0.85], ['pushfold', 0.85], ['equity', 0.8]] }, { tools: ['lab-ranges'], what: 'Na aba de treino de ranges, responda 20 decisões com atenção.' }, { tools: ['elite-rangeviz', 'elite-blockers'], what: 'Faça 10 decisões e leia cada explicação.' }, { table: 'nl2' }],
+    3: [null, { tools: ['lab-trainer'], what: 'Faça 40 decisões e confira o EV perdido de cada uma.' }, { drills: [['icm', 0.85]] }, { tools: ['elite-spot', 'elite-bayes'], what: 'Faça 15 decisões e anote o padrão de cada erro.' }, { tools: ['dbexam'], what: 'Faça a prova de database.' }],
+    5: [null, { tools: ['lab-trainer'], what: 'Ligue o relógio de 7 segundos e faça 40 decisões.' }, { table: 'adversarial' }, { table: 'hu' }, { tools: ['elite-jury', 'elite-gm'], what: 'Resolva um problema e defenda a decisão por escrito.' }, { tools: ['elite-patterns', 'elite-spot'], what: 'Trabalhe 15 minutos no próximo nível de domínio.' }],
+  };
+  const levelDone = (L) => MODS.filter((m) => m.level === L).every((m) => passed(m) || placedSkip(m)) && (L !== 4 || (S.exams.final && S.exams.final.best >= 0.85) || (S.placement || 0) > 4);
+  function gateItems(L) {
+    if (L < 1 || L < (S.placement || 0)) return [];
+    const c = carteira()[L - 1]; if (!c) return [];
+    return c.items.map((it, i) => Object.assign({}, it, { go: (GATE_GO[L] || [])[i] })).filter((it, i) => i > 0 && !it.real);
+  }
+  var capCache = null;
+  function levelCap() {
+    const key = [S.decisions.length, S.sim.hands, JSON.stringify(S.simModes), Object.values(S.exams).map((e) => e.best).join(), S.placement, S.dbexam && S.dbexam.best, (S.jury || []).length, (S.gm || []).length].join('|');
+    if (capCache && capCache.key === key) return capCache.v;
+    let v = 5; for (let L = 0; L <= 5; L++) if (!(levelDone(L) && gateItems(L).every((i) => i.ok))) { v = L; break; }
+    capCache = { key, v }; return v;
+  }
+  // No modo mentor, os módulos acima da fase atual ficam fechados até o portão ser cumprido (o que já foi começado continua aberto).
+  function mentorLocked(mi) { const m = MODS[mi]; return mentorOn() && !!S.profile && m.level > levelCap() && !passed(m) && !m.lessons.some((l) => S.lessons[l.id]); }
+
+  const WHY = {
+    diag: 'Antes de ensinar, o mentor precisa saber de onde você parte. Leva poucos minutos, e "Não sei" é uma resposta válida.',
+    rediag: 'Um mês depois, o mesmo diagnóstico mostra em números o quanto você evoluiu e o que ficou para trás.',
+    review: 'Começamos pelo que você já estudou. Tentar lembrar (e não reler) é o que fixa a memória. A prova corrige sozinha e mostra o que revisar.',
+    fix: 'Base fraca primeiro. Tudo o que vem depois se apoia neste conceito, e avançar em cima de um buraco custa caro mais tarde.',
+    refresh: 'Você dominou estes conceitos, mas faz tempo que não os usa. Uma prática curta impede que eles se apaguem.',
+    lesson: 'Matéria nova, com calma. Responda as perguntas "Pense antes de ler" antes de abrir a resposta: o esforço de pensar é o que ensina.',
+    relesson: 'O quiz desta lição ficou abaixo de 67%. Releia com calma e refaça o quiz antes de seguir: a próxima lição depende desta.',
+    cons: 'Logo depois de aprender, praticar com exercícios novos e situações de jogo transforma a leitura em habilidade.',
+    drill: 'Automatizar. A meta é 85% com pelo menos 30 respostas, para que a conta não ocupe a sua cabeça na mesa.',
+    tool: 'Usar o software como um profissional: a lição explicou; a ferramenta mostra o conceito funcionando.',
+    rem: 'A prova não passou. Antes de tentar de novo, o mentor reforça exatamente os conceitos do módulo que estão fracos.',
+    exam: 'Prova do módulo: 80% para seguir. Se não passar, o mentor monta o reforço e você tenta de novo.',
+    final: 'A certificação teórica fecha o nível profissional: 30 questões de todos os níveis, intercaladas.',
+    gate: 'As provas teóricas deste nível estão aprovadas. Antes de abrir o próximo, o método exige demonstrar na prática.',
+    table: 'Jogar para aplicar o que estudou, com o mentor comentando cada decisão. O que conta é a qualidade das decisões, não o resultado da mão.',
+    replay: 'Rever as mãos com erro é onde a experiência vira aprendizado. Antes de ler o comentário, responda a pergunta-chave.',
+    weekly: 'Quinze minutos para olhar a semana: o que funcionou, qual o leak principal e uma meta de processo para a próxima.',
+  };
+  function lessonBlock(l, add) {
+    add({ id: 'lesson:' + l.id, kind: 'lesson', lid: l.id, title: 'Lição: ' + l.title, min: l.min + 4, why: WHY.lesson });
+    if ((Pr.byLesson[l.id] || []).length) add({ id: 'cons:' + l.id, kind: 'cons', lid: l.id, title: 'Consolidação: ' + l.title, min: 7, why: WHY.cons });
+    if (l.drill && DRILLS[l.drill]) add({ id: 'drill:' + l.drill, kind: 'drill', drill: l.drill, title: 'Treino: ' + DRILLS[l.drill].name, min: 5, why: WHY.drill });
+    if (l.lab && VIEWS[l.lab[0]]) add({ id: 'tool:' + l.id, kind: 'tool', view: l.lab[0], title: 'No software: ' + toolName(l.lab[0]), what: l.lab[1] || 'Repita o exemplo da lição na ferramenta e mude um dado para ver o que acontece.', min: 6, why: WHY.tool });
+  }
+  function buildTasks(extra) {
+    const out = [], mins = dayMin(); let left = extra ? Math.round(mins * 0.6) : mins;
+    const add = (t) => { if (out.some((x) => x.id === t.id)) return; out.push(t); left -= t.min; };
+    if (!S.diag.baseline && !extra) add({ id: 'diag', kind: 'diag', title: 'Diagnóstico inicial', min: 5, why: WHY.diag });
+    const due = dueCards().length;
+    if (due) { const n = Math.min(due, 15); add({ id: 'review', kind: 'review', n, title: `Prova de revisão (${n} questões)`, min: Math.ceil(n * 0.8), why: WHY.review }); }
+    // Só conta como fraco o que já foi ensinado (lição feita) ou dado como conhecido pelo diagnóstico; "Não sei" no diagnóstico não bloqueia quem está começando.
+    const open = Pr.CONCEPTS.filter((c) => c.lessons.some((l) => S.lessons[l]) || c.level < (S.placement || 0)), stOf = {}; open.forEach((c) => (stOf[c.id] = conceptState(c.id)));
+    const weak = open.filter((c) => stOf[c.id].st === 'fraco' || stOf[c.id].gap).sort((a, b) => stOf[a.id].p - stOf[b.id].p);
+    weak.slice(0, 2).forEach((c) => { const ap = stOf[c.id].gap && applicable(c); if (!ap && !practicable(c)) return; add({ id: 'fix:' + c.id, kind: ap ? 'apply' : 'practice', cids: [c.id], title: `Reforço: ${c.name}${ap ? ' (aplicação)' : ''}`, min: 8, why: WHY.fix + (ap ? ' Você acerta na teoria, mas erra ao decidir: por isso o reforço é em situações de jogo.' : '') }); });
+    const old = open.filter((c) => stOf[c.id].st === 'revisar' && practicable(c)).slice(0, 3);
+    if (old.length && left > 20) add({ id: 'refresh', kind: 'practice', cids: old.map((c) => c.id), title: 'Manutenção: ' + old.map((c) => c.name).join(', '), min: 6, why: WHY.refresh });
+    const hold = due > 40 ? `há ${due} cartões de revisão acumulados` : weak.length >= 3 ? `${weak.length} conceitos estão fracos` : null;
+    const ns = nextStep(), cap = levelCap();
+    if (!hold) {
+      if (ns && ns.type === 'lesson') {
+        const prev = ns.l.id && ns.m.lessons[ns.m.lessons.indexOf(ns.l) - 1], ps = prev && S.lessons[prev.id];
+        if (ps && ps.score < 0.67) add({ id: 'relesson:' + prev.id, kind: 'lesson', lid: prev.id, redo: true, title: 'Reler e refazer o quiz: ' + prev.title, min: prev.min, why: WHY.relesson });
+        const rest = ns.m.lessons.filter((l) => !S.lessons[l.id]), max = extra ? 1 : mins >= 80 ? 3 : 2;
+        for (let k = 0; k < rest.length && k < max && (k === 0 || left >= rest[k].min + 15); k++) lessonBlock(rest[k], add);
+      } else if (ns && ns.type === 'exam') {
+        const ex = S.exams[ns.m.id];
+        if (ex) { const cids = [...new Set(ns.m.lessons.flatMap((l) => Pr.byLesson[l.id] || []))].filter((c) => practicable(Pr.byId[c])).sort((a, b) => (conceptState(a).p || 0) - (conceptState(b).p || 0)).slice(0, 4); if (cids.length) add({ id: 'rem:' + ns.m.id, kind: 'practice', cids, title: 'Reforço para a prova: ' + ns.m.title, min: 8, why: WHY.rem }); }
+        add({ id: 'exam:' + ns.m.id, kind: 'exam', mid: ns.m.id, title: 'Prova: ' + ns.m.title, min: 10, why: WHY.exam });
+      } else if (ns && ns.type === 'final') add({ id: 'final', kind: 'final', title: 'Certificação teórica profissional', min: 25, why: WHY.final });
+      else if (levelDone(cap) && cap < 5) {
+        const todo = gateItems(cap).filter((i) => !i.ok && i.go && !i.go.table).slice(0, 2);
+        todo.forEach((i, k) => {
+          const g = i.go;
+          if (g.drills) { const d = g.drills.find(([id, t]) => !drillOk(id, t).ok) || g.drills[0]; add({ id: 'gate-drill:' + d[0], kind: 'drill', drill: d[0], title: `Portão da fase: ${DRILLS[d[0]].name} (meta ${pct(d[1])})`, min: 6, why: WHY.gate + ' ' + WHY.drill }); }
+          else { const v = g.tools[(new Date().getDate() + k) % g.tools.length]; add({ id: 'gate-tool:' + v, kind: 'tool', view: v, title: 'Portão da fase: ' + toolName(v), what: g.what, min: 15, why: WHY.gate + ' Critério: ' + i.label + ' (' + i.txt + ').' }); }
+        });
+      }
+    }
+    if (tableOpen() && (left >= 8 || !extra)) {
+      const gt = levelDone(cap) ? gateItems(cap).find((i) => !i.ok && i.go && i.go.table) : null, mode = gt ? gt.go.table : PHASE_MODE[cap];
+      const tmin = Math.max(8, Math.min(Math.max(left, 8), Math.round(mins * (gt ? 0.5 : 0.35)))), n = Math.max(20, Math.round((tmin * 3) / 10) * 10);
+      add({ id: 'table', kind: 'table', mode, n, title: `Mesa: ${n} mãos em ${MODES[mode][0]}`, min: tmin, why: WHY.table + (gt ? ` Critério do portão: ${gt.label} (${gt.txt}).` : '') });
+      add({ id: 'replay', kind: 'replay', title: 'Rever as mãos com erro', min: 5, why: WHY.replay });
+    }
+    const wd = new Date().getDay(), lastW = S.weekly[S.weekly.length - 1];
+    if (!extra && [5, 6, 0].includes(wd) && !(lastW && lastW.week === weekKey()) && Object.keys(S.lessons).length >= 3) add({ id: 'weekly', kind: 'weekly', title: 'Revisão da semana', min: 10, why: WHY.weekly });
+    const b = S.diag.baseline, lt = S.diag.latest || b;
+    if (!extra && b && lt.date < addDays(todayStr(), -30)) add({ id: 'rediag', kind: 'diag', title: 'Rediagnóstico mensal', min: 6, why: WHY.rediag });
+    return { tasks: out, hold };
+  }
+  function snapTask(t) { t.base = { hands: S.sim.hands, les: S.lessons[t.lid] ? S.lessons[t.lid].date : null, ex: t.mid && S.exams[t.mid] ? S.exams[t.mid].n : 0, fin: S.exams.final ? S.exams.final.n : 0 }; return t; }
+  function mentorPlan() {
+    const d = todayStr();
+    if (!S.mplan || S.mplan.date !== d) { const b = buildTasks(false); S.mplan = { date: d, tasks: b.tasks.map(snapTask), hold: b.hold }; save(); }
+    return S.mplan;
+  }
+  function taskDone(t) {
+    if (t.done || t.skipped) return true;
+    const pd = S.mplan.date;
+    switch (t.kind) {
+      case 'diag': return t.id === 'diag' ? !!S.diag.baseline : !!(S.diag.latest && S.diag.latest.date === pd);
+      case 'review': return !dueCards().length;
+      case 'lesson': { const x = S.lessons[t.lid]; return !!x && (t.redo ? x.date === pd && t.base.les !== pd : true); }
+      case 'exam': { const m = MODS.find((y) => y.id === t.mid), x = S.exams[t.mid]; return passed(m) || !!(x && x.n > t.base.ex); }
+      case 'final': return !!(S.exams.final && S.exams.final.n > t.base.fin);
+      case 'table': return S.sim.hands - t.base.hands >= t.n;
+      case 'weekly': { const w = S.weekly[S.weekly.length - 1]; return !!(w && w.week === weekKey()); }
+      default: return false;
+    }
+  }
+  const mentorCurrent = () => mentorPlan().tasks.find((t) => !taskDone(t));
+  function markTask(id, score) { const t = S.mplan && S.mplan.tasks.find((x) => x.id === id); if (t) { t.done = true; if (score != null) t.score = score; save(); } }
+  let MTASK = null;
+  function consItems(lid) {
+    const cs = (Pr.byLesson[lid] || []).map((c) => Pr.byId[c]), pr = cs.filter(practicable), ap = cs.filter((c) => applySources(c).length);
+    const fb = () => Object.assign(DRILLS.ranking.gen(), { cid: 'combinacoes' });
+    const items = [];
+    for (let i = 0; i < 5 && pr.length; i++) items.push(() => practiceItem(pick(pr).id) || fb());
+    for (let i = 0; i < 3 && ap.length; i++) items.push(() => { const it = applyItem(pick(ap).id); return it ? Object.assign(it, { track: 'p' }) : fb(); });
+    return items;
+  }
+  function startTask(t) {
+    MTASK = t.id;
+    const n = t.n || 10;
+    switch (t.kind) {
+      case 'diag': return startDiag();
+      case 'review': return startReviewExam(dueCards(), false, t.n);
+      case 'practice': return startPractice(Array.from({ length: n }, (_, i) => t.cids[i % t.cids.length]), { title: t.title });
+      case 'apply': return startApply(Array.from({ length: n }, (_, i) => t.cids[i % t.cids.length]), { title: t.title });
+      case 'cons': return startRunner('practice', shuffle(consItems(t.lid)), { title: t.title });
+      case 'drill': return startDrill(t.drill);
+      case 'exam': return ACTS.exam({ id: t.mid });
+      case 'final': return ACTS.final();
+    }
+    MTASK = null;
+    if (t.kind === 'lesson') return go('lesson', { id: t.lid });
+    if (t.kind === 'table') return ACTS.deal({ mode: t.mode });
+    if (t.kind === 'replay') { markTask(t.id); return go('replays', (S.replays || []).some((r) => r.bad) ? { bad: 1 } : {}); }
+    if (t.kind === 'tool') { markTask(t.id); return go(t.view); }
+    if (t.kind === 'weekly') return go('plan', { weekly: 1 });
+  }
+  const mentorNextBtn = (cls) => { const t = mentorCurrent(); return t ? `<button class="btn ${cls || 'primary'}" data-act="mnext">Próximo passo: ${esc(t.title)} ›</button>` : `<button class="btn ${cls || 'primary'}" data-act="nav" data-v="home">Sessão de hoje concluída ›</button>`; };
+  const KIND_TXT = { diag: 'Diagnóstico', review: 'Revisão', practice: 'Prática', apply: 'Aplicação', cons: 'Consolidação', drill: 'Treino', tool: 'Software', lesson: 'Lição', exam: 'Prova', final: 'Certificação', table: 'Mesa', replay: 'Replay', weekly: 'Semana' };
+  function phaseHTML() {
+    const cap = levelCap(), L = LVL(cap), mods = MODS.filter((m) => m.level === cap), ok = mods.filter((m) => passed(m) || placedSkip(m)).length, gi = gateItems(cap);
+    const steps = [{ label: `Provas dos ${mods.length} módulos do nível`, ok: ok === mods.length, txt: `${ok}/${mods.length} aprovadas` }].concat(cap === 4 ? [{ label: 'Certificação teórica (85%)', ok: !!(S.exams.final && S.exams.final.best >= 0.85), txt: S.exams.final ? pct(S.exams.final.best) : 'pendente' }] : []).concat(gi);
+    const done = steps.filter((s) => s.ok).length;
+    return `<div class="panel stack"><div class="row" style="justify-content:space-between"><div><div class="eyebrow">Fase ${cap} de 5</div><h3 style="margin:0">${esc(L[1])}</h3></div><span class="pill ${done === steps.length ? 'good' : 'gold'}">${done}/${steps.length} etapas</span></div>
+      <div class="bar"><i style="width:${(done / steps.length) * 100}%"></i></div>
+      <p class="small muted" style="margin:0">${cap < 5 ? `Para abrir a Fase ${cap + 1} (${esc(LVL(cap + 1)[1])}), cumpra tudo abaixo. O mentor distribui essas etapas nas sessões diárias.` : 'Última fase: domínio de elite e carreira.'}</p>
+      ${steps.map((s) => `<div class="crit"><span class="check ${s.ok ? 'on' : ''}">${s.ok ? '✓' : ''}</span><div><b class="small">${esc(s.label)}</b><div class="small muted">${esc(s.txt)}</div></div></div>`).join('')}
+      ${cap >= 4 ? '<p class="small muted" style="margin:0">No nível profissional também contam provas de jogo real (sessões registradas, disciplina, 30.000 mãos com lucro). Elas aparecem na aba Evolução e correm em paralelo à trilha.</p>' : ''}</div>`;
+  }
+  VIEWS.mentor = () => {
+    const plan = mentorPlan(), cur = mentorCurrent(), tasks = plan.tasks, dn = tasks.filter(taskDone).length;
+    const h = new Date().getHours(), greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    const totalMin = tasks.reduce((a, t) => a + t.min, 0), leftMin = tasks.filter((t) => !taskDone(t)).reduce((a, t) => a + t.min, 0);
+    const row = (t) => { const d = taskDone(t), c = t === cur; return `<div class="mission ${c ? 'cur' : ''}"><span class="check ${d ? 'on' : ''}">${t.skipped ? '–' : d ? '✓' : ''}</span><span><span class="pill small">${KIND_TXT[t.kind] || ''}</span> ${esc(t.title)}${t.skipped ? ' <span class="small muted">(pulada)</span>' : t.score != null ? ` <span class="small muted num">${pct(t.score)}</span>` : ''}</span><span class="small muted num">${t.min} min</span></div>`; };
+    const curPanel = cur ? `<div class="panel stack now"><div class="eyebrow">Agora · ${KIND_TXT[cur.kind] || ''} · cerca de ${cur.min} min</div><h2 style="margin:0">${esc(cur.title)}</h2>
+        <p style="margin:0"><b>Por que agora:</b> ${esc(cur.why || '')}</p>${cur.what ? `<p class="small" style="margin:0"><b>O que fazer:</b> ${esc(cur.what)}</p>` : ''}${cur.kind === 'table' ? `<p class="small muted" style="margin:0">Progresso: ${Math.max(0, S.sim.hands - cur.base.hands)}/${cur.n} mãos.</p>` : ''}
+        <div class="row"><button class="btn primary" data-act="mnext" id="mnextBtn">Começar</button><button class="btn ghost small" data-act="mskip">Pular esta etapa</button></div></div>`
+      : `<div class="panel stack now"><div class="eyebrow">Sessão concluída</div><h2 style="margin:0">Você cumpriu o plano de hoje.</h2><p style="margin:0">Parar aqui também faz parte do método: o sono consolida o que você estudou, e amanhã a revisão vai medir o que ficou. Se ainda tiver energia, o mentor monta um bloco extra, mais curto.</p><div class="row"><button class="btn" data-act="mmore">Quero continuar</button></div></div>`;
+    return `<div class="wrap narrow">
+      <div><div class="eyebrow">${greet}, ${esc(S.profile.name)} · modo mentor</div><h1>Sua sessão de hoje</h1><p class="muted">${tasks.length ? `${dn} de ${tasks.length} etapas · cerca de ${leftMin} de ${totalMin} minutos restantes. ` : ''}Siga na ordem: cada etapa prepara a seguinte.</p></div>
+      ${plan.hold ? mentorHTML(`<p>Hoje não tem matéria nova: ${esc(plan.hold)}. O método não avança em cima de base fraca. Assim que isso estiver em dia, a trilha volta a andar.</p>`) : ''}
+      ${curPanel}
+      <div class="panel"><div class="eyebrow">Plano de hoje</div>${tasks.map(row).join('')}</div>
+      ${phaseHTML()}
+      <details class="panel"><summary><b>Como o método funciona</b></summary><div class="stack small" style="margin-top:10px">
+        <p style="margin:0">Todo dia segue o mesmo ciclo, na ordem que a ciência do aprendizado recomenda:</p>
+        <ol style="margin:0;padding-left:20px"><li><b>Revisar com prova.</b> Lembrar com esforço fixa a memória; a correção é automática.</li><li><b>Reforçar a base.</b> Conceito fraco é corrigido antes de qualquer matéria nova.</li><li><b>Aprender.</b> Uma ou duas lições por dia, com calma.</li><li><b>Consolidar.</b> Exercícios novos e situações de jogo logo depois da lição.</li><li><b>Automatizar.</b> Treinos com meta de 85%, para as contas saírem sem esforço.</li><li><b>Jogar e rever.</b> Mesa com o mentor comentando, depois o replay dos erros.</li><li><b>Medir.</b> Provas de módulo, portões de fase e rediagnóstico mensal.</li></ol>
+        <p style="margin:0">Cada fase só abre quando a anterior foi aprovada nas provas <b>e</b> na prática. O tamanho da sessão vem do tempo que você informou (${dayMin()} minutos por dia de estudo).</p></div></details>
+      <div class="panel stack"><div class="eyebrow">Pergunte ao mentor</div><textarea id="ask-q" rows="2" placeholder="Ex.: por que devo fazer 3-bet com A5s e não com A9o?"></textarea><div class="row"><button class="btn" id="ask-go">Perguntar</button><span class="small muted">Usa o Claude pela sua conta, só quando você clica.</span></div><div id="ask-out"></div></div>
+      <p class="small muted">Prefere montar os seus estudos? <button class="btn ghost small" data-act="mentor-toggle">Mudar para o modo livre</button></p></div>`;
+  };
+
   VIEWS.onboard = () => `<div class="wrap narrow">
     <div class="eyebrow">Bem-vindo à mesa</div><h1>Do zero à elite, uma decisão de cada vez.</h1>
     ${mentorHTML(`<p>Eu sou o <b>Ás</b>, seu mentor. Você não precisa saber nada de poker, nem conhecer as cartas do baralho. Começamos do zero absoluto e vamos devagar: cada ideia é explicada com calma, com exemplos e perguntas para você pensar antes de ler a resposta. O objetivo não é decorar jogadas, e sim entender o porquê de cada uma.</p>
-      <p>O app tem três partes: <b>Formação</b> (a trilha que começa no Nível 0, para quem nunca jogou, e vai até a elite), <b>Laboratório</b> (o nosso software: equity, ranges, solver, push/fold, ICM, database e mais) e <b>Alto rendimento</b> (treino de decisões, mapa de leaks e fase Grandmaster).</p>
+      <p>Você começa no <b>modo mentor</b>: todo dia eu monto a sua sessão e digo exatamente o que fazer e em que ordem (revisar, aprender, praticar, treinar, jogar e rever), no tempo que você tem. Cada fase só abre quando você demonstra domínio da anterior, na teoria e na prática. Se preferir escolher sozinho, há um <b>modo livre</b>, com todas as partes do app abertas: a trilha, o Laboratório (o nosso software) e o Alto rendimento.</p>
       <p>Três números acompanham você: o <b>XP</b> mede esforço; o <b>IPP</b> (0 a 100) mede competência; e a <b>carteira profissional</b> (níveis 1 a 5) só avança com provas teóricas e práticas.</p>`)}
     <form class="panel stack" id="onboardForm">
       <label class="field">Como quer ser chamado?<input type="text" id="ob-name" maxlength="24" placeholder="Seu nome" required></label>
@@ -700,6 +896,7 @@ ${defense}`;
   };
 
   VIEWS.home = () => {
+    if (mentorOn()) return VIEWS.mentor();
     const v = ipp(), r = rankFor(v.total), lv = level(), ns = nextStep(), due = dueCards().length, ms = missions(), cl = carteiraLevel();
     const h = new Date().getHours(), greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
     let msg;
@@ -716,7 +913,8 @@ ${defense}`;
       : `<div class="eyebrow">Certificação teórica</div><h3>Certificação profissional</h3><p class="muted small">30 questões dos níveis 1 a 4. Aprovação com 85%.</p><button class="btn primary" data-act="final">Fazer a certificação</button>`)
       : `<h3>Trilha concluída</h3><p>Continue no Alto rendimento e no seu plano de carreira.</p>`;
     return `<div class="wrap">
-      <div><div class="eyebrow">${greet}, ${esc(S.profile.name)}</div><h1>${LADDER[r][1]}</h1><p class="muted">${LADDER[r][2]}</p></div>
+      <div><div class="eyebrow">${greet}, ${esc(S.profile.name)} · modo livre</div><h1>${LADDER[r][1]}</h1><p class="muted">${LADDER[r][2]}</p></div>
+      <div class="panel row" style="justify-content:space-between"><span class="small"><b>Modo livre:</b> você escolhe o que estudar e em que ordem. No <b>modo mentor</b>, o app monta a sua sessão de cada dia e diz exatamente o que fazer: quando estudar, revisar, treinar e jogar.</span><button class="btn" data-act="mentor-toggle">Ligar o modo mentor</button></div>
       ${mentorHTML(msg)}
       <div class="hero-stats">
         <div class="stat"><span class="eyebrow">IPP</span><span class="v num">${num(v.total, 0)}<span class="muted" style="font-size:1rem">/100</span></span><div class="bar"><i style="width:${v.total}%"></i></div></div>
@@ -733,6 +931,7 @@ ${defense}`;
         <button class="panel drill tool-card" data-act="nav" data-v="dashboard"><div class="eyebrow">Medição</div><h3>Painel de performance</h3><p class="small muted" style="margin:0">As 12 áreas do jogador profissional, com a métrica de cada uma.</p></button></div>
     </div>`;
   };
+  MOUNTS.mentor = (root) => MOUNTS.home(root);
   MOUNTS.home = (root) => { const b = root.querySelector('#ask-go'); if (b) b.addEventListener('click', () => { const t = root.querySelector('#ask-q').value.trim(); if (t) askMentor(root.querySelector('#ask-out'), t); }); };
 
   VIEWS.plan = () => {
@@ -754,7 +953,7 @@ ${defense}`;
   };
 
   VIEWS.trail = () => {
-    let lastLvl = -1;
+    let lastLvl = -1, lockNote = 0;
     return `<div class="wrap narrow">
     <div><div class="eyebrow">Trilha</div><h1>Do zero absoluto à elite</h1><p class="muted">${MODS.length} módulos em ${C.LEVELS.length} níveis: ${C.LEVELS.map((L) => L[1]).join(', ')}. Cada módulo termina com uma prova (80% para avançar). Se já domina um assunto, pode fazer a prova sem ler as lições. A carteira de cada nível também exige provas práticas (aba Evolução).</p></div>
     ${!S.diag.baseline ? `<div class="panel row" style="justify-content:space-between"><span>Você ainda não fez o diagnóstico inicial.</span><button class="btn" data-act="diag">Fazer diagnóstico</button></div>` : ''}
@@ -762,8 +961,9 @@ ${defense}`;
       const open = moduleOpen(mi), done = m.lessons.filter((l) => S.lessons[l.id]).length, ex = S.exams[m.id];
       let head = '';
       if (m.level !== lastLvl) { lastLvl = m.level; const L = LVL(m.level); head = `<div class="level-head"><span class="pill gold">Nível ${L[0]}</span><h2>${L[1]}</h2><p class="small muted">${L[2]}</p></div>`; }
-      return `${head}<section class="panel module"><div class="module-head"><div><div class="eyebrow">${esc(C.DOMAINS[m.domain])}</div><h2>${esc(m.title)}</h2></div>${passed(m) ? `<span class="pill good">Aprovado · ${pct(ex.best)}</span>` : placedSkip(m) ? '<span class="pill">Liberado pelo diagnóstico · revisão opcional</span>' : open ? `<span class="pill gold">${done}/${m.lessons.length} lições</span>` : '<span class="pill">Bloqueado</span>'}</div>
+      return `${head}<section class="panel module"><div class="module-head"><div><div class="eyebrow">${esc(C.DOMAINS[m.domain])}</div><h2>${esc(m.title)}</h2></div>${passed(m) ? `<span class="pill good">Aprovado · ${pct(ex.best)}</span>` : placedSkip(m) ? '<span class="pill">Liberado pelo diagnóstico · revisão opcional</span>' : open ? `<span class="pill gold">${done}/${m.lessons.length} lições</span>` : mentorLocked(mi) ? `<span class="pill">Abre na Fase ${m.level}</span>` : '<span class="pill">Bloqueado</span>'}</div>
       <p class="muted small">${esc(m.desc)}</p>
+      ${!open && mentorLocked(mi) && !lockNote++ ? `<p class="small">No modo mentor, o Nível ${m.level} abre quando a Fase ${levelCap()} estiver completa: provas aprovadas <b>e</b> as metas práticas do portão (veja em Hoje). <button class="btn ghost small" data-act="nav" data-v="home">Ver o portão</button></p>` : ''}
       ${open ? m.lessons.map((l, li) => { const ok = lessonOpen(mi, li), d = S.lessons[l.id]; return `<button class="lesson-row ${d ? 'done' : ''}" data-act="lesson" data-id="${l.id}" ${ok ? '' : 'disabled'}><span class="n">${d ? '✓' : li + 1}</span><span>${esc(l.title)}<br><span class="small muted">${l.min} min${l.drill ? ' · com treino' : ''}${l.lab ? ' · no Laboratório' : ''}</span></span>${ok ? (d ? `<span class="small muted num">${pct(d.score)}</span>` : '<span class="small">›</span>') : '<span class="lock">bloqueada</span>'}</button>`; }).join('') : `<p class="small muted">${m.lessons.length} lições · libera ao passar na prova anterior.</p>`}
       <div class="row"><button class="btn ${open && done === m.lessons.length && !passed(m) ? 'primary' : ''}" data-act="exam" data-id="${m.id}" ${open ? '' : 'disabled'}>${passed(m) ? 'Refazer a prova' : 'Prova do módulo'}</button>${ex ? `<span class="small muted">Melhor nota: ${pct(ex.best)} em ${ex.n} tentativa(s)</span>` : ''}</div></section>
       ${m.id === 'm8' ? `<section class="panel module"><div class="module-head"><div><div class="eyebrow">Fechamento do nível 4</div><h2>Certificação teórica profissional</h2></div>${S.exams.final && S.exams.final.best >= 0.85 ? `<span class="pill good">Certificado · ${pct(S.exams.final.best)}</span>` : ''}</div><p class="muted small">30 questões dos níveis 1 a 4, sorteadas e intercaladas. Aprovação com 85%.</p><div><button class="btn" data-act="final" ${passed(m) ? '' : 'disabled'}>Fazer a certificação</button></div></section>` : ''}`;
@@ -1024,7 +1224,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
 
   // ---------- runner genérico ----------
   let runTimer = null;
-  function startRunner(kind, items, meta) { R = Object.assign({ kind, items, i: 0, correct: 0, answered: false, results: [] }, meta || {}); prepItem(); go('runner'); }
+  function startRunner(kind, items, meta) { R = Object.assign({ kind, items, i: 0, correct: 0, answered: false, results: [], picks: [] }, meta || {}, { mtask: MTASK }); MTASK = null; prepItem(); go('runner'); }
   function prepItem() {
     let it = R.items[R.i];
     if (typeof it === 'function') it = R.items[R.i] = it();
@@ -1040,16 +1240,17 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       let cls = ''; if (R.answered) { if (oi === it.a) cls = 'right'; else if (oi === R.picked || first) cls = 'wrong'; } else if (first) cls = 'wrong';
       return `<button class="opt ${cls}" data-act="answer" data-o="${oi}" ${R.answered || first ? 'disabled' : ''}><span class="k">${k + 1}</span><span>${colorize(esc(it.options[oi]))}</span></button>`;
     }).join('');
-    const ok = R.picked === it.a, isDiag = R.kind === 'diag';
+    const ok = R.picked === it.a, isDiag = R.kind === 'diag', idk = isDiag || R.kind === 'review';
     const headTxt = R.picked === -1 ? 'O tempo acabou.' : R.picked === -2 ? 'Tudo bem.' : R.retry && R.retry.revealed ? 'Esta é a resposta.' : R.retry ? (ok ? 'Você chegou lá com a pista.' : 'Ainda não era essa.') : ok ? pick(['Correto.', 'Isso mesmo.', 'Exato.']) : it.partial && it.partial.includes(R.picked) ? 'Aceitável, mas existe uma opção melhor.' : 'Não foi dessa vez.';
-    const tailTxt = R.picked === -2 ? ' Marcar "Não sei" é melhor do que chutar: deixa o diagnóstico preciso. ' : R.retry && ok ? ' No placar conta como erro, mas agora o raciocínio é seu. ' : ' ';
+    const tailTxt = R.picked === -2 ? (R.kind === 'review' ? ' Marcar "Não sei" é honesto: este cartão volta amanhã. ' : ' Marcar "Não sei" é melhor do que chutar: deixa o diagnóstico preciso. ') : R.retry && ok ? ' No placar conta como erro, mas agora o raciocínio é seu. ' : ' ';
     return `<div class="wrap narrow runner">
       <div class="runner-top"><div><div class="eyebrow">${esc(R.title)}</div><span class="small muted num">${isDiag ? `Questão ${R.i + 1} · nível ${R.cur.lvl} · ${R.correct} acerto(s)` : `Questão ${R.i + 1} de ${n} · ${R.correct} acerto(s)`}</span></div><button class="btn ghost" data-act="quit">Sair</button></div>
       <div class="bar"><i style="width:${isDiag ? (R.cur.lvl / 6) * 100 + 8 : (R.i / n) * 100}%"></i></div>
       ${R.kind === 'drill' && S.settings.drillTime && !R.answered ? '<div class="bar clock"><i id="run-clock" style="width:100%"></i></div>' : ''}
       <div class="panel prompt">${it.html || `<p class="lead">${colorize(esc(it.text))}</p>`}</div>
       <div class="opts ${it.two ? 'two' : ''}">${optsHTML}</div>
-      ${isDiag && !R.answered ? '<div class="row"><button class="btn ghost" data-act="answer" data-o="-2">Não sei</button><span class="small muted">Não sabe? Marque "Não sei". Chutar deixa o diagnóstico impreciso.</span></div>' : ''}
+      ${idk && !R.answered ? `<div class="row"><button class="btn ghost" data-act="answer" data-o="-2">Não sei</button><span class="small muted">${isDiag ? 'Não sabe? Marque "Não sei". Chutar deixa o diagnóstico impreciso.' : 'Não lembra? Marque "Não sei": o cartão volta amanhã. Chutar só engana a sua agenda.'}</span></div>` : ''}
+      ${R.kind === 'review' && R.answered && R.cur.cardF ? `<div class="panel small"><div class="eyebrow">Cartão · ${esc(R.cur.topic)}</div><b>${colorize(esc(R.cur.cardF))}</b><div>${colorize(esc(R.cur.cardB))}</div></div>` : ''}
       ${R.retry && !R.answered ? socraticHTML(it) : ''}
       ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div><div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
     </div>`;
@@ -1076,7 +1277,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   }
   function record(o, ok) {
     if (ok) R.correct++;
-    R.results.push(ok);
+    R.results.push(ok); R.picks[R.i] = o;
     const ms = performance.now() - R.t0, cur = R.cur;
     if (R.kind === 'drill') {
       if (R.mixed) R.drill = R.mixed[R.i];
@@ -1090,11 +1291,17 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     }
     if (R.kind === 'lesson') { const dom = R.domain; S.qs[dom] = S.qs[dom] || { n: 0, c: 0 }; S.qs[dom].n++; if (ok) S.qs[dom].c++; }
     if (R.kind === 'lesson') observeLesson(R.id, ok);
-    else if (cur.cid) observe(cur.cid, R.kind === 'apply' ? 'p' : 'k', ok, R.kind === 'diag' ? 1.5 : !ok && cur.partial && cur.partial.includes(o) ? 0.5 : 1);
+    else if (cur.cid) observe(cur.cid, cur.track || (R.kind === 'apply' ? 'p' : 'k'), ok, R.kind === 'diag' ? 1.5 : !ok && cur.partial && cur.partial.includes(o) ? 0.5 : 1);
     else if (cur.lid) observeLesson(cur.lid, ok);
     if (R.kind === 'drill') (Pr.byDrill[R.drill] || []).forEach((c) => observe(c, 'k', ok));
     if (R.kind === 'practice' || R.kind === 'apply') { daily().drills++; dayLog('drills'); dayLog(R.kind); S.xp += ok ? 4 : 1; checkMissions(); }
     if (R.kind === 'diag') diagRecord(ok);
+    if (R.kind === 'review') {
+      const g = !ok ? 0 : ms < 7000 && (cardOf(cur.card) || {}).reps >= 1 ? 3 : 2; cur.g = g;
+      if (!R.free) scheduleCard(cur.card, g);
+      S.reviews++; daily().reviews++; dayLog('reviews'); S.xp += ok ? 3 : 1; touch();
+      if (S.reviews >= 100) award('reviews100'); checkMissions();
+    }
     save();
   }
   function nextQ() { if (R.i + 1 < R.items.length) { R.i++; prepItem(); render(); return; } R.done = true; finishRunner(); render(); }
@@ -1118,11 +1325,12 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     } else if (R.kind === 'drill') addXP(R.correct >= 8 ? 20 : 0);
     else if (R.kind === 'practice' || R.kind === 'apply') addXP(R.correct >= 8 ? 15 : 0);
     const cl = carteiraLevel(); for (let k = 1; k <= cl; k++) award('lvl' + k);
+    if (R.mtask) markTask(R.mtask, score);
     checkMissions(); save();
   }
   function runnerResult() {
     const sc = R.score, n = R.items.length;
-    let head, body = '', actions = '';
+    let head, body = '', actions = '', extra = '';
     if (R.kind === 'lesson') {
       const x = findLesson(R.id), nxt = x.m.lessons[x.li + 1];
       head = sc === 1 ? 'Lição dominada.' : sc >= 0.67 ? 'Lição concluída.' : 'Lição concluída, com pontos a reforçar.';
@@ -1154,13 +1362,20 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       head = `${R.correct} de ${n} ${R.single ? 'em ' + esc(Pr.byId[R.single].name) : R.kind === 'apply' ? 'no treino de aplicação' : 'na prática adaptativa'}`;
       body = `<table class="t"><tr><th>Conceito</th><th>Acertos</th><th>Estado agora</th></tr>${Object.entries(by).map(([cid, x]) => { const st = ST[conceptState(cid).st]; return `<tr><td>${esc(Pr.byId[cid].name)}</td><td class="num">${x.c} de ${x.n}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join('')}</table><p class="small muted">${R.kind === 'apply' ? 'Cenários de jogo: você decide como na mesa, e o resultado alimenta a barra de Aplicação do mapa de domínio.' : 'Os exercícios são criados na hora pelo motor do app: você nunca fica sem prática.'}</p>`;
       actions = `<button class="btn primary" data-act="${R.kind === 'apply' ? (R.single ? 'applyc' : 'applyadapt') : R.single ? 'practice' : 'adaptive'}" data-c="${R.single || ''}">Mais 10</button><button class="btn ghost" data-act="nav" data-v="mastery">Mapa de domínio</button>`;
+    } else if (R.kind === 'review') {
+      const wrong = R.results.filter((x) => !x).length;
+      head = `${R.correct} de ${n} ${R.free ? 'na revisão livre' : 'na prova de revisão'}`;
+      body = R.free ? '<p>Revisão livre: serve para treinar e não muda a agenda dos cartões.</p>' : `<p>${wrong ? `Os ${wrong === 1 ? 'cartão que você errou volta' : wrong + ' cartões que você errou voltam'} amanhã. ` : ''}Os que você acertou voltam mais tarde; os que acertou rápido, mais tarde ainda. Abaixo, questão por questão, o que conferir.</p>`;
+      actions = `<button class="btn ${dueCards().length ? 'primary' : ''}" data-act="rv-start" ${dueCards().length ? '' : 'disabled'}>${dueCards().length ? `Continuar (${dueCards().length} pendentes)` : 'Revisão em dia'}</button><button class="btn ghost" data-act="nav" data-v="review">Revisão</button>`;
+      extra = reviewReportHTML();
     } else {
       const a = drillAcc(R.drill);
       head = R.mixed ? `${R.correct} de ${n} no treino misto` : `${R.correct} de ${n} no treino "${DRILLS[R.drill].name}"`;
       body = R.mixed ? '<p>Cada resposta foi somada ao treino de origem e ao seu mapa de leaks.</p>' : `<p>Precisão nas últimas ${Math.min(30, a.n)} respostas: <b>${pct(a.acc)}</b>. A meta é 85% ou mais com pelo menos 30 respostas.</p>`;
       actions = `<button class="btn primary" data-act="${R.mixed ? 'mixed' : 'drill'}" data-id="${R.drill}">Mais 10</button><button class="btn ghost" data-act="nav" data-v="drills">Outros treinos</button>`;
     }
-    return `<div class="wrap narrow runner"><div class="eyebrow">${esc(R.title)}</div><h1 class="num">${R.kind === 'diag' ? `Nível ${R.diagRes.level}` : pct(sc)}</h1><h2>${head}</h2>${mentorHTML(body)}<div class="row">${actions}</div></div>`;
+    if (mentorOn() && S.profile) actions = mentorNextBtn() + actions.replace(/btn primary/g, 'btn');
+    return `<div class="wrap narrow runner"><div class="eyebrow">${esc(R.title)}</div><h1 class="num">${R.kind === 'diag' ? `Nível ${R.diagRes.level}` : pct(sc)}</h1><h2>${head}</h2>${mentorHTML(body)}<div class="row">${actions}</div>${extra}</div>`;
   }
   const toItem = (q) => ({ text: q.text, options: q.options, a: q.a, exp: q.exp });
   const examItems = (m) => shuffle(m.exam.map((q) => [q, null]).concat(...m.lessons.map((l) => l.quiz.map((q) => [q, l.id])))).slice(0, 10).map(([q, lid]) => Object.assign(toItem(q), { lid }));
@@ -1407,6 +1622,13 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     const ok = r.ans === p.profile;
     return `<div class="feedback ${ok ? 'ok' : 'no'} small"><b>${ok ? 'Leitura correta.' : `Era ${esc(prof.label)}.`}</b> ${esc(prof.desc)} Com ${o.h} mãos a amostra ainda é pequena: VPIP e PFR se estabilizam por volta de 50 a 100 mãos, e o resto das estatísticas demora bem mais.</div>`;
   }
+  function tableGoalHTML() {
+    if (!mentorOn()) return '';
+    const t = S.mplan && S.mplan.tasks.find((x) => x.kind === 'table' && !x.skipped && (!x.done && S.sim.hands - x.base.hands < x.n || S.sim.hands - x.base.hands - x.n < 3));
+    if (!t) return '';
+    const got = Math.max(0, S.sim.hands - t.base.hands), ok = got >= t.n;
+    return `<div class="mbanner"><span class="small"><b>Meta do mentor:</b> ${Math.min(got, t.n)}/${t.n} mãos${t.mode !== TMODE ? ` (a meta é em ${esc(MODES[t.mode][0])})` : ''}. ${ok ? 'Meta cumprida.' : 'Pense no conceito antes de cada decisão.'}</span>${ok && T.over ? mentorNextBtn('small primary') : ''}</div>`;
+  }
   VIEWS.table = () => {
     const sm = S.sim, dec = sm.good + sm.ok + sm.bad;
     const stats = `<div class="grid3"><div class="stat"><span class="eyebrow">Mãos</span><span class="v num">${num(sm.hands, 0)}</span></div><div class="stat"><span class="eyebrow">Resultado</span><span class="v num">${sm.hands ? num((sm.net / sm.hands) * 100, 1) : 0}<span class="small muted"> bb/100</span></span><span class="small muted num">${num(sm.net, 1)} bb no total</span></div><div class="stat"><span class="eyebrow">Qualidade das decisões</span><span class="v num">${dec ? pct((sm.good + 0.5 * sm.ok) / dec) : '—'}</span><span class="small muted num">VPIP ${sm.hands ? pct(sm.vpip / sm.hands) : '—'} · PFR ${sm.hands ? pct(sm.pfr / sm.hands) : '—'}</span></div></div>`;
@@ -1451,6 +1673,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       : T.over ? `<div class="small">${T.results && T.results.showdown ? 'Showdown.' : 'Mão encerrada sem showdown.'} Seu resultado: <b class="num">${hero.net > 0 ? '+' : ''}${num(hero.net, 1)}bb</b>.</div>${T.lossAt === T.handNo ? `<div class="hint small"><b>Perda grande.</b> O próximo baralho não sabe que você perdeu: as cartas são sorteadas de forma justa, sem compensação. Solte os ombros, respire fundo duas vezes e pergunte: a decisão foi boa com o que eu sabia? ${T.rv && T.rv.some((d) => d.g === 'bad') ? 'O replay mostra onde houve erro.' : 'O mentor não marcou erro seu nesta mão: pode ter sido só variância.'}</div>` : ''}${readQHTML()}` : '<div class="small muted">Aguardando a sua vez.</div>';
     return `<div class="wrap">
       <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${esc(MODES[TMODE][0])} · mão #${T.handNo}</div><h2>${T.street === 'preflop' ? 'Pré-flop' : T.street[0].toUpperCase() + T.street.slice(1)}</h2></div><span class="pill num">${simMode(TMODE).hands} mãos neste modo</span></div>
+      ${tableGoalHTML()}
       <div class="table-wrap ${T.n === 2 ? 'hu' : ''}"><div class="oval"></div><div class="center"><div class="board">${T.board.length ? cardsHTML(T.board) : ''}</div><span class="pot">Pote ${num(T.pot(), 1)} bb</span></div>${seats}</div>
       ${L && T.clk ? `<div class="bar clock" title="Relógio de decisão"><i style="width:100%;animation:clk ${T.clk.lim}ms linear ${-(Date.now() - T.clk.t0)}ms forwards"></i></div>` : ''}
       <div class="actions">${actions}</div>
@@ -1502,37 +1725,54 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   };
 
   // ---------- revisão ----------
-  let RV = null;
+  // A revisão é uma prova: cada cartão vencido vira uma questão (a do quiz da lição ou um exercício novo do mesmo conceito).
+  // A correção é automática e define a próxima data do cartão; ninguém precisa se autoavaliar.
+  function reviewItem(id, used) {
+    const k = id.lastIndexOf(':'), lid = id.slice(0, k), i = +id.slice(k + 1), x = findLesson(lid), c = cardOf(id) || { reps: 0 }, card = ALLCARDS[id];
+    const gens = (Pr.byLesson[lid] || []).map((cid) => Pr.byId[cid]).filter((cc) => cc && cc.gens.length);
+    let it;
+    if (gens.length && (c.reps % 2 === 1 || !x.l.quiz.length)) { const cc = pick(gens), g = pick(cc.gens); it = Object.assign({}, g.startsWith('drill:') ? DRILLS[g.slice(6)].gen() : Pr.GEN[g](GH), { cid: cc.id }); }
+    else { const q = x.l.quiz; let j = (i + (c.reps || 0)) % q.length; for (let t = 0; t < q.length && used.has(lid + ':' + j); t++) j = (j + 1) % q.length; used.add(lid + ':' + j); it = Object.assign(toItem(q[j]), { lid }); }
+    return Object.assign(it, { card: id, topic: x.l.title, cardF: card.f, cardB: card.b, lid: it.lid || lid });
+  }
+  function startReviewExam(ids, free, n) {
+    const order = free ? shuffle(ids) : ids.slice().sort((a, b) => (S.cards[a].due < S.cards[b].due ? -1 : 1));
+    const pickIds = order.slice(0, n || (free ? 10 : 15)); if (!pickIds.length) { toast('Nenhum cartão para revisar.'); return; }
+    const used = new Set();
+    startRunner('review', shuffle(pickIds).map((id) => () => reviewItem(id, used)), { free: !!free, title: free ? 'Revisão livre' : 'Prova de revisão' });
+  }
+  function scheduleCard(id, g) {
+    const c = cardOf(id); if (!c) return;
+    const t = c.last ? Math.max(0, (new Date(todayStr()) - new Date(c.last)) / DAY) : c.s, ret = Math.exp((Math.log(0.9) * t) / Math.max(0.5, c.s));
+    S.rvHist = (S.rvHist || []).concat(g > 0 ? 1 : 0).slice(-100);
+    if (g === 0) lapseCard(id);
+    else { const f = g === 1 ? 1.2 : g === 2 ? 2.5 - (c.d - 5) * 0.15 : 3.3 - (c.d - 5) * 0.15; c.s = Math.max(c.s + 1, c.s * f * (1 + (1 - ret))); c.d = Math.max(1, Math.min(10, c.d + (g === 3 ? -1 : 0))); }
+    c.reps++; c.last = todayStr(); c.due = addDays(todayStr(), g === 0 ? 1 : Math.max(1, Math.round(c.s * intervalScale())));
+  }
+  const stripHTML = (h) => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  function reviewReportHTML() {
+    const rows = R.items.map((it, i) => ({ it, ok: R.results[i], o: R.picks[i] })).filter((r) => r.it && typeof r.it === 'object');
+    rows.sort((a, b) => a.ok - b.ok);
+    return `<div class="stack"><h3>Questão por questão</h3>${rows.map(({ it, ok, o }) => {
+      const q = it.text || stripHTML(it.html), mine = o === -2 ? 'Não sei' : o === -1 ? 'Sem resposta' : it.options[o], c = S.cards[it.card];
+      const exp = it.html ? it.exp : colorize(esc(it.exp)), cp = it.cid && Pr.byId[it.cid] ? Pr.byId[it.cid] : (Pr.byLesson[it.lid] || []).map((x) => Pr.byId[x]).find((x) => x && practicable(x));
+      return `<div class="panel stack rv-item ${ok ? 'ok' : 'no'}"><div class="row" style="justify-content:space-between"><span class="eyebrow">${esc(it.topic)}</span><span class="pill ${ok ? 'good' : 'bad'}">${ok ? 'Acertou' : 'Errou'}</span></div>
+        <div class="small">${colorize(esc(q.length > 220 ? q.slice(0, 220) + '…' : q))}</div>
+        <div class="small">Sua resposta: <b>${colorize(esc(mine || '—'))}</b>${ok ? '' : ` · Correta: <b>${colorize(esc(it.options[it.a]))}</b>`}</div>
+        ${ok ? (R.free || !c ? '' : `<div class="small muted">Este cartão volta em ${Math.max(1, Math.round((new Date(c.due) - new Date(todayStr())) / DAY))} dia(s).</div>`)
+          : `<div class="feedback no small">${exp}</div><div class="callout"><span class="eyebrow">Para revisar</span><p style="margin:4px 0 0"><b>${colorize(esc(it.cardF))}</b></p><p style="margin:4px 0 0">${colorize(esc(it.cardB))}</p></div>
+          <div class="row"><button class="btn small" data-act="lesson" data-id="${it.lid}">Reler a lição</button>${cp ? `<button class="btn small" data-act="practice" data-c="${cp.id}">Praticar: ${esc(cp.name)}</button>` : ''}</div>`}</div>`;
+    }).join('')}</div>`;
+  }
   VIEWS.review = () => {
     const due = dueCards(), total = Object.keys(S.cards).length;
     const cs = Object.keys(S.cards).map(cardOf), ret = retention(), sc = intervalScale();
     const bands = [['Memória de até 3 dias', 0, 3], ['4 a 14 dias', 3, 14], ['15 a 60 dias', 14, 60], ['Mais de 60 dias', 60, 1e9]].map(([t, lo, hi]) => [t, cs.filter((c) => c.s > lo && c.s <= hi).length]);
-    if (!RV || !RV.queue.length) {
-      return `<div class="wrap narrow"><div><div class="eyebrow">Revisão espaçada</div><h1>${due.length ? `${due.length} cartões para hoje` : 'Nada pendente hoje'}</h1><p class="muted">Cada cartão tem uma <b>estabilidade</b> (por quantos dias a memória dura) e uma <b>dificuldade</b>. Acertar aumenta a estabilidade, mais ainda quando você lembra depois de muito tempo; errar a reduz. Os intervalos também se ajustam à sua memória: o objetivo é você lembrar cerca de 90% dos cartões quando eles voltam.</p></div>
-      <div class="panel stack"><div class="eyebrow">Sua memória</div><div class="grid3">${bands.map(([t, n]) => `<div><div class="small muted">${t}</div><b class="num" style="font-size:1.4rem">${n}</b></div>`).join('')}</div><p class="small muted">${total} cartões desbloqueados. ${ret == null ? 'A sua taxa de retenção aparece depois de 10 revisões.' : `A sua retenção: <b>${pct(ret)}</b> (meta: 90%). Intervalos ajustados em ×${num(sc, 2)}.`}</p></div>
-      <div class="row"><button class="btn primary" data-act="rv-start" ${due.length ? '' : 'disabled'}>Revisar agora</button><button class="btn" data-act="rv-free" ${total ? '' : 'disabled'}>Revisão livre (10 cartões)</button></div></div>`;
-    }
-    const id = RV.queue[0], card = ALLCARDS[id];
-    return `<div class="wrap narrow"><div class="runner-top"><div><div class="eyebrow">Revisão · ${esc(card.m)}</div><span class="small muted">${RV.queue.length} restante(s)</span></div><button class="btn ghost" data-act="rv-quit">Sair</button></div>
-      <div class="panel flash"><div><div class="front">${colorize(esc(card.f))}</div>${RV.show ? `<hr style="border:0;border-top:1px solid var(--line);margin:18px 0"><div>${colorize(esc(card.b))}</div>` : '<p class="small muted">Responda mentalmente antes de virar.</p>'}</div></div>
-      <div class="row" style="justify-content:center">${RV.show ? `<button class="btn danger" data-act="rv-grade" data-g="0">Errei</button><button class="btn" data-act="rv-grade" data-g="1">Difícil</button><button class="btn primary" data-act="rv-grade" data-g="2">Acertei</button><button class="btn" data-act="rv-grade" data-g="3">Fácil</button>` : '<button class="btn primary" data-act="rv-show" id="rvShow">Mostrar resposta</button>'}</div></div>`;
+    return `<div class="wrap narrow"><div><div class="eyebrow">Revisão espaçada</div><h1>${due.length ? `${due.length} cartões para hoje` : 'Nada pendente hoje'}</h1><p class="muted">A revisão é uma <b>prova</b>. Para cada cartão vencido, o app faz uma pergunta sobre o assunto: às vezes a do quiz da lição, às vezes um exercício novo do mesmo conceito, com outros números. Você responde, o app corrige e, no final, mostra questão por questão o que acertou, o que errou e o que revisar.</p></div>
+      ${mentorHTML('<p>Ninguém precisa se autoavaliar: quem decide é a resposta. <b>Acertou</b>: o cartão volta daqui a mais tempo. <b>Acertou rápido</b>: mais tempo ainda. <b>Errou ou marcou "Não sei"</b>: volta amanhã. Se não lembrar, marque "Não sei"; chutar só engana a sua própria agenda.</p>')}
+      <div class="panel stack"><div class="eyebrow">Sua memória</div><div class="grid3">${bands.map(([t, n]) => `<div><div class="small muted">${t}</div><b class="num" style="font-size:1.4rem">${n}</b></div>`).join('')}</div><p class="small muted">${total} cartões desbloqueados. ${ret == null ? 'A sua taxa de acerto na revisão aparece depois de 10 questões.' : `Acerto nas revisões: <b>${pct(ret)}</b> (meta: 90%). Intervalos ajustados em ×${num(sc, 2)}.`}</p></div>
+      <div class="row"><button class="btn primary" data-act="rv-start" ${due.length ? '' : 'disabled'}>Fazer a prova de revisão${due.length ? ` (${Math.min(15, due.length)} questões)` : ''}</button><button class="btn" data-act="rv-free" ${total ? '' : 'disabled'}>Revisão livre (10 questões, não muda a agenda)</button></div></div>`;
   };
-  function rvGrade(g) {
-    const id = RV.queue.shift(), c = S.cards[id];
-    if (!RV.free) {
-      cardOf(id);
-      const t = c.last ? Math.max(0, (new Date(todayStr()) - new Date(c.last)) / DAY) : c.s, ret = Math.exp((Math.log(0.9) * t) / Math.max(0.5, c.s));
-      S.rvHist = (S.rvHist || []).concat(g > 0 ? 1 : 0).slice(-100);
-      if (g === 0) lapseCard(id);
-      else { const f = g === 1 ? 1.2 : g === 2 ? 2.5 - (c.d - 5) * 0.15 : 3.3 - (c.d - 5) * 0.15; c.s = Math.max(c.s + 1, c.s * f * (1 + (1 - ret))); c.d = Math.max(1, Math.min(10, c.d + (g === 1 ? 1 : g === 3 ? -1 : 0))); }
-      c.reps++; c.last = todayStr(); c.due = addDays(todayStr(), g === 0 ? 1 : Math.max(1, Math.round(c.s * intervalScale())));
-    }
-    S.reviews++; daily().reviews++; dayLog('reviews'); S.xp += 2; touch();
-    if (S.reviews >= 100) award('reviews100');
-    RV.show = false; checkMissions(); save();
-    if (!RV.queue.length) { toast('Revisão concluída'); RV = null; }
-    render();
-  }
 
   // ---------- evolução: IPP + carteira ----------
   VIEWS.progress = () => {
@@ -1719,7 +1959,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   // ---------- eventos ----------
   const ACTS = {
     section: (d) => { SECTION = d.s; go({ form: 'home', lab: 'lab-home', elite: 'elite-home' }[d.s]); },
-    nav: (d) => { if (d.v === 'review') RV = null; go(d.v); },
+    nav: (d) => go(d.v),
     lesson: (d) => go('lesson', { id: d.id }),
     lessonquiz: (d) => { const x = findLesson(d.id); startRunner('lesson', x.l.quiz.map(toItem), { id: d.id, domain: x.m.domain, title: 'Quiz · ' + x.l.title }); },
     exam: (d) => { const m = MODS.find((x) => x.id === d.id); if (m) startRunner('exam', examItems(m), { id: m.id, pass: 0.8, title: 'Prova · ' + m.title }); },
@@ -1739,7 +1979,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     mixed: () => { const ids = Object.keys(DRILLS).filter((id) => lessonOpenById(DRILLS[id].lesson)); const seq = Array.from({ length: 10 }, () => pick(ids)); startRunner('drill', seq.map((id) => () => DRILLS[id].gen()), { drill: seq[0], title: 'Treino misto', mixed: seq }); },
     answer: (d) => answer(+d.o),
     next: () => nextQ(),
-    quit: () => { const k = R && R.kind; clearInterval(runTimer); R = null; go(k === 'drill' ? 'drills' : k === 'practice' || k === 'apply' ? 'mastery' : k === 'lesson' || k === 'exam' || k === 'final' ? 'trail' : 'home'); },
+    quit: () => { const k = R && R.kind; clearInterval(runTimer); R = null; go(mentorOn() && k !== 'review' ? 'home' : k === 'drill' ? 'drills' : k === 'practice' || k === 'apply' ? 'mastery' : k === 'review' ? 'review' : k === 'lesson' || k === 'exam' || k === 'final' ? 'trail' : 'home'); },
     'ob-skip': () => { if (saveProfile()) go('home'); },
     deal: (d) => { if (d.mode && (!T || d.mode !== TMODE)) { TMODE = d.mode; T = null; } if (VIEW !== 'table') go('table'); newHand(); },
     adversarial: () => { TMODE = 'adversarial'; T = null; go('table'); newHand(); },
@@ -1754,11 +1994,12 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     replays: (d) => go('replays', d.bad ? { bad: 1 } : {}),
     replay: (d) => go('replay', { id: d.id }),
     hero: (d) => heroAct(d.a, d.amt ? +d.amt : undefined),
-    'rv-start': () => { RV = { queue: shuffle(dueCards()), show: false }; render(); },
-    'rv-free': () => { RV = { queue: shuffle(Object.keys(S.cards)).slice(0, 10), show: false, free: true }; render(); },
-    'rv-show': () => { RV.show = true; render(); },
-    'rv-grade': (d) => rvGrade(+d.g),
-    'rv-quit': () => { RV = null; render(); },
+    'rv-start': () => startReviewExam(dueCards(), false),
+    'rv-free': () => startReviewExam(Object.keys(S.cards).filter((id) => ALLCARDS[id]), true),
+    mnext: () => { const t = mentorCurrent(); if (t) startTask(t); else go('home'); },
+    mskip: () => { const t = mentorCurrent(); if (t) { t.skipped = true; save(); render(); } },
+    mmore: () => { const pl = mentorPlan(), b = buildTasks(true); b.tasks.forEach((t) => { let id = t.id, k = 2; while (pl.tasks.some((x) => x.id === id)) id = t.id + '#' + k++; t.id = id; pl.tasks.push(snapTask(t)); }); save(); render(); },
+    'mentor-toggle': () => { S.settings.mentor = !mentorOn(); capCache = null; save(); toast(mentorOn() ? 'Modo mentor ligado: o mentor diz o que fazer a cada momento.' : 'Modo livre: você escolhe o que estudar.'); go('home'); },
     'jr-del': (d) => { S.journal = S.journal.filter((s) => String(s.id) !== d.id); save(); render(); },
     copy: () => { const t = document.getElementById('bk-code'); try { navigator.clipboard.writeText(t.value).then(() => toast('Código copiado'), () => t.select()); } catch (e) { t.select(); } },
     import: () => {
