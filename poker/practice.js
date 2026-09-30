@@ -70,7 +70,7 @@
   const byDrill = {}; CONCEPTS.forEach((c) => c.gens.forEach((gid) => { if (gid.startsWith('drill:')) (byDrill[gid.slice(6)] = byDrill[gid.slice(6)] || []).push(c.id); }));
   // Ferramentas de aplicação (mesa, Laboratório, Alto rendimento) → conceito praticado.
   const APPLY = { 'pre-table': 'abertura', 'post-table': 'posflop', 'pre-range': 'abertura', spot: 'textura', pattern: 'textura', rangeviz: 'ranges', blockers: 'bloqueadores', bayes: 'perfis', plan: 'posflop2', gm: 'gto', jury: 'elite', dbexam: 'estudo' };
-  const applyConcept = (d) => { const t = (d.spot && d.spot.type) || d.src || ''; if (d.src === 'gto' || /^river-/.test(t)) return 'blefes_river'; return APPLY[t] || null; };
+  const applyConcept = (d) => { if (d.cid) return d.cid; const t = (d.spot && d.spot.type) || d.src || ''; if (d.src === 'gto' || /^river-/.test(t)) return 'blefes_river'; return APPLY[t] || null; };
 
   // ---------------------------------------------------------------- utilidades
   const RNAME = { A: 'ás', K: 'rei', Q: 'dama', J: 'valete', T: '10' };
@@ -287,5 +287,98 @@
     },
   };
 
-  g.Practice = { CONCEPTS, byId, byLesson, byDrill, applyConcept, GEN };
+  // ---------------------------------------------------------------- cenários de aplicação (decisões de jogo)
+  // Diferente dos exercícios: aqui não se pede o número, e sim a decisão que a conta sustenta, como na mesa.
+  const dec = (x) => String(Math.round(x * 100) / 100).replace('.', ',');
+  const ev1 = (x) => (x > 0 ? '+' : '') + String(Math.round(x * 10) / 10).replace('.', ',');
+  function missedDraw() {
+    for (let t = 0; t < 400; t++) {
+      const d = P.deck(), s = Math.floor(Math.random() * 4);
+      const suited = d.filter((c) => P.suitOf(c) === s), hero = suited.slice(0, 2);
+      if (Math.abs(P.rankOf(hero[0]) - P.rankOf(hero[1])) > 4) continue;
+      const rest = d.filter((c) => hero.indexOf(c) < 0);
+      const two = rest.filter((c) => P.suitOf(c) === s).slice(0, 2), others = rest.filter((c) => P.suitOf(c) !== s).slice(0, 3);
+      const board = [two[0], two[1], others[0], others[1], others[2]];
+      if (P.category(P.evaluate(hero.concat(board))) !== 0) continue;
+      return { hero, board };
+    }
+    return null;
+  }
+  const APP_GEN = {
+    appEVBluff(h) {
+      const pot = h.pick([20, 40, 60, 90]), fr = h.pick([0.5, 0.75, 1]), bet = Math.round(pot * fr), be = bet / (pot + bet);
+      let f; do { f = h.pick([0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.55, 0.6, 0.7]); } while (Math.abs(f - be) < 0.07);
+      const md = missedDraw(), evB = f * pot - (1 - f) * bet;
+      return { two: true, html: `<p class="lead">River. O seu projeto de flush não completou e você não tem par. O pote tem ${pot} bb.</p>${md ? `<div class="lbl">Você</div><div class="board">${h.cards(md.hero)}</div><div class="lbl">Mesa</div><div class="board">${h.cards(md.board)}</div>` : ''}<p>O adversário passou. Pelo que você observou, ele desiste cerca de <b>${Math.round(f * 100)}%</b> das vezes diante de uma aposta de ${bet} bb.</p>`,
+        options: [`Blefar ${bet} bb`, 'Passar e desistir do pote'], a: f > be ? 0 : 1,
+        exp: `O blefe arrisca ${bet} para ganhar ${pot}: precisa de ${Math.round(be * 100)}% de desistências. Ele desiste ${Math.round(f * 100)}%. EV do blefe: ${ev1(evB)} bb; passar vale 0 (você não ganha no showdown). ${f > be ? 'Blefar ganha.' : 'Passar perde menos.'}`, hints: ['Quanto o blefe arrisca e quanto ganha?', 'De quantas desistências ele precisa? Compare com o que você observou.'] };
+    },
+    appMDF(h) {
+      const pot = h.pick([30, 50, 80, 100]), fr = h.pick([0.5, 0.75, 1]), bet = Math.round(pot * fr), need = bet / (pot + 2 * bet);
+      let V, B, share; do { V = h.pick([6, 8, 9, 10, 12, 15]); B = h.pick([1, 2, 3, 4, 5, 6, 8, 10]); share = B / (V + B); } while (Math.abs(share - need) < 0.06);
+      return { two: true, html: `<p class="lead">River. O adversário aposta ${bet} bb num pote de ${pot} bb.</p><p>Você tem um par médio: ganha de todos os blefes dele e perde de todas as mãos de valor. Contando o range dele nesta linha: <b>${V} combinações de valor</b> e <b>${B} de blefe</b>.</p>`,
+        options: ['Pagar', 'Desistir'], a: share > need ? 0 : 1,
+        exp: `Você precisa ganhar ${Math.round(need * 100)}% (paga ${bet} para um pote final de ${pot + 2 * bet}). Você ganha contra os blefes: ${B} de ${V + B} = ${Math.round(share * 100)}%. ${share > need ? 'Pagar.' : 'Desistir.'}`, hints: ['Quanto você precisa ganhar para pagar?', 'Contra quais mãos do range você ganha? Que fração do range elas são?'] };
+    },
+    appSemi(h) {
+      const pot = 100, bet = 100, outs = h.pick([8, 9, 12, 15]), e = Math.round((outs / 46) * 100) / 100;
+      let f, evC, evS; do { f = h.pick([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]); evC = e * pot; evS = f * pot + (1 - f) * (e * (pot + bet) - (1 - e) * bet); } while (Math.abs(evC - evS) < 5);
+      return { two: true, html: `<p class="lead">Turn, pote de ${pot} bb, você tem ${bet} bb atrás. O adversário passou.</p><p>Você tem um projeto com ${outs} outs (completa ${Math.round(e * 100)}% no river). Você estima que ele desiste <b>${Math.round(f * 100)}%</b> das vezes se você for all-in. Se você passar, ele também passa no river.</p>`,
+        options: ['Semi-blefe: all-in', 'Passar e ver o river de graça'], a: evS > evC ? 0 : 1,
+        exp: `Passar: você ganha o pote quando completa, ${Math.round(e * 100)}% × ${pot} = ${ev1(evC)} bb. All-in: ${Math.round(f * 100)}% × ${pot} (ele desiste) + ${Math.round((1 - f) * 100)}% × (${dec(e)} × ${pot + bet} − ${dec(1 - e)} × ${bet}) = ${ev1(evS)} bb. ${evS > evC ? 'O semi-blefe vale mais.' : 'Passar vale mais: ele desiste pouco.'}`, hints: ['Quanto vale passar? Pense nas vezes em que você completa.', 'Quanto vale o all-in somando as desistências e as vezes em que ele paga?'] };
+    },
+    appSPR(h) {
+      const low = Math.random() < 0.5, pot = low ? h.pick([20, 25, 30]) : h.pick([6, 7, 8]), stack = low ? Math.round(pot * h.pick([2, 3, 3.5])) : Math.round(pot * h.pick([12, 14, 16]));
+      return { two: true, html: `<p class="lead">Flop A♦ 8♣ 4♠. Você tem A♠ K♥: par de ases com o melhor kicker. O pote tem ${pot} bb e o stack efetivo é ${stack} bb (SPR ${String(Math.round((stack / pot) * 10) / 10).replace('.', ',')}).</p><p>Você aposta e um adversário ${low ? '' : 'muito apertado '}aumenta all-in.</p>`,
+        options: ['Pagar e colocar tudo', 'Desistir'], a: low ? 0 : 1,
+        exp: low ? `Com SPR baixo, um par alto com o melhor kicker é mão de colocar tudo: o range dele tem muitos ases piores, projetos e blefes, e o pote já é grande em relação ao stack.` : `Com SPR alto, colocar ${stack} bb com um par, contra um jogador muito apertado que aumentou tudo no flop, é caro: o range dele fica cheio de trincas e dois pares. Um par raramente vale 100 bb nessa situação.`, hints: ['Quanto é o SPR?', 'Com esse SPR, um par vale todas as fichas? Quem aumentou tudo, e com que mãos?'] };
+    },
+    appBBdef(h) {
+      const o = h.pick([2, 2.2, 2.5]); let lab, s, suited;
+      do { lab = h.pick(P.ALL_LABELS); s = P.chen(lab); suited = lab[2] === 's'; } while (lab.length === 2 && Math.random() < 0.6);
+      const call = s >= 5 || (suited && s >= 3), cards = h.pick(P.COMBOS[lab]), need = (o - 1) / (2 * o + 0.5);
+      return { two: true, html: `<p class="lead">O botão abre para ${String(o).replace('.', ',')} bb e o small blind desiste. Você está no big blind.</p><div class="lbl">Você</div><div class="board">${h.cards(cards)}</div>`,
+        options: ['Pagar', 'Desistir'], a: call ? 0 : 1,
+        exp: `O preço é bom: você precisa de ${Math.round(need * 100)}%. Mas a mão precisa jogar bem depois do flop, fora de posição. ${lab} ${call ? 'tem cartas altas, par ou jogabilidade (mesmo naipe, próximas) suficientes para defender.' : 'é fraca demais: cartas baixas ou desconectadas, que raramente fazem mãos fortes.'}`, hints: ['Quanto custa pagar e quanto você precisa ganhar?', 'Esta mão faz pares altos, flushes ou sequências com frequência?'] };
+    },
+    appImplied(h) {
+      const pot = h.pick([30, 40, 60]), bet = Math.round(pot * h.pick([0.5, 0.75, 1])), outs = h.pick([8, 9]), e = outs / 46;
+      const R = h.pick([30, 60, 100, 150]); let pay, X, ev;
+      do { pay = h.pick([0, 0.25, 0.5, 1]); X = R * pay; ev = e * (pot + bet + X) - (1 - e) * bet; } while (Math.abs(ev) < 2);
+      const payTxt = { 0: 'nunca paga nada a mais quando a carta do projeto aparece', 0.25: 'paga uma aposta pequena, cerca de um quarto do que tem', 0.5: 'costuma pagar cerca de metade do que tem', 1: 'é um pagador: coloca tudo o que tem' }[pay];
+      return { two: true, html: `<p class="lead">Turn. Você tem um projeto com ${outs} outs (${Math.round(e * 100)}% no river). O adversário aposta ${bet} bb num pote de ${pot} bb e ainda tem ${R} bb atrás.</p><p>Quando você completa, ele ${payTxt}.</p>`,
+        options: ['Pagar', 'Desistir'], a: ev > 0 ? 0 : 1,
+        exp: `Pelas pot odds você precisaria de ${Math.round((bet / (pot + 2 * bet)) * 100)}% e tem ${Math.round(e * 100)}%. Com o que você ganha depois (${Math.round(X)} bb em média quando completa): EV = ${dec(e)} × ${pot + bet + Math.round(X)} − ${dec(1 - e)} × ${bet} = ${ev1(ev)} bb. ${ev > 0 ? 'Pagar.' : 'Desistir.'}`, hints: ['Só pelas pot odds, pagar compensa?', 'Quanto você ganha a mais quando completa? Isso cobre a diferença?'] };
+    },
+    appBounty(h) {
+      const perEntry = h.pick([5, 10]), chips = 20000, bounty = h.pick([0, 5, 10, 20]), cv = perEntry / chips, bChips = Math.round(bounty / cv);
+      const call = h.pick([3000, 5000, 8000]), fin = call * 2 + h.pick([1500, 3000]), need = call / (fin + bChips);
+      let e; do { e = h.pick([0.15, 0.22, 0.3, 0.35, 0.4, 0.45]); } while (Math.abs(e - need) < 0.04);
+      return { two: true, html: `<p class="lead">Torneio com bounty fixa (cada inscrição coloca $${perEntry} no prêmio e dá ${chips.toLocaleString('pt-BR')} fichas). Um adversário que você cobre vai all-in. Pagar custa ${call.toLocaleString('pt-BR')} para um pote final de ${fin.toLocaleString('pt-BR')}.</p><p>A bounty dele é de <b>$${bounty}</b>. A sua mão tem cerca de <b>${Math.round(e * 100)}%</b> contra o range dele.</p>`,
+        options: ['Pagar', 'Desistir'], a: e > need ? 0 : 1,
+        exp: `A bounty vale ${bChips.toLocaleString('pt-BR')} fichas. Você precisa de ${call.toLocaleString('pt-BR')} ÷ (${fin.toLocaleString('pt-BR')} + ${bChips.toLocaleString('pt-BR')}) = ${Math.round(need * 100)}%. Com ${Math.round(e * 100)}%, ${e > need ? 'pague' : 'desista'}.`, hints: ['Quantas fichas a bounty representa?', 'Somando a bounty ao pote, quanto você precisa ganhar?'] };
+    },
+    appDeal(h) {
+      const second = h.pick([1000, 3000, 6000]), first = second + h.pick([1000, 2000, 4000]), share = h.pick([0.3, 0.4, 0.5, 0.6, 0.7]);
+      const fair = second + share * (first - second); let off; do { off = Math.round((fair + h.pick([-600, -400, -250, 250, 400, 600])) / 50) * 50; } while (off <= second || off >= first);
+      return { two: true, html: `<p class="lead">Mano a mano final. 1º: $${first.toLocaleString('pt-BR')}; 2º: $${second.toLocaleString('pt-BR')}. Você tem ${Math.round(share * 100)}% das fichas.</p><p>O adversário, que joga no mesmo nível que você, propõe um acordo: você fica com <b>$${off.toLocaleString('pt-BR')}</b>.</p>`,
+        options: ['Aceitar', 'Recusar e jogar'], a: off >= fair ? 0 : 1,
+        exp: `Valor justo do seu stack: $${second.toLocaleString('pt-BR')} + ${Math.round(share * 100)}% de $${(first - second).toLocaleString('pt-BR')} = $${Math.round(fair).toLocaleString('pt-BR')}. A proposta está ${off >= fair ? 'acima: aceite (e ainda elimina a variância).' : 'abaixo: recuse ou peça mais.'}`, hints: ['Quanto os dois já têm garantido?', 'Qual o valor justo do seu stack pelas fichas? A proposta está acima ou abaixo?'] };
+    },
+    appBlefes(h) {
+      const fr = h.pick([[1, 2], [1, 1]]), x = fr[0] / fr[1], V = h.pick([8, 9, 12, 15]), right = Math.round((V * x) / (1 + x)), C = right + h.pick([6, 8, 10]);
+      return { html: `<p class="lead">River. Você vai apostar ${fr[0] === fr[1] ? 'o tamanho do pote' : 'meio pote'}. Chegam aqui ${V} combinações de valor e ${C} combinações de projetos que não completaram.</p><p>O adversário é atento e equilibrado. Como jogar os projetos que falharam?</p>`,
+        options: [`Blefar com todos os ${C}`, `Blefar com cerca de ${right} e passar com o resto`, 'Nunca blefar'], a: 1,
+        exp: `Com ${fr[0] === fr[1] ? 'aposta do pote' : 'meio pote'}, a proporção equilibrada é ${fr[0] === fr[1] ? '1 blefe para 2 de valor' : '1 blefe para 3 de valor'}: cerca de ${right}. Blefar com todos deixa pagar lucrativo para ele; nunca blefar faz ele desistir sempre que você aposta. Escolha os blefes com os melhores bloqueadores.`, hints: ['Qual a proporção de blefes para este tamanho de aposta?', 'O que um adversário atento faz se você blefar demais? E de menos?'] };
+    },
+  };
+  // Conceito → fontes de cenários de aplicação (além das mãos interativas das lições e dos cenários escritos).
+  const APPLY_SRC = {
+    cartas: ['drill:ranking'], combinacoes: ['drill:ranking', 'drill:besthand'], abertura: ['drill:rfi'], bbdefesa: ['appBBdef'],
+    outs: ['drill:callfold', 'appImplied'], regra24: ['drill:callfold'], potodds: ['drill:callfold'], ev: ['appEVBluff'], implied: ['appImplied'],
+    mdf: ['appMDF'], semiblefe: ['appSemi'], spr: ['appSPR'], textura: ['drill:texture'], ranges: ['appMDF'], blefes_river: ['appBlefes', 'appEVBluff'],
+    torneio: ['drill:pushfold'], pushfold: ['drill:pushfold'], icm: ['drill:icm'], bf: ['drill:icm'], bounty: ['appBounty'], acordos: ['appDeal'],
+    estudo: ['impacto'], gto: ['appBlefes', 'appMDF'], banca: ['drill:bankroll'], elite: ['impacto'],
+  };
+  g.Practice = { CONCEPTS, byId, byLesson, byDrill, applyConcept, GEN, APP_GEN, APPLY_SRC };
 })(typeof window !== 'undefined' ? window : globalThis);

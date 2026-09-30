@@ -47,12 +47,12 @@
   function fresh() {
     return { v: 1, profile: null, xp: 0, streak: { count: 0, best: 0, last: null }, lessons: {}, qs: {}, exams: {}, diag: {}, mastery: {}, placement: null, drills: {}, cards: {}, reviews: 0,
       sim: { hands: 0, net: 0, vpip: 0, pfr: 0, good: 0, ok: 0, bad: 0, curve: [0] }, simModes: {}, journal: [], hist: {}, badges: {}, daily: {}, days: {},
-      decisions: [], tools: {}, ranges: {}, notes: {}, gto: null, jury: [], gm: [], principles: [], study: [], session: null, plan: {}, planExtra: [], weekly: [], dbexam: null, settings: { drillTime: 0 }, savedAt: 0 };
+      decisions: [], tools: {}, ranges: {}, notes: {}, gto: null, jury: [], gm: [], principles: [], study: [], session: null, plan: {}, planExtra: [], weekly: [], dbexam: null, replays: [], pressure: {}, settings: { drillTime: 0 }, savedAt: 0 };
   }
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
   S = S && S.v === 1 ? Object.assign(fresh(), S) : fresh();
-  S.settings = Object.assign({ drillTime: 0, socratic: true }, S.settings);
+  S.settings = Object.assign({ drillTime: 0, socratic: true, tableClock: 0, breath: true }, S.settings);
   let cloudTimer = null;
   function save() {
     if (S.profile) S.hist[todayStr()] = Math.round(ipp().total);
@@ -521,6 +521,7 @@
     items.push({ id: 'lessons', title: `Estudar ${Math.max(2, Math.round(hours * 0.6))} lições`, v: lessonsWeek, n: Math.max(2, Math.round(hours * 0.6)), go: ns && ns.type === 'lesson' ? ['lesson', ns.l.id] : ['nav', 'trail'] });
     items.push({ id: 'reviews', title: 'Revisão espaçada em 5 dias da semana', v: Object.entries(S.days).filter(([d, v]) => d >= weekStart() && v.reviews).length, n: 5, go: ['nav', 'review'] });
     items.push({ id: 'adaptive', title: `Prática adaptativa: ${hours * 5} exercícios nos seus conceitos mais fracos`, v: weekSum('practice'), n: hours * 5, go: ['adaptive'] });
+    items.push({ id: 'apply', title: `Treino de aplicação: ${hours * 3} situações de jogo`, v: weekSum('apply'), n: hours * 3, go: ['applyadapt'] });
     items.push({ id: 'drills', title: `Responder ${hours * 15} questões de treino`, v: weekSum('drills'), n: hours * 15, go: ['nav', 'drills'] });
     items.push({ id: 'hands', title: `Jogar ${hours * 40} mãos na mesa com o mentor`, v: weekSum('hands'), n: hours * 40, go: ['nav', 'table'] });
     if (moduleOpen(5)) items.push({ id: 'gto', title: `${hours * 10} decisões no Treinador GTO`, v: weekSum('gto'), n: hours * 10, go: ['nav', 'lab-trainer'] });
@@ -590,6 +591,7 @@ ${defense}`;
     render();
     main.scrollTop = 0; window.scrollTo(0, 0);
     if (view === 'table' && T && !T.over && T.turn !== 0) tableTimer = setTimeout(tableStep, 300);
+    if (view === 'table' && T && !T.over && T.turn === 0) { T.clk = null; startHeroClock(); render(); }
     try { sessionStorage.setItem('as-view', view); } catch (e) { /* sem armazenamento */ }
   }
   function renderNav() {
@@ -690,9 +692,10 @@ ${defense}`;
     return `<div class="wrap"><div><div class="eyebrow">Formação · Domínio</div><h1>O que você domina, conceito por conceito</h1><p class="muted">O mentor acompanha ${Pr.CONCEPTS.length} conceitos. Cada resposta em quizzes, exercícios e diagnóstico mede o <b>conhecimento</b>; cada decisão na Mesa de treino, no Laboratório e no Alto rendimento mede a <b>aplicação</b>. Respostas recentes pesam mais que as antigas, e o que fica muito tempo sem prática volta para revisão.</p></div>
       <div class="hero-stats"><div class="stat"><span class="eyebrow">Dominados</span><span class="v num">${cnt('dominado')}</span></div><div class="stat"><span class="eyebrow">Em construção</span><span class="v num">${cnt('construcao')}</span></div><div class="stat"><span class="eyebrow">Precisam de reforço</span><span class="v num">${cnt('fraco')}</span></div><div class="stat"><span class="eyebrow">Hora de revisar</span><span class="v num">${cnt('revisar')}</span></div></div>
       <div class="panel row" style="justify-content:space-between"><span><b>Prática adaptativa</b><br><span class="small muted">10 exercícios criados na hora, concentrados no que está mais fraco${gaps.length ? ' e nas lacunas entre saber e aplicar' : ''}.</span></span><button class="btn primary" data-act="adaptive">Praticar agora</button></div>
+      <div class="panel row" style="justify-content:space-between"><span><b>Treino de aplicação</b><br><span class="small muted">Situações de jogo em que você decide como na mesa. Prioriza o que você sabe, mas ainda não aplica.</span></span><button class="btn" data-act="applyadapt">Aplicar agora</button></div>
       ${gaps.length ? mentorHTML(`<p><b>Sabe na teoria, erra na prática:</b> ${gaps.map((r) => esc(r.c.name)).join(', ')}. Você acerta esses conceitos nos exercícios, mas não nas decisões de jogo. Treine-os na Mesa de treino e no Laboratório, pensando no conceito antes de agir.</p>`, 'Mentor Ás') : ''}
       ${weak.length ? `<p class="small muted">Precisam de atenção agora: ${weak.map((r) => esc(r.c.name)).join(' · ')}.</p>` : ''}
-      ${[0, 1, 2, 3, 4, 5].map((L) => `<section class="panel stack"><div class="eyebrow">Nível ${L} · ${esc(LVL(L)[1])}</div>${rows.filter((r) => r.c.level === L).map((r) => { const st = ST[r.x.st]; const lesson = r.c.lessons.find((l) => findLesson(l)); return `<div class="mrow ${r.open ? '' : 'locked'}"><div><b>${esc(r.c.name)}</b> <span class="pill ${st[1]}">${r.open ? st[0] : 'Ainda não liberado'}</span>${r.x.gap ? ' <span class="pill bad">sabe, mas erra na prática</span>' : ''}</div><div class="mbars">${bar(r.x.k, 'Conhecimento')}${bar(r.x.a, 'Aplicação')}</div><div class="row">${r.open && practicable(r.c) ? `<button class="btn small" data-act="practice" data-c="${r.c.id}">Praticar</button>` : ''}${lesson ? `<button class="btn ghost small" data-act="lesson" data-id="${lesson}">Lição</button>` : ''}</div></div>`; }).join('')}</section>`).join('')}
+      ${[0, 1, 2, 3, 4, 5].map((L) => `<section class="panel stack"><div class="eyebrow">Nível ${L} · ${esc(LVL(L)[1])}</div>${rows.filter((r) => r.c.level === L).map((r) => { const st = ST[r.x.st]; const lesson = r.c.lessons.find((l) => findLesson(l)); return `<div class="mrow ${r.open ? '' : 'locked'}"><div><b>${esc(r.c.name)}</b> <span class="pill ${st[1]}">${r.open ? st[0] : 'Ainda não liberado'}</span>${r.x.gap ? ' <span class="pill bad">sabe, mas erra na prática</span>' : ''}</div><div class="mbars">${bar(r.x.k, 'Conhecimento')}${bar(r.x.a, 'Aplicação')}</div><div class="row">${r.open && practicable(r.c) ? `<button class="btn small" data-act="practice" data-c="${r.c.id}">Praticar</button>` : ''}${applicable(r.c) ? `<button class="btn small" data-act="applyc" data-c="${r.c.id}">Aplicar</button>` : ''}${lesson ? `<button class="btn ghost small" data-act="lesson" data-id="${lesson}">Lição</button>` : ''}</div></div>`; }).join('')}</section>`).join('')}
     </div>`;
   };
 
@@ -746,7 +749,7 @@ ${defense}`;
       ${lastW.length ? `<div class="panel"><div class="eyebrow">Revisões anteriores</div>${lastW.map((w) => `<div class="crit" style="grid-template-columns:1fr"><div class="small"><b>${esc(w.week)}</b> · meta: ${esc(w.goal || '—')}<div class="muted">${esc(w.leak || '')}</div></div></div>`).join('')}</div>` : ''}</div>`;
   };
   MOUNTS.plan = (root) => {
-    root.querySelectorAll('[data-plango]').forEach((b) => b.addEventListener('click', () => { const g = JSON.parse(b.dataset.plango); if (g[0] === 'nav') go(g[1]); else if (g[0] === 'lesson') go('lesson', { id: g[1] }); else if (g[0] === 'drill') startDrill(g[1]); else if (g[0] === 'diag') ACTS.diag(); else if (g[0] === 'adaptive') ACTS.adaptive(); else if (g[0] === 'weekly') go('plan', { weekly: 1 }); }));
+    root.querySelectorAll('[data-plango]').forEach((b) => b.addEventListener('click', () => { const g = JSON.parse(b.dataset.plango); if (g[0] === 'nav') go(g[1]); else if (g[0] === 'lesson') go('lesson', { id: g[1] }); else if (g[0] === 'drill') startDrill(g[1]); else if (g[0] === 'diag') ACTS.diag(); else if (g[0] === 'adaptive') ACTS.adaptive(); else if (g[0] === 'applyadapt') ACTS.applyadapt(); else if (g[0] === 'weekly') go('plan', { weekly: 1 }); }));
     root.querySelectorAll('[data-pdone]').forEach((b) => b.addEventListener('click', () => { const x = S.planExtra.find((y) => y.key === b.dataset.pdone); if (x) x.done = true; save(); render(); }));
   };
 
@@ -781,6 +784,48 @@ ${defense}`;
   // ---------- mãos interativas e exemplos resolvidos ----------
   const parseCards = (str) => (str || '').trim().split(/\s+/).filter(Boolean).map((c) => P.parseCard(c.replace(/^10/, 'T')));
   const bbTxt = (v) => num(v, v % 1 ? 1 : 0) + ' bb';
+  const spotTableHTML = (o) => `<div class="spot-table"><div><span class="lbl">Você${o.pos ? ' · ' + esc(o.pos) : ''}</span><div class="board">${o.hero ? cardsHTML(parseCards(o.hero)) : ''}</div></div>
+        <div><span class="lbl">Mesa</span><div class="board">${o.board ? cardsHTML(parseCards(o.board)) : '<span class="small muted">ainda sem cartas</span>'}</div></div>
+        <div class="spot-nums">${o.pot != null ? `<span class="lbl">Pote</span><b class="num">${bbTxt(o.pot)}</b>` : ''}${o.stack != null ? `<span class="lbl">Stack efetivo</span><b class="num">${bbTxt(o.stack)}</b>` : ''}</div></div>`;
+
+  // ---------- cenários de aplicação ----------
+  // Fontes: as mãos interativas das lições do conceito, os cenários escritos (C.APPLY_BANK) e os geradores de decisão (Pr.APPLY_SRC).
+  const unent = (x) => x.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const SPOTS_BY_LESSON = {};
+  FLAT.forEach(({ l }) => { for (const m of l.body.matchAll(/data-spot="([^"]*)"/g)) { try { (SPOTS_BY_LESSON[l.id] = SPOTS_BY_LESSON[l.id] || []).push(JSON.parse(unent(m[1]))); } catch (e) { /* ignora */ } } });
+  function applySources(c) {
+    const src = [];
+    c.lessons.forEach((l) => (SPOTS_BY_LESSON[l] || []).forEach((o) => src.push({ spot: o })));
+    ((C.APPLY_BANK || {})[c.id] || []).forEach((o) => src.push({ spot: o }));
+    (Pr.APPLY_SRC[c.id] || []).forEach((g) => src.push({ gen: g }));
+    return src;
+  }
+  function spotItem(o) {
+    const table = !!(o.hero || o.board || o.pot != null), best = o.opts.findIndex((x) => x[1] === 1);
+    return { html: `${o.title ? `<div class="eyebrow">${esc(o.title)}</div>` : ''}${table ? spotTableHTML(o) : ''}${o.hist ? `<p class="small muted">${colorize(o.hist)}</p>` : ''}<p class="lead">${colorize(o.q)}</p>`,
+      options: o.opts.map((x) => x[0]), a: best, partial: o.opts.map((x, i) => (x[1] > 0 && x[1] < 1 ? i : -1)).filter((i) => i >= 0),
+      exp: o.opts.map((x) => `<div class="whynot"><b>${x[1] === 1 ? 'Melhor' : x[1] > 0 ? 'Aceitável' : 'Por que não'}: ${colorize(esc(x[0]))}.</b> ${colorize(x[2])}</div>`).join('') };
+  }
+  function applyItem(cid) {
+    const c = Pr.byId[cid], src = applySources(c); if (!src.length) return null;
+    const gens = src.filter((x) => x.gen), spots = src.filter((x) => x.spot);
+    const x = gens.length && (!spots.length || Math.random() < 0.6) ? pick(gens) : pick(spots);
+    let it = x.spot ? spotItem(x.spot) : x.gen.startsWith('drill:') ? DRILLS[x.gen.slice(6)].gen() : (Pr.APP_GEN[x.gen] || Pr.GEN[x.gen])(GH);
+    return Object.assign({}, it, { cid, hints: it.hints || c.hints });
+  }
+  const applicable = (c) => conceptOpen(c) && applySources(c).length > 0;
+  function applyPick(n) {
+    const open = Pr.CONCEPTS.filter(applicable);
+    if (!open.length) return [];
+    const w = (c) => { const x = conceptState(c.id); return (x.gap ? 5 : x.a && x.a.p < 0.6 ? 4 : x.k && !x.a ? 3 : x.a ? 1 : 2) + Math.random(); };
+    const ranked = open.map((c) => [c.id, w(c)]).sort((a, b) => b[1] - a[1]).map((x) => x[0]), top = ranked.slice(0, 4);
+    return shuffle(Array.from({ length: n }, (_, i) => (i < Math.ceil(n * 0.7) ? top[i % top.length] : pick(ranked))));
+  }
+  function startApply(cids, meta) {
+    if (!cids.length) { toast('Conclua uma lição para liberar os cenários.'); return; }
+    startRunner('apply', cids.map((cid) => () => applyItem(cid) || Object.assign(DRILLS.ranking.gen(), { cid: 'combinacoes' })), meta);
+  }
+
   function mountWidgets(root, lid) {
     S.spots = S.spots || {};
     root.querySelectorAll('.spot[data-spot]').forEach((el, i) => {
@@ -789,9 +834,7 @@ ${defense}`;
       el.className = 'spot panel stack';
       const table = !!(o.hero || o.board || o.pot != null);
       el.innerHTML = `<div class="eyebrow">${table ? 'Mão interativa' : 'Situação'}${o.title ? ' · ' + esc(o.title) : ''}</div>
-        ${table ? `<div class="spot-table"><div><span class="lbl">Você${o.pos ? ' · ' + esc(o.pos) : ''}</span><div class="board">${o.hero ? cardsHTML(parseCards(o.hero)) : ''}</div></div>
-        <div><span class="lbl">Mesa</span><div class="board">${o.board ? cardsHTML(parseCards(o.board)) : '<span class="small muted">ainda sem cartas</span>'}</div></div>
-        <div class="spot-nums">${o.pot != null ? `<span class="lbl">Pote</span><b class="num">${bbTxt(o.pot)}</b>` : ''}${o.stack != null ? `<span class="lbl">Stack efetivo</span><b class="num">${bbTxt(o.stack)}</b>` : ''}</div></div>` : ''}
+        ${table ? spotTableHTML(o) : ''}
         ${o.hist ? `<p class="small muted" style="margin:0">${colorize(o.hist)}</p>` : ''}
         <p class="spot-q">${colorize(o.q)}</p>
         <div class="opts">${o.opts.map((x, k) => `<button type="button" class="opt" data-k="${k}"><span class="k">${k + 1}</span>${colorize(x[0])}</button>`).join('')}</div>
@@ -998,7 +1041,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       return `<button class="opt ${cls}" data-act="answer" data-o="${oi}" ${R.answered || first ? 'disabled' : ''}><span class="k">${k + 1}</span><span>${colorize(esc(it.options[oi]))}</span></button>`;
     }).join('');
     const ok = R.picked === it.a, isDiag = R.kind === 'diag';
-    const headTxt = R.picked === -1 ? 'O tempo acabou.' : R.picked === -2 ? 'Tudo bem.' : R.retry && R.retry.revealed ? 'Esta é a resposta.' : R.retry ? (ok ? 'Você chegou lá com a pista.' : 'Ainda não era essa.') : ok ? pick(['Correto.', 'Isso mesmo.', 'Exato.']) : 'Não foi dessa vez.';
+    const headTxt = R.picked === -1 ? 'O tempo acabou.' : R.picked === -2 ? 'Tudo bem.' : R.retry && R.retry.revealed ? 'Esta é a resposta.' : R.retry ? (ok ? 'Você chegou lá com a pista.' : 'Ainda não era essa.') : ok ? pick(['Correto.', 'Isso mesmo.', 'Exato.']) : it.partial && it.partial.includes(R.picked) ? 'Aceitável, mas existe uma opção melhor.' : 'Não foi dessa vez.';
     const tailTxt = R.picked === -2 ? ' Marcar "Não sei" é melhor do que chutar: deixa o diagnóstico preciso. ' : R.retry && ok ? ' No placar conta como erro, mas agora o raciocínio é seu. ' : ' ';
     return `<div class="wrap narrow runner">
       <div class="runner-top"><div><div class="eyebrow">${esc(R.title)}</div><span class="small muted num">${isDiag ? `Questão ${R.i + 1} · nível ${R.cur.lvl} · ${R.correct} acerto(s)` : `Questão ${R.i + 1} de ${n} · ${R.correct} acerto(s)`}</span></div><button class="btn ghost" data-act="quit">Sair</button></div>
@@ -1017,7 +1060,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     const t0 = performance.now(), lim = S.settings.drillTime * 1000;
     runTimer = setInterval(() => { const el = document.getElementById('run-clock'); if (!el || !R || R.answered) return clearInterval(runTimer); const left = 1 - (performance.now() - t0) / lim; el.style.width = Math.max(0, left * 100) + '%'; if (left <= 0) { clearInterval(runTimer); answer(-1); } }, 100);
   };
-  const socraticOn = () => S.settings.socratic !== false && ['lesson', 'practice', 'drill'].includes(R.kind) && (R.cur.options || []).length > 2;
+  const socraticOn = () => S.settings.socratic !== false && ['lesson', 'practice', 'drill', 'apply'].includes(R.kind) && (R.cur.options || []).length > 2;
   const focusNext = () => { const nb = document.getElementById('nextBtn'); if (nb) nb.focus(); };
   function answer(o) {
     if (!R || R.answered) return;
@@ -1047,10 +1090,10 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     }
     if (R.kind === 'lesson') { const dom = R.domain; S.qs[dom] = S.qs[dom] || { n: 0, c: 0 }; S.qs[dom].n++; if (ok) S.qs[dom].c++; }
     if (R.kind === 'lesson') observeLesson(R.id, ok);
-    else if (cur.cid) observe(cur.cid, 'k', ok, R.kind === 'diag' ? 1.5 : 1);
+    else if (cur.cid) observe(cur.cid, R.kind === 'apply' ? 'p' : 'k', ok, R.kind === 'diag' ? 1.5 : !ok && cur.partial && cur.partial.includes(o) ? 0.5 : 1);
     else if (cur.lid) observeLesson(cur.lid, ok);
     if (R.kind === 'drill') (Pr.byDrill[R.drill] || []).forEach((c) => observe(c, 'k', ok));
-    if (R.kind === 'practice') { daily().drills++; dayLog('drills'); dayLog('practice'); S.xp += ok ? 4 : 1; checkMissions(); }
+    if (R.kind === 'practice' || R.kind === 'apply') { daily().drills++; dayLog('drills'); dayLog(R.kind); S.xp += ok ? 4 : 1; checkMissions(); }
     if (R.kind === 'diag') diagRecord(ok);
     save();
   }
@@ -1073,7 +1116,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       else { S.diag.latest = res; if (res.ability - diagAbility(S.diag.baseline) >= 1) award('diag_up'); }
       S.placement = Math.max(S.placement || 0, res.level);
     } else if (R.kind === 'drill') addXP(R.correct >= 8 ? 20 : 0);
-    else if (R.kind === 'practice') addXP(R.correct >= 8 ? 15 : 0);
+    else if (R.kind === 'practice' || R.kind === 'apply') addXP(R.correct >= 8 ? 15 : 0);
     const cl = carteiraLevel(); for (let k = 1; k <= cl; k++) award('lvl' + k);
     checkMissions(); save();
   }
@@ -1106,11 +1149,11 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
         body = `<p>${diff > 0.05 ? `Você avançou ${num(diff, 1)} nível(is) desde o primeiro diagnóstico.` : diff < -0.05 ? 'O resultado ficou abaixo do início. Isso acontece: um diagnóstico curto tem variação. Revise o mapa de domínio e refaça daqui a algumas semanas.' : 'Resultado parecido com o do início. Veja no mapa de domínio o que praticar.'}</p>${table}`;
         actions = '<button class="btn primary" data-act="nav" data-v="mastery">Ver o mapa de domínio</button><button class="btn ghost" data-act="nav" data-v="home">Início</button>';
       }
-    } else if (R.kind === 'practice') {
+    } else if (R.kind === 'practice' || R.kind === 'apply') {
       const by = {}; R.results.forEach((ok, i) => { const it = R.items[i]; if (!it || !it.cid) return; const x = (by[it.cid] = by[it.cid] || { n: 0, c: 0 }); x.n++; if (ok) x.c++; });
-      head = `${R.correct} de ${n} ${R.single ? 'em ' + esc(Pr.byId[R.single].name) : 'na prática adaptativa'}`;
-      body = `<table class="t"><tr><th>Conceito</th><th>Acertos</th><th>Estado agora</th></tr>${Object.entries(by).map(([cid, x]) => { const st = ST[conceptState(cid).st]; return `<tr><td>${esc(Pr.byId[cid].name)}</td><td class="num">${x.c} de ${x.n}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join('')}</table><p class="small muted">Os exercícios são criados na hora pelo motor do app: você nunca fica sem prática.</p>`;
-      actions = `<button class="btn primary" data-act="${R.single ? 'practice' : 'adaptive'}" data-c="${R.single || ''}">Mais 10</button><button class="btn ghost" data-act="nav" data-v="mastery">Mapa de domínio</button>`;
+      head = `${R.correct} de ${n} ${R.single ? 'em ' + esc(Pr.byId[R.single].name) : R.kind === 'apply' ? 'no treino de aplicação' : 'na prática adaptativa'}`;
+      body = `<table class="t"><tr><th>Conceito</th><th>Acertos</th><th>Estado agora</th></tr>${Object.entries(by).map(([cid, x]) => { const st = ST[conceptState(cid).st]; return `<tr><td>${esc(Pr.byId[cid].name)}</td><td class="num">${x.c} de ${x.n}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`; }).join('')}</table><p class="small muted">${R.kind === 'apply' ? 'Cenários de jogo: você decide como na mesa, e o resultado alimenta a barra de Aplicação do mapa de domínio.' : 'Os exercícios são criados na hora pelo motor do app: você nunca fica sem prática.'}</p>`;
+      actions = `<button class="btn primary" data-act="${R.kind === 'apply' ? (R.single ? 'applyc' : 'applyadapt') : R.single ? 'practice' : 'adaptive'}" data-c="${R.single || ''}">Mais 10</button><button class="btn ghost" data-act="nav" data-v="mastery">Mapa de domínio</button>`;
     } else {
       const a = drillAcc(R.drill);
       head = R.mixed ? `${R.correct} de ${n} no treino misto` : `${R.correct} de ${n} no treino "${DRILLS[R.drill].name}"`;
@@ -1131,6 +1174,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   VIEWS.drills = () => `<div class="wrap">
     <div><div class="eyebrow">Treinos</div><h1>Prática deliberada</h1><p class="muted">Rodadas de 10 questões geradas na hora, com feedback imediato. Cada resposta entra no mapa de leaks com tempo e tipo de erro. A meta de cada treino é 85% nas últimas 30 respostas.</p></div>
     <div class="panel row" style="justify-content:space-between"><span><b>Prática adaptativa</b><br><span class="small muted">Exercícios novos a cada rodada, escolhidos pelo seu mapa de domínio.</span></span><button class="btn primary" data-act="adaptive">Praticar</button></div>
+    <div class="panel row" style="justify-content:space-between"><span><b>Treino de aplicação</b><br><span class="small muted">Situações de jogo para transformar o que você sabe em decisões.</span></span><button class="btn" data-act="applyadapt">Aplicar</button></div>
     <div class="panel row" style="justify-content:space-between"><span><b>Pistas antes da resposta</b><br><span class="small muted">Quando você erra, o mentor dá pistas e uma nova chance antes de mostrar a resposta (método socrático).</span></span><button class="btn ${S.settings.socratic === false ? '' : 'primary'}" data-act="socratic-toggle">${S.settings.socratic === false ? 'Desligado' : 'Ligado'}</button></div>
     <div class="panel row" style="justify-content:space-between"><span><b>Treino misto</b><br><span class="small muted">Intercala todos os treinos liberados.</span></span><label class="field" style="width:180px">Relógio por questão<select id="dr-time">${[[0, 'Sem relógio'], [15, '15 segundos'], [7, '7 segundos'], [3, '3 segundos']].map(([v, t]) => `<option value="${v}" ${S.settings.drillTime === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label><button class="btn primary" data-act="mixed">Começar</button></div>
     <div class="grid3">${Object.entries(DRILLS).map(([id, d]) => {
@@ -1148,7 +1192,26 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     normal: ['Mesa 6-max', 'Cinco estilos clássicos: nit, TAG, recreativo, LAG e maníaco.', [['Rocha', 'nit'], ['Bia', 'tag'], ['Seu Zé', 'fish'], ['Dudu', 'lag'], ['Turbo', 'maniac']]],
     adversarial: ['Adversários adaptativos', 'Bots que estudam você: atacam seus overfolds e overcalls, aumentam suas apostas pequenas, mudam de estilo ou jogam sólido.', [['Caçador', 'tag', 'A'], ['Paredão', 'tag', 'B'], ['Martelo', 'lag', 'C'], ['Camaleão', 'tag', 'D'], ['Sólido', 'tag', 'E']]],
     hu: ['Heads-up', 'Mano a mano contra uma regular sólida.', [['Nina', 'tag']]],
+    nl2: ['Mesa NL2', 'O limite mais baixo: muitos recreativos e pagadores, poucos regulares. Os estilos ficam escondidos: leia cada um pelos números.', 'pop'],
+    nl10: ['Mesa NL10', 'Mistura de recreativos e regulares, a maioria cautelosa depois do flop. Estilos escondidos.', 'pop'],
+    nl50: ['Mesa NL50', 'Mais regulares sólidos e agressivos, poucos recreativos. Estilos escondidos.', 'pop'],
   };
+  // Composição típica de cada limite (perfis descritos na literatura e nas tendências de população; não é uma base de dados real).
+  const POPS = {
+    nl2: [['fish', 30], ['station', 25], ['nit', 15], ['maniac', 8], ['weakreg', 12], ['tag', 10]],
+    nl10: [['fish', 18], ['station', 14], ['nit', 16], ['maniac', 5], ['weakreg', 25], ['tag', 17], ['lag', 5]],
+    nl50: [['fish', 10], ['station', 6], ['nit', 10], ['weakreg', 20], ['tag', 34], ['lag', 18], ['maniac', 2]],
+  };
+  const NAMES = ['Aline', 'Beto', 'Cida', 'Diogo', 'Elis', 'Fabi', 'Gui', 'Helô', 'Igor', 'Juju', 'Kaio', 'Lia', 'Marcão', 'Nando', 'Olga', 'Paulo', 'Quel', 'Rafa', 'Sara', 'Téo', 'Úrsula', 'Vini', 'Wagner', 'Xande', 'Yara', 'Zeca'];
+  const isPop = (k) => MODES[k] && MODES[k][2] === 'pop';
+  const botsOf = (k) => (isPop(k) ? Array(5) : MODES[k][2]);
+  function popProfile(k) { const mix = POPS[k], tot = mix.reduce((a, x) => a + x[1], 0); let r = Math.random() * tot; for (const [pr, w] of mix) { r -= w; if (r <= 0) return pr; } return mix[0][0]; }
+  function popName(used) { const free = NAMES.filter((n) => !used.includes(n)); return pick(free.length ? free : NAMES); }
+  // Um jogador sai e outro senta, como numa mesa real (cerca de uma troca a cada 30 mãos por assento).
+  function rotateSeats() {
+    if (!isPop(TMODE)) return;
+    T.p.forEach((p, i) => { if (i === 0 || Math.random() > 0.035) return; const old = p.name; p.name = popName(T.p.map((x) => x.name)); p.profile = popProfile(TMODE); p.stack = 100; p.obs = { h: 0, v: 0, pf: 0 }; T.seatMsg = `${old} saiu da mesa; ${p.name} sentou no lugar.`; });
+  }
   const REC_TXT = { raise: 'aumentar', call: 'pagar', fold: 'desistir', check: 'passar' };
   function adaptBots() {
     if (TMODE !== 'adversarial' || !T) return;
@@ -1222,17 +1285,54 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     if (A === 'raise') return eq > 0.55 ? { g: 'good', txt: `Aposta por valor com ${E_} de equity estimada.` } : eq < 0.3 ? { g: 'ok', txt: `Blefe com ${E_} de equity. Escolha bem o adversário.` } : { g: 'ok', txt: `Mão média (${E_}). Que mão pior paga? Controle de pote costuma ser melhor.` };
     return eq > 0.72 ? { g: 'ok', err: 'valor-perdido', txt: `Passou com ${E_} de equity. Considere apostar por valor.` } : { g: 'good', txt: `Passar com ${E_} de equity é razoável.` };
   }
-  function heroAct(a, amt) {
+  // Conceito do currículo que cada decisão da mesa exercita (liga a mesa ao mapa de domínio e ao replay).
+  function tableCid(a, L) {
+    if (T.street === 'preflop') {
+      if (T.n === 2) return 'hu';
+      const pos = T.pos(0);
+      if (T.raises === 0) return pos === 'BB' ? 'estilo' : 'abertura';
+      if (T.raises === 1) return pos === 'BB' ? 'bbdefesa' : 'vs3bet';
+      return 'preflop2';
+    }
+    if (L.toCall > 0) return a === 'raise' ? (coachInfo.eq < 0.5 ? 'semiblefe' : 'posflop') : 'potodds';
+    return 'posflop';
+  }
+  // Qualidade das decisões em cada situação de pressão (calma, depois de perda grande, sessão longa, com e sem relógio).
+  function pressureLog(g) {
+    const q = g === 'good' ? 1 : g === 'ok' ? 0.5 : 0, pr = (S.pressure = S.pressure || {});
+    const add = (k) => { const b = pr[k] || (pr[k] = { n: 0, q: 0 }); b.n++; b.q += q; };
+    const loss = T.lossAt != null && T.handNo > T.lossAt && T.handNo - T.lossAt <= 10, late = T.handNo >= 150;
+    if (loss) add('loss'); if (late) add('late'); if (!loss && !late) add('calm');
+    add(S.settings.tableClock ? 'clock' : 'free');
+  }
+  let heroTimer = null, breathTimer = null;
+  function startHeroClock() {
+    clearTimeout(heroTimer); heroTimer = null;
+    const lim = (S.settings.tableClock || 0) * 1000;
+    if (!T || !lim) { if (T) T.clk = null; return; }
+    const key = T.handNo + '-' + T.events.length;
+    if (!T.clk || T.clk.key !== key) T.clk = { t0: Date.now(), lim, key };
+    heroTimer = setTimeout(() => {
+      if (VIEW !== 'table' || !T || T.over || T.turn !== 0) return;
+      const L = T.legal(0); heroAct(L.canCheck ? 'check' : 'fold', undefined, true);
+    }, Math.max(0, T.clk.t0 + lim - Date.now()));
+  }
+  function heroAct(a, amt, timedOut) {
     if (!T || T.over || T.turn !== 0) return;
+    clearTimeout(heroTimer); heroTimer = null; T.clk = null;
     if (!coachInfo) computeCoach();
     const L = T.legal(0);
     if (T.street !== 'preflop' && L.toCall > 0) { T.hs = T.hs || { faced: 0, folds: 0, calls: 0, smallBets: 0 }; T.hs.faced++; if (a === 'fold') T.hs.folds++; if (a === 'call') T.hs.calls++; }
     if (T.street !== 'preflop' && a === 'raise' && L.toCall === 0 && amt && amt <= T.pot() * 0.4) { T.hs = T.hs || { faced: 0, folds: 0, calls: 0, smallBets: 0 }; T.hs.smallBets++; }
-    const gr = grade(a);
+    let gr = grade(a);
+    if (gr && timedOut) gr = { g: 'bad', err: 'tempo', loss: gr.loss || 0, txt: `Tempo esgotado: a mesa ${a === 'check' ? 'passou' : 'desistiu'} por você. Na pressão, decida primeiro o plano da mão e só depois o tamanho. ${gr.txt.replace(/^(Boa|Aceitável|Erro)\.\s*/, '')}` };
     if (gr) {
+      const cid = tableCid(a, L), c = coachInfo;
       feed.unshift(Object.assign({ street: T.street }, gr)); S.sim[gr.g]++;
       const m = (S.simModes[TMODE] = S.simModes[TMODE] || { hands: 0, net: 0, good: 0, ok: 0, bad: 0, vpip: 0, pfr: 0 }); m[gr.g]++;
-      logDecision({ src: 'table', spot: { type: T.street === 'preflop' ? 'pre-table' : 'post-table', mode: TMODE, pos: coachInfo.pos }, choice: a, ok: gr.g !== 'bad', err: gr.err || null, evLoss: gr.loss || 0, evLossPct: coachInfo.pot ? Math.min(1, (gr.loss || 0) / coachInfo.pot) : 0, leverage: coachInfo.pot, domain: T.street === 'preflop' ? 'pre' : 'post' });
+      pressureLog(gr.g);
+      (T.rv = T.rv || []).push({ street: T.street, board: T.board.slice(), pot: c.pot, toCall: L.toCall, need: c.need, eq: c.eq, made: c.made || null, pos: c.pos, label: c.label, a, amt: amt || null, g: gr.g, txt: gr.txt, cid, rec: c.pre ? c.pre.rec : null, timed: !!timedOut });
+      logDecision({ src: 'table', cid, spot: { type: T.street === 'preflop' ? 'pre-table' : 'post-table', mode: TMODE, pos: c.pos }, choice: a, ok: gr.g !== 'bad', err: gr.err || null, evLoss: gr.loss || 0, evLossPct: c.pot ? Math.min(1, (gr.loss || 0) / c.pot) : 0, leverage: c.pot, domain: T.street === 'preflop' ? 'pre' : 'post' });
     }
     T.act(0, a, amt); coachInfo = null; tableStep();
   }
@@ -1240,7 +1340,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     clearTimeout(tableTimer);
     if (!T) return;
     if (T.over) { if (!T.counted) { T.counted = true; handDone(); } render(); const b = document.getElementById('dealBtn'); if (b) b.focus(); return; }
-    if (T.turn === 0) { computeCoach(); render(); return; }
+    if (T.turn === 0) { computeCoach(); startHeroClock(); render(); return; }
     render();
     tableTimer = setTimeout(() => { if (VIEW !== 'table' || !T || T.over) return; const d = T.botDecide(T.turn); T.act(T.turn, d.a, d.amt); tableStep(); }, T.p[0].folded ? 200 : 520);
   }
@@ -1252,21 +1352,70 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     daily().hands++; dayLog('hands'); S.xp += 2; touch();
     if (sm.hands >= 100) award('hands100'); if (sm.hands >= 1000) award('hands1000');
     try { T_.putMany([T_.fromTable(T, 'sim')]); } catch (e) { /* banco indisponível */ }
+    // HUD: o que o aluno observou de cada adversário (VPIP e PFR contados mão a mão).
+    T.p.forEach((p, i) => { if (!i || !p.obs) return; p.obs.h++; if (p.vpip) p.obs.v++; if (p.pfr) p.obs.pf++; });
+    if (isPop(TMODE) && T.handNo % 20 === 0) {
+      const cand = T.p.filter((p, i) => i && p.obs && p.obs.h >= 15);
+      if (cand.length) {
+        const p = pick(cand), others = shuffle(Object.keys(POPS[TMODE].reduce((o, x) => ((o[x[0]] = 1), o), {})).filter((k) => k !== p.profile)).slice(0, 3);
+        T.readQ = { i: T.p.indexOf(p), opts: shuffle([p.profile].concat(others)), ans: null };
+      }
+    }
+    // Replay: a mão inteira, com cada decisão sua e o comentário do mentor.
+    const rp = { id: Date.now(), mode: TMODE, handNo: T.handNo, date: todayStr(), net: h.net, hero: h.cards.slice(), board: T.board.slice(), events: T.events.slice(), dec: T.rv || [], bad: (T.rv || []).filter((d) => d.g === 'bad').length };
+    S.replays = [rp].concat(S.replays || []).slice(0, 40); T.replayId = rp.id;
+    // Pressão: depois de uma perda grande, uma pausa curta para respirar antes da próxima mão.
+    if (h.net <= -25) { T.lossAt = T.handNo; if (S.settings.breath !== false) T.pauseUntil = Date.now() + 8000; }
     checkMissions(); save();
   }
   function newHand() {
-    if (!T) { T = new P.Table(S.profile ? S.profile.name.slice(0, 12) : 'Você', MODES[TMODE][2].map(([n, p]) => [n, p])); MODES[TMODE][2].forEach((b, i) => { if (b[2]) T.p[i + 1].adv = b[2]; }); }
-    feed = []; T.newHand(); T.counted = false; adaptBots(); tableStep();
+    if (!T) {
+      if (isPop(TMODE)) { const me = S.profile ? S.profile.name.slice(0, 12) : 'Você', used = [me]; T = new P.Table(me, Array.from({ length: 5 }, () => { const n = popName(used); used.push(n); return [n, popProfile(TMODE)]; })); T.p.forEach((p, i) => { if (i) p.obs = { h: 0, v: 0, pf: 0 }; }); }
+      else { T = new P.Table(S.profile ? S.profile.name.slice(0, 12) : 'Você', MODES[TMODE][2].map(([n, p]) => [n, p])); MODES[TMODE][2].forEach((b, i) => { if (b[2]) T.p[i + 1].adv = b[2]; }); }
+    } else { T.seatMsg = null; rotateSeats(); }
+    feed = []; T.rv = []; T.readQ = null; T.newHand(); if (T.seatMsg) T.log(T.seatMsg); T.counted = false; adaptBots(); tableStep();
   }
-  function tableAfterRender() { const lg = document.getElementById('handlog'); if (lg) lg.scrollTop = lg.scrollHeight; }
+  function tableAfterRender() {
+    const lg = document.getElementById('handlog'); if (lg) lg.scrollTop = lg.scrollHeight;
+    clearInterval(breathTimer);
+    if (T && T.over && T.pauseUntil > Date.now()) {
+      const tick = () => {
+        const b = document.getElementById('dealBtn'); if (!b) { clearInterval(breathTimer); return; }
+        const left = Math.ceil((T.pauseUntil - Date.now()) / 1000);
+        if (left <= 0) { clearInterval(breathTimer); b.disabled = false; b.textContent = 'Próxima mão'; b.focus(); } else b.textContent = `Respire… ${left}s`;
+      };
+      tick(); breathTimer = setInterval(tick, 250);
+    }
+  }
   const SEATXY = { 6: [[50, 88], [9, 64], [13, 17], [50, 7], [87, 17], [91, 64]], 2: [[50, 88], [50, 9]] };
+  const CLOCKS = [[0, 'Sem relógio'], [20, '20 s'], [12, '12 s'], [7, '7 s']];
+  function pressurePanel() {
+    const pr = S.pressure || {}, q = (k) => (pr[k] && pr[k].n >= 10 ? pr[k].q / pr[k].n : null);
+    const rows = [['calm', 'Em condições normais'], ['loss', 'Nas 10 mãos depois de uma perda grande (25bb ou mais)'], ['late', 'Depois da mão 150 da sessão'], ['free', 'Sem relógio'], ['clock', 'Com relógio']];
+    const base = q('calm'), drop = ['loss', 'late', 'clock'].map((k) => [k, q(k)]).filter(([, v]) => v != null && base != null && base - v >= 0.08);
+    return `<div class="panel stack"><div class="eyebrow">Modo pressão</div>
+      <p class="small muted" style="margin:0">Treine a decisão com o relógio correndo: quando o tempo acaba, a mesa passa ou desiste por você, e isso conta como erro. As cartas são sempre sorteadas de forma justa; a pressão vem só do relógio, do cansaço e das perdas, como numa mesa real.</p>
+      <div class="row"><span class="small">Relógio por decisão:</span>${CLOCKS.map(([v, t]) => `<button class="btn small ${S.settings.tableClock === v ? 'primary' : ''}" data-act="tclock" data-s="${v}">${t}</button>`).join('')}</div>
+      <div class="row"><span class="small">Pausa de 8 s para respirar depois de uma perda grande:</span><button class="btn small ${S.settings.breath !== false ? 'primary' : ''}" data-act="breath">${S.settings.breath !== false ? 'Ligada' : 'Desligada'}</button></div>
+      <div class="scroll-x"><table class="t"><tr><th>Situação</th><th>Decisões</th><th>Qualidade</th></tr>${rows.map(([k, t]) => `<tr><td>${t}</td><td class="num">${pr[k] ? pr[k].n : 0}</td><td class="num">${q(k) == null ? '<span class="muted">mín. 10</span>' : pct(q(k))}</td></tr>`).join('')}</table></div>
+      <p class="small ${drop.length ? '' : 'muted'}" style="margin:0">${base == null ? 'Jogue ao menos 10 decisões para ver a comparação.' : drop.length ? `<b>Atenção:</b> a sua qualidade cai ${drop.map(([k, v]) => ({ loss: 'depois de perdas grandes', late: 'em sessões longas', clock: 'com relógio' })[k] + ` (${pct(v)} contra ${pct(base)})`).join('; ')}. ${drop.some(([k]) => k === 'loss') ? 'Use a pausa e revise o protocolo de tilt da lição de mental.' : drop.some(([k]) => k === 'late') ? 'Considere sessões mais curtas.' : 'Treine os treinos rápidos com relógio para automatizar as contas.'}` : 'A sua qualidade se mantém sob pressão. Continue medindo.'}</p></div>`;
+  }
+  function readQHTML() {
+    const r = T.readQ; if (!r) return '';
+    const p = T.p[r.i], o = p.obs, prof = P.PROFILES[p.profile];
+    if (r.ans == null) return `<div class="spot stack"><div class="eyebrow">Leitura de mesa</div><div class="small">Em <b>${o.h}</b> mãos, <b>${esc(p.name)}</b> entrou no pote em <b>${Math.round((o.v / o.h) * 100)}%</b> (VPIP) e aumentou antes do flop em <b>${Math.round((o.pf / o.h) * 100)}%</b> (PFR). Qual perfil descreve melhor esse jogador?</div><div class="opts">${r.opts.map((k) => `<button class="opt" data-act="readq" data-k="${k}">${esc(P.PROFILES[k].label)}</button>`).join('')}</div></div>`;
+    const ok = r.ans === p.profile;
+    return `<div class="feedback ${ok ? 'ok' : 'no'} small"><b>${ok ? 'Leitura correta.' : `Era ${esc(prof.label)}.`}</b> ${esc(prof.desc)} Com ${o.h} mãos a amostra ainda é pequena: VPIP e PFR se estabilizam por volta de 50 a 100 mãos, e o resto das estatísticas demora bem mais.</div>`;
+  }
   VIEWS.table = () => {
     const sm = S.sim, dec = sm.good + sm.ok + sm.bad;
     const stats = `<div class="grid3"><div class="stat"><span class="eyebrow">Mãos</span><span class="v num">${num(sm.hands, 0)}</span></div><div class="stat"><span class="eyebrow">Resultado</span><span class="v num">${sm.hands ? num((sm.net / sm.hands) * 100, 1) : 0}<span class="small muted"> bb/100</span></span><span class="small muted num">${num(sm.net, 1)} bb no total</span></div><div class="stat"><span class="eyebrow">Qualidade das decisões</span><span class="v num">${dec ? pct((sm.good + 0.5 * sm.ok) / dec) : '—'}</span><span class="small muted num">VPIP ${sm.hands ? pct(sm.vpip / sm.hands) : '—'} · PFR ${sm.hands ? pct(sm.pfr / sm.hands) : '—'}</span></div></div>`;
     if (!T || (!T.events && T.over)) {
       return `<div class="wrap"><div><div class="eyebrow">Mesa de treino</div><h1>Jogue com o mentor ao lado</h1><p class="muted">Fichas de treino, 100bb. O mentor mostra pot odds e equity estimada e comenta cada decisão; tudo vai para o seu banco de mãos e para o mapa de leaks. O que conta é a qualidade das decisões, não o resultado.</p></div>
       ${stats}
-      <div class="grid3">${Object.entries(MODES).map(([k, [n, d, bots]]) => { const m = simMode(k); return `<div class="panel stack"><div class="eyebrow">${bots.length + 1} jogadores</div><h3>${n}</h3><p class="small muted" style="margin:0">${d}</p><span class="small num">${m.hands} mãos · ${m.hands ? num((m.net / m.hands) * 100, 1) : 0} bb/100</span><button class="btn ${k === 'normal' ? 'primary' : ''}" data-act="deal" data-mode="${k}">Sentar</button></div>`; }).join('')}</div>
+      <div class="grid3">${Object.entries(MODES).map(([k, [n, d]]) => { const m = simMode(k); return `<div class="panel stack"><div class="eyebrow">${botsOf(k).length + 1} jogadores</div><h3>${n}</h3><p class="small muted" style="margin:0">${d}</p><span class="small num">${m.hands} mãos · ${m.hands ? num((m.net / m.hands) * 100, 1) : 0} bb/100</span><button class="btn ${k === 'normal' ? 'primary' : ''}" data-act="deal" data-mode="${k}">Sentar</button></div>`; }).join('')}</div>
+      ${pressurePanel()}
+      <div class="panel row" style="justify-content:space-between"><span><b>Replay comentado</b><br><span class="small muted">${(S.replays || []).length ? `As suas últimas ${(S.replays || []).length} mãos, decisão por decisão, com o conceito de cada uma.` : 'As mãos que você jogar aparecem aqui para revisão.'}</span></span><button class="btn" data-act="replays" ${(S.replays || []).length ? '' : 'disabled'}>Rever mãos</button></div>
       ${!moduleOpen(1) ? '<p class="small muted">Dica: conclua o primeiro módulo antes. A mesa fica mais útil quando você já conhece as posições.</p>' : ''}</div>`;
     }
     const hero = T.p[0], L = !T.over && T.turn === 0 ? T.legal(0) : null;
@@ -1278,12 +1427,12 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       const lab = p.adv ? MODES.adversarial[2].find((b) => b[2] === p.adv)[0] : p.profile ? P.PROFILES[p.profile].label : '';
       return `<div class="seat ${T.turn === i ? 'turn' : ''} ${p.folded ? 'folded' : ''} ${win ? 'win' : ''}" style="left:${x}%;top:${y}%">
         ${i === 0 ? '' : `<div class="cards">${p.folded ? '' : show ? cardsHTML(p.cards, true) : backHTML(true) + backHTML(true)}</div>`}
-        <div class="plate"><span class="pos">${T.pos(i)}${i === T.button ? ' · D' : ''}</span><b>${esc(p.name)}${!p.hero && !p.adv ? ` <span class="muted small">${esc(lab)}</span>` : ''}</b><span class="mono">${num(p.stack, 1)} bb</span></div>
+        <div class="plate"><span class="pos">${T.pos(i)}${i === T.button ? ' · D' : ''}</span><b>${esc(p.name)}${!p.hero && !p.adv && !isPop(TMODE) ? ` <span class="muted small">${esc(lab)}</span>` : ''}</b>${p.obs && p.obs.h ? `<span class="small muted num" title="VPIP / PFR em ${p.obs.h} mãos">${Math.round((p.obs.v / p.obs.h) * 100)}/${Math.round((p.obs.pf / p.obs.h) * 100)} · ${p.obs.h}m</span>` : ''}<span class="mono">${num(p.stack, 1)} bb</span></div>
         ${p.bet > 0 ? `<span class="betchip">${num(p.bet, 1)}</span>` : T.over && p.net ? `<span class="small num" style="color:${p.net > 0 ? 'var(--good)' : 'var(--red)'}">${p.net > 0 ? '+' : ''}${num(p.net, 1)}</span>` : ''}
         ${i === 0 ? `<div class="cards">${cardsHTML(p.cards)}</div>` : ''}</div>`;
     }).join('');
     let actions = '';
-    if (T.over) actions = `<button class="btn primary" data-act="deal" id="dealBtn">Próxima mão</button><button class="btn ghost" data-act="leave">Levantar da mesa</button>`;
+    if (T.over) { const wait = T.pauseUntil > Date.now(); actions = `<button class="btn primary" data-act="deal" id="dealBtn" ${wait ? 'disabled' : ''}>${wait ? `Respire… ${Math.ceil((T.pauseUntil - Date.now()) / 1000)}s` : 'Próxima mão'}</button>${T.replayId ? `<button class="btn" data-act="replay" data-id="${T.replayId}">Rever esta mão</button>` : ''}<button class="btn ghost" data-act="leave">Levantar da mesa</button>`; }
     else if (L) {
       const pot = T.pot(), sizes = [];
       if (T.street === 'preflop') {
@@ -1299,14 +1448,57 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
         <div class="row"><span class="pill gold">${c.pos}</span><span class="pill">${c.label}</span>${c.made ? `<span class="pill">${c.made}</span>` : ''}</div>
         ${c.pre && T.raises === 0 && c.pos !== 'BB' && T.n > 2 ? '<div>Ninguém aumentou antes de você. Regra da tabela: ou você aumenta, ou desiste. Nada de limp.</div>' : c.toCall > 0 ? `<div>Para pagar <b class="num">${num(c.toCall, 1)}bb</b> num pote de <b class="num">${num(c.pot, 1)}bb</b>: você precisa de <b class="num">${pct(c.need, 1)}</b> de equity.</div>` : '<div>Ninguém apostou: você pode passar de graça.</div>'}
         ${c.eq !== undefined ? `<div>Equity estimada contra os ranges prováveis: <b class="num">${pct(c.eq)}</b>.</div>` : '<div>Pré-flop: pense na tabela da sua posição. O mentor comenta depois da sua escolha.</div>'}</div>`
-      : T.over ? `<div class="small">${T.results && T.results.showdown ? 'Showdown.' : 'Mão encerrada sem showdown.'} Seu resultado: <b class="num">${hero.net > 0 ? '+' : ''}${num(hero.net, 1)}bb</b>.</div>` : '<div class="small muted">Aguardando a sua vez.</div>';
+      : T.over ? `<div class="small">${T.results && T.results.showdown ? 'Showdown.' : 'Mão encerrada sem showdown.'} Seu resultado: <b class="num">${hero.net > 0 ? '+' : ''}${num(hero.net, 1)}bb</b>.</div>${T.lossAt === T.handNo ? `<div class="hint small"><b>Perda grande.</b> O próximo baralho não sabe que você perdeu: as cartas são sorteadas de forma justa, sem compensação. Solte os ombros, respire fundo duas vezes e pergunte: a decisão foi boa com o que eu sabia? ${T.rv && T.rv.some((d) => d.g === 'bad') ? 'O replay mostra onde houve erro.' : 'O mentor não marcou erro seu nesta mão: pode ter sido só variância.'}</div>` : ''}${readQHTML()}` : '<div class="small muted">Aguardando a sua vez.</div>';
     return `<div class="wrap">
       <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${esc(MODES[TMODE][0])} · mão #${T.handNo}</div><h2>${T.street === 'preflop' ? 'Pré-flop' : T.street[0].toUpperCase() + T.street.slice(1)}</h2></div><span class="pill num">${simMode(TMODE).hands} mãos neste modo</span></div>
       <div class="table-wrap ${T.n === 2 ? 'hu' : ''}"><div class="oval"></div><div class="center"><div class="board">${T.board.length ? cardsHTML(T.board) : ''}</div><span class="pot">Pote ${num(T.pot(), 1)} bb</span></div>${seats}</div>
+      ${L && T.clk ? `<div class="bar clock" title="Relógio de decisão"><i style="width:100%;animation:clk ${T.clk.lim}ms linear ${-(Date.now() - T.clk.t0)}ms forwards"></i></div>` : ''}
       <div class="actions">${actions}</div>
       <div class="grid2"><div class="panel stack"><div class="eyebrow">Painel do mentor</div>${panel}<div class="coach-feed">${feed.map((f) => `<div class="coach-item ${f.g}"><span class="lbl">${f.street}</span> ${f.txt}</div>`).join('') || '<span class="small muted">Os comentários sobre as suas decisões aparecem aqui.</span>'}</div></div>
       <div class="panel stack"><div class="eyebrow">Histórico da mão</div><div class="log" id="handlog">${T.events.map((e) => colorize(esc(e.replace(/\b([2-9TJQKA])([shdc])\b/g, (m, r, s) => r + '♠♥♦♣'['shdc'.indexOf(s)])))).join('<br>')}</div></div></div>
       ${stats}</div>`;
+  };
+
+  // ---------- replay comentado ----------
+  const ACT_TXT = { raise: 'aumentou', call: 'pagou', fold: 'desistiu', check: 'passou' };
+  const STREET_TXT = { preflop: 'Pré-flop', flop: 'Flop', turn: 'Turn', river: 'River' };
+  const G_TXT = { good: ['good', 'Boa'], ok: ['', 'Aceitável'], bad: ['bad', 'Erro'] };
+  // A pergunta que o aluno deveria se fazer antes de cada tipo de decisão.
+  const THINK = {
+    abertura: 'Ninguém entrou antes: a minha mão está na tabela de abertura desta posição?',
+    estilo: 'No big blind sem aumento: passar é grátis. A minha mão é forte o bastante para aumentar?',
+    bbdefesa: 'Já tenho 1bb no pote: quanto custa pagar e a mão tem jogabilidade depois do flop?',
+    vs3bet: 'Alguém aumentou: de que posição ele abriu, estou em posição e a mão é 3-bet, pagamento ou desistência?',
+    preflop2: 'Houve 3-bet: o range dele é forte. A minha mão continua contra esse range?',
+    hu: 'No heads-up os ranges são muito mais largos: que mãos o adversário tem aqui?',
+    potodds: 'Quanto preciso pagar, qual o pote final e a minha equity cobre esse preço?',
+    semiblefe: 'Aumentar sem a melhor mão: ele desiste com frequência, e se pagar ainda tenho outs?',
+    posflop: 'O que eu tenho contra o range dele? Aposto por valor, como blefe ou passo para controlar o pote?',
+  };
+  function replayDecHTML(d, i) {
+    const c = Pr.byId[d.cid], [cls, lbl] = G_TXT[d.g] || G_TXT.ok;
+    return `<div class="panel stack"><div class="row" style="justify-content:space-between"><div class="eyebrow">Decisão ${i + 1} · ${STREET_TXT[d.street] || d.street}</div><span class="pill ${cls}">${lbl}${d.timed ? ' · tempo' : ''}</span></div>
+      ${d.board.length ? `<div class="row">${cardsHTML(d.board, true)}</div>` : ''}
+      <div class="row small"><span class="pill gold">${esc(d.pos)}</span><span class="pill">${esc(d.label)}</span>${d.made ? `<span class="pill">${esc(d.made)}</span>` : ''}<span class="pill num">Pote ${num(d.pot, 1)}bb</span>${d.toCall && d.street !== 'preflop' ? `<span class="pill num">Pagar ${num(d.toCall, 1)} · precisa ${pct(d.need)}</span>` : ''}${d.eq != null ? `<span class="pill num">Equity ${pct(d.eq)}</span>` : ''}</div>
+      ${THINK[d.cid] ? `<div class="small"><b>Pergunta-chave:</b> ${THINK[d.cid]}</div>` : ''}
+      <div class="small">Você <b>${ACT_TXT[d.a] || d.a}${d.amt ? ' ' + num(d.amt, 1) + 'bb' : ''}</b>. ${esc(d.txt)}</div>
+      ${c ? `<div class="row"><span class="small muted">Conceito: <b>${esc(c.name)}</b></span><button class="btn small" data-act="lesson" data-id="${c.lessons[0]}">Lição</button><button class="btn small" data-act="applyc" data-c="${c.id}">Aplicar</button>${c.gens.length ? `<button class="btn small" data-act="practice" data-c="${c.id}">Praticar</button>` : ''}</div>` : ''}</div>`;
+  }
+  VIEWS.replays = () => {
+    const all = S.replays || [], bad = !!PARAMS.bad, list = bad ? all.filter((r) => r.bad) : all;
+    return `<div class="wrap narrow"><div><div class="eyebrow">Mesa de treino</div><h1>Replay comentado</h1><p class="muted">Rever mãos é onde se aprende mais. Olhe o processo, não o resultado: uma mão perdida com boas decisões está certa; uma mão ganha com erro continua sendo erro.</p></div>
+      <div class="row"><button class="btn small ${bad ? '' : 'primary'}" data-act="replays">Todas (${all.length})</button><button class="btn small ${bad ? 'primary' : ''}" data-act="replays" data-bad="1">Só com erro (${all.filter((r) => r.bad).length})</button><button class="btn ghost small" data-act="nav" data-v="table">Voltar à mesa</button></div>
+      ${list.length ? `<div class="scroll-x"><table class="t"><tr><th>Mão</th><th>Cartas</th><th>Resultado</th><th>Decisões</th><th></th></tr>${list.map((r) => `<tr><td>${esc(MODES[r.mode] ? MODES[r.mode][0] : r.mode)} #${r.handNo}<div class="small muted">${r.date.split('-').reverse().join('/')}</div></td><td>${cardsHTML(r.hero, true)}</td><td class="num" style="color:${r.net > 0 ? 'var(--good)' : r.net < 0 ? 'var(--red)' : 'inherit'}">${r.net > 0 ? '+' : ''}${num(r.net, 1)}bb</td><td class="num">${r.dec.length}${r.bad ? ` <span class="pill bad">${r.bad} erro${r.bad > 1 ? 's' : ''}</span>` : ''}</td><td><button class="btn small" data-act="replay" data-id="${r.id}">Rever</button></td></tr>`).join('')}</table></div>` : '<p class="muted">Nenhuma mão nesta lista.</p>'}</div>`;
+  };
+  VIEWS.replay = () => {
+    const r = (S.replays || []).find((x) => String(x.id) === String(PARAMS.id));
+    if (!r) return '<div class="wrap narrow"><p class="muted">Mão não encontrada.</p><button class="btn" data-act="replays">Voltar</button></div>';
+    const cids = [...new Set(r.dec.filter((d) => d.g === 'bad').map((d) => d.cid))].filter((c) => Pr.byId[c]);
+    return `<div class="wrap narrow"><div class="runner-top"><div><div class="eyebrow">${esc(MODES[r.mode] ? MODES[r.mode][0] : r.mode)} · mão #${r.handNo}</div><h1>Replay da mão</h1></div><button class="btn ghost" data-act="replays">Todas as mãos</button></div>
+      <div class="panel row" style="justify-content:space-between"><div class="row">${cardsHTML(r.hero)}${r.board.length ? `<span class="small muted">mesa</span>${cardsHTML(r.board, true)}` : ''}</div><b class="num" style="font-size:1.4rem;color:${r.net > 0 ? 'var(--good)' : r.net < 0 ? 'var(--red)' : 'inherit'}">${r.net > 0 ? '+' : ''}${num(r.net, 1)}bb</b></div>
+      ${r.dec.length ? `<p class="small muted">Antes de ler o comentário de cada decisão, cubra-o e responda à pergunta-chave. Depois compare.</p>${r.dec.map(replayDecHTML).join('')}` : '<p class="muted">Você não tomou decisões nesta mão (desistiu antes ou a mão acabou antes da sua vez).</p>'}
+      ${cids.length ? `<div class="panel stack"><div class="eyebrow">O que treinar a partir desta mão</div><div class="row">${cids.map((c) => `<button class="btn small primary" data-act="applyc" data-c="${c}">Aplicar: ${esc(Pr.byId[c].name)}</button>`).join('')}</div></div>` : ''}
+      <details class="panel"><summary><b>Histórico completo da mão</b></summary><div class="log">${r.events.map((e) => colorize(esc(e.replace(/\b([2-9TJQKA])([shdc])\b/g, (m, a, b) => a + '♠♥♦♣'['shdc'.indexOf(b)])))).join('<br>')}</div></details></div>`;
   };
 
   // ---------- revisão ----------
@@ -1535,6 +1727,8 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     diag: () => startDiag(),
     'place-zero': () => { S.placement = 0; save(); go('lesson', { id: MODS[0].lessons[0].id }); },
     adaptive: () => startPractice(adaptivePick(10), { title: 'Prática adaptativa' }),
+    applyadapt: () => startApply(applyPick(10), { title: 'Treino de aplicação' }),
+    applyc: (d) => { if (!d.c) return ACTS.applyadapt(); startApply(Array(10).fill(d.c), { title: 'Aplicação · ' + Pr.byId[d.c].name, single: d.c }); },
     practice: (d) => { if (!d.c) return ACTS.adaptive(); startPractice(Array(10).fill(d.c), { title: 'Prática · ' + Pr.byId[d.c].name, single: d.c }); },
     'hint-more': () => { if (R && R.retry) { R.retry.h++; render(); } },
     reveal: () => { if (R && R.retry) { R.retry.revealed = true; R.picked = R.retry.first; R.answered = true; render(); focusNext(); } },
@@ -1545,11 +1739,20 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     mixed: () => { const ids = Object.keys(DRILLS).filter((id) => lessonOpenById(DRILLS[id].lesson)); const seq = Array.from({ length: 10 }, () => pick(ids)); startRunner('drill', seq.map((id) => () => DRILLS[id].gen()), { drill: seq[0], title: 'Treino misto', mixed: seq }); },
     answer: (d) => answer(+d.o),
     next: () => nextQ(),
-    quit: () => { const k = R && R.kind; clearInterval(runTimer); R = null; go(k === 'drill' ? 'drills' : k === 'practice' ? 'mastery' : k === 'lesson' || k === 'exam' || k === 'final' ? 'trail' : 'home'); },
+    quit: () => { const k = R && R.kind; clearInterval(runTimer); R = null; go(k === 'drill' ? 'drills' : k === 'practice' || k === 'apply' ? 'mastery' : k === 'lesson' || k === 'exam' || k === 'final' ? 'trail' : 'home'); },
     'ob-skip': () => { if (saveProfile()) go('home'); },
     deal: (d) => { if (d.mode && (!T || d.mode !== TMODE)) { TMODE = d.mode; T = null; } if (VIEW !== 'table') go('table'); newHand(); },
     adversarial: () => { TMODE = 'adversarial'; T = null; go('table'); newHand(); },
-    leave: () => { T = null; feed = []; go('table'); },
+    leave: () => { clearTimeout(heroTimer); clearInterval(breathTimer); T = null; feed = []; go('table'); },
+    tclock: (d) => { S.settings.tableClock = +d.s; save(); render(); },
+    breath: () => { S.settings.breath = S.settings.breath === false; save(); render(); },
+    readq: (d) => {
+      if (!T || !T.readQ || T.readQ.ans != null) return;
+      const p = T.p[T.readQ.i]; T.readQ.ans = d.k; const ok = d.k === p.profile;
+      logDecision({ src: 'profile-read', cid: 'perfis', spot: { type: 'profile-read', mode: TMODE }, choice: d.k, best: p.profile, ok, err: ok ? null : 'leitura', domain: 'read' }); save(); render();
+    },
+    replays: (d) => go('replays', d.bad ? { bad: 1 } : {}),
+    replay: (d) => go('replay', { id: d.id }),
     hero: (d) => heroAct(d.a, d.amt ? +d.amt : undefined),
     'rv-start': () => { RV = { queue: shuffle(dueCards()), show: false }; render(); },
     'rv-free': () => { RV = { queue: shuffle(Object.keys(S.cards)).slice(0, 10), show: false, free: true }; render(); },

@@ -189,6 +189,8 @@
     lag: { label: 'LAG', desc: 'Joga muitas mãos com muita agressão.', open: 5, limp: 99, threebet: 9, call: 6, bluff3: 0.1, value: 0.55, bluff: 0.25, raiseEq: 0.7, aggr: 0.6, margin: 0, range: 0.34 },
     fish: { label: 'Recreativo', desc: 'Paga demais e quase nunca desiste. Aposte por valor contra ele.', open: 11, limp: 4, threebet: 13, call: 5, bluff3: 0, value: 0.7, bluff: 0.05, raiseEq: 0.9, aggr: 0.3, margin: -0.12, range: 0.55 },
     leaky: { label: 'Aluno com vazamentos', desc: 'Perfil usado para gerar a base de exemplo: paga demais, aumenta pouco e quase não blefa.', open: 10, limp: 5, threebet: 14, call: 6, bluff3: 0, value: 0.72, bluff: 0.02, raiseEq: 0.9, aggr: 0.2, margin: -0.1, range: 0.35 },
+    station: { label: 'Pagador', desc: 'Entra em muitos potes pagando e vai até o fim com qualquer par. Quase nunca blefa.', open: 12, limp: 3, threebet: 15, call: 3, bluff3: 0, value: 0.78, bluff: 0.03, raiseEq: 0.92, aggr: 0.15, margin: -0.18, range: 0.6 },
+    weakreg: { label: 'Regular medroso', desc: 'Joga uma tabela razoável antes do flop, mas desiste demais depois dele.', open: 7, limp: 99, threebet: 11, call: 8, bluff3: 0.03, value: 0.64, bluff: 0.08, raiseEq: 0.82, aggr: 0.45, margin: 0.1, range: 0.22 },
     maniac: { label: 'Maníaco', desc: 'Aumenta tudo. Deixe ele blefar e pague com mãos boas.', open: 4, limp: 99, threebet: 7, call: 5, bluff3: 0.2, value: 0.45, bluff: 0.4, raiseEq: 0.6, aggr: 0.7, margin: -0.02, range: 0.6 },
   };
   const r1 = (x) => Math.round(x * 10) / 10;
