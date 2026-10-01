@@ -308,6 +308,17 @@ svg text { font-family: var(--font-mono); }
 .bar.clock i { background: var(--red); }
 @keyframes clk { from { width: 100%; } to { width: 0; } }
 #secs:empty { display: none; }
+.modesw { margin-left: auto; }
+.modebtn { display: inline-flex; align-items: center; gap: 8px; background: var(--felt-3); border: 1px solid var(--line); border-radius: 99px; padding: 5px 6px 5px 12px; color: var(--ivory); font: 700 0.8rem/1 var(--font-body, inherit); cursor: pointer; }
+.modebtn:hover { border-color: var(--brass); }
+.modebtn:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.modebtn .switch { display: inline-block; pointer-events: none; }
+.modebtn .lbl { display: inline; }
+ol.roteiro { margin: 6px 0 10px; padding-left: 22px; display: grid; gap: 4px; }
+ol.roteiro li.done { color: var(--muted); }
+ol.roteiro li.cur { font-weight: 700; color: var(--brass); }
+ol.roteiro .ok-mark { color: var(--good); font-size: .85em; }
+ul.brief-list { margin: 4px 0 10px; padding-left: 20px; display: grid; gap: 4px; }
 .switch { width: 44px; height: 24px; border-radius: 99px; border: 1px solid var(--line); background: var(--felt); position: relative; cursor: pointer; flex: none; padding: 0; }
 .switch i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted, #8a9a8f); transition: left .15s, background .15s; }
 .switch.on { background: var(--brass); border-color: var(--brass); }
@@ -367,6 +378,7 @@ table.dash td { vertical-align: middle; }
     <div class="brand">
       <div class="brand-mark" aria-hidden="true">A<small>♠</small></div>
       <div><b>Escola do Ás</b><span>do zero ao profissional</span></div>
+      <div class="modesw" id="modesw"></div>
     </div>
     <div class="secs" id="secs" role="group" aria-label="Menus"></div>
     <nav class="tabs" id="tabs" aria-label="Seções"></nav>
