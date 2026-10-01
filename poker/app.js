@@ -198,6 +198,35 @@
   const eqCache = {};
   const rangeOf = (profile) => (eqCache[profile] = eqCache[profile] || P.topRange((P.PROFILES[profile] || P.PROFILES.tag).range));
 
+  // As 5 cartas que formam o melhor jogo entre 7 (para mostrar ao aluno), em ordem de leitura: grupos primeiro, depois as mais altas.
+  function best5(cards) {
+    let best = null, bs = -1;
+    for (let i = 0; i < cards.length; i++) for (let j = i + 1; j < cards.length; j++) {
+      const five = cards.filter((_, k) => k !== i && k !== j), sc = P.evaluate(five);
+      if (sc > bs) { bs = sc; best = five; }
+    }
+    const cnt = {}; best.forEach((c) => (cnt[c >> 2] = (cnt[c >> 2] || 0) + 1));
+    return best.slice().sort((a, b) => cnt[b >> 2] - cnt[a >> 2] || (b >> 2) - (a >> 2));
+  }
+  // Armadilhas comuns de quem está aprendendo: quatro cartas em sequência ou do mesmo naipe ainda não formam jogo.
+  function nearMiss(cards, score) {
+    const cat = P.category(score), out = [], R = 'A23456789TJQKA', names = { T: '10' };
+    if (cat < 4) {
+      const set = new Set(cards.map((c) => c >> 2)), has = (r) => set.has(r === -1 ? 12 : r), txt = (r) => (r === -1 || r === 12 ? 'Ás' : rankTxt(r));
+      let shown = null; const miss = new Set();
+      for (let lo = 8; lo >= -1; lo--) {
+        const run = [0, 1, 2, 3, 4].map((k) => lo + k), m = run.filter((r) => !has(r));
+        if (m.length !== 1) continue;
+        const four = run.filter((r) => has(r)).map((r) => (r === -1 ? 12 : r)).sort((x, y) => x - y).join();
+        if (!shown) shown = run.filter((r) => has(r)), shown.key = four;
+        if (shown.key === four) miss.add(txt(m[0]));
+      }
+      if (shown) { const list = shown.map(txt), mm = [...miss]; out.push(`${list.slice(0, -1).join(', ')} e ${list[list.length - 1]} são só quatro cartas: faltaria ${mm.map((x) => (x === 'Ás' ? 'um Ás' : 'um ' + x)).join(' ou ')} para completar uma sequência de cinco.`); }
+    }
+    if (cat < 5) { const by = [0, 0, 0, 0]; cards.forEach((c) => by[c & 3]++); const k = by.findIndex((n) => n === 4); if (k >= 0) out.push(`Há quatro cartas de ${['espadas', 'copas', 'ouros', 'paus'][k]}, mas o flush precisa de cinco.`); }
+    return out;
+  }
+  const handLine = (who, cards, sc) => { const nm = nearMiss(cards, sc); return `<div class="small" style="margin:6px 0"><b>${who}:</b> ${describe(sc)}<div class="board" style="margin:4px 0">${cardsHTML(best5(cards), true)}</div>${nm.length ? `<div class="muted">Atenção: ${nm.join(' ')}</div>` : ''}</div>`; };
   const DRILLS = {
     ranking: { name: 'Quem vence?', domain: 'fund', lesson: 'z3_5', desc: 'Compare duas mãos no showdown.', err: 'calc',
       gen() {
@@ -205,7 +234,7 @@
         const sa = P.evaluate(a.concat(board)), sb = P.evaluate(b.concat(board));
         return { keep: true, html: `<p class="lead">Quem vence no showdown?</p><div class="lbl">Mesa</div><div class="board">${cardsHTML(board)}</div><div class="duel"><div><span class="lbl">Jogador A</span><div>${cardsHTML(a)}</div></div><div><span class="lbl">Jogador B</span><div>${cardsHTML(b)}</div></div></div>`,
           options: ['Jogador A', 'Jogador B', 'Empate'], a: sa > sb ? 0 : sb > sa ? 1 : 2,
-          exp: `A tem ${describe(sa)}. B tem ${describe(sb)}.${P.category(sa) === P.category(sb) ? ' Mesma categoria: o desempate é pelas cartas mais altas e pelo kicker.' : ''}` };
+          exp: `<p style="margin:0 0 4px">Cada jogador usa as <b>5 melhores cartas</b> entre as suas 2 e as 5 da mesa.</p>${handLine('Jogador A', a.concat(board), sa)}${handLine('Jogador B', b.concat(board), sb)}<p style="margin:4px 0 0">${sa === sb ? 'As cinco cartas têm o mesmo valor: empate, e o pote é dividido.' : P.category(sa) === P.category(sb) ? `Mesma categoria: compare carta por carta, da mais alta para a mais baixa, até achar a diferença. Vence o ${sa > sb ? 'A' : 'B'}.` : `${P.CAT_NAMES[Math.max(P.category(sa), P.category(sb))]} vale mais que ${P.CAT_NAMES[Math.min(P.category(sa), P.category(sb))].toLowerCase()}: vence o ${sa > sb ? 'A' : 'B'}.`}</p>` };
       } },
     besthand: { name: 'Qual é a sua mão?', domain: 'fund', lesson: 'z3_5', desc: 'Encontre a melhor combinação de 5 cartas.', err: 'calc',
       gen() {
@@ -214,7 +243,7 @@
         const others = shuffle([0, 1, 2, 3, 4, 5, 6, 7, 8].filter((c) => c !== cat && Math.abs(c - cat) <= 3)).slice(0, 3);
         const opts = [cat].concat(others).sort((x, y) => y - x);
         return { keep: true, html: `<p class="lead">Qual a sua melhor mão?</p><div class="lbl">Sua mão</div><div class="board">${cardsHTML(hero)}</div><div class="lbl">Mesa</div><div class="board">${cardsHTML(board)}</div>`,
-          options: opts.map((c) => P.CAT_NAMES[c]), a: opts.indexOf(cat), exp: `Você tem ${describe(sc)}.` };
+          options: opts.map((c) => P.CAT_NAMES[c]), a: opts.indexOf(cat), exp: `${handLine('Seu melhor jogo', hero.concat(board), sc)}` };
       } },
     rfi: { name: 'Abrir ou desistir', domain: 'pre', lesson: 'l2_3', desc: 'A tabela de abertura por posição.',
       gen() {
