@@ -437,7 +437,7 @@
   function practiceItem(cid) {
     const c = Pr.byId[cid], pool = quizPoolOf(c);
     let it;
-    if (c.gens.length && (!pool.length || Math.random() < 0.75)) { const g = pick(c.gens); it = g.startsWith('drill:') ? DRILLS[g.slice(6)].gen() : Pr.GEN[g](GH); }
+    if (c.gens.length && (!pool.length || Math.random() < 0.75)) { const g = pick(c.gens); it = Object.assign({}, g.startsWith('drill:') ? DRILLS[g.slice(6)].gen() : Pr.GEN[g](GH), { gk: (g.startsWith('drill:') ? g.slice(6) : g) }); }
     else if (pool.length) { const [q, l] = pick(pool); it = Object.assign(toItem(q), { lid: l }); }
     else return null;
     return Object.assign({}, it, { cid, hints: it.hints || c.hints });
@@ -1225,7 +1225,7 @@ ${defense}`;
     const c = Pr.byId[cid], src = applySources(c); if (!src.length) return null;
     const gens = src.filter((x) => x.gen), spots = src.filter((x) => x.spot);
     const x = gens.length && (!spots.length || Math.random() < 0.6) ? pick(gens) : pick(spots);
-    let it = x.spot ? spotItem(x.spot) : x.gen.startsWith('drill:') ? DRILLS[x.gen.slice(6)].gen() : (Pr.APP_GEN[x.gen] || Pr.GEN[x.gen])(GH);
+    let it = x.spot ? spotItem(x.spot) : Object.assign({}, x.gen.startsWith('drill:') ? DRILLS[x.gen.slice(6)].gen() : (Pr.APP_GEN[x.gen] || Pr.GEN[x.gen])(GH), { gk: x.gen.startsWith('drill:') ? x.gen.slice(6) : x.gen });
     return Object.assign({}, it, { cid, hints: it.hints || c.hints });
   }
   const applicable = (c) => conceptOpen(c) && applySources(c).length > 0;
@@ -1314,6 +1314,7 @@ ${defense}`;
       <div class="callout example"><span class="eyebrow">Na prática</span>${colorize(l.example)}</div>
       <div class="callout"><span class="eyebrow">Dica do mentor</span>${colorize(l.tip)}</div>
       ${l.lab ? `<div class="callout lab"><span class="eyebrow">No Laboratório</span>${colorize(esc(l.lab[1]))}<div style="margin-top:8px"><button class="btn" data-act="nav" data-v="${l.lab[0]}">Abrir ${esc((Lab.tools.find((t) => t[0] === l.lab[0]) || E.drills.find((t) => t[0] === l.lab[0]) || [0, l.lab[0] === 'elite-leaks' ? 'Mapa de leaks' : 'ferramenta'])[1])}</button></div></div>` : ''}
+      ${lessonHowHTML(l)}
       ${doubtHTML('les:' + l.id, 'Tenho uma dúvida sobre esta lição')}
       <div class="panel stack"><h3>Verifique o que aprendeu</h3><p class="muted small">Perguntas sem consultar o texto. Buscar a resposta na memória é o que fixa o conteúdo.</p>
       <div class="row"><button class="btn primary" data-act="lessonquiz" data-id="${l.id}">Começar o quiz</button>${l.drill ? `<button class="btn" data-act="drill" data-id="${l.drill}">Treino: ${DRILLS[l.drill].name}</button>` : ''}${(Pr.byLesson[l.id] || []).map((cid) => Pr.byId[cid]).filter((c) => c.gens.length).map((c) => `<button class="btn" data-act="practice" data-c="${c.id}">Praticar: ${esc(c.name)}</button>`).join('')}${S.lessons[l.id] && nxt ? `<button class="btn ghost" data-act="lesson" data-id="${nxt.id}">Próxima lição ›</button>` : ''}</div></div>
@@ -1367,8 +1368,29 @@ ${defense}`;
     b.after(d); b.setAttribute('aria-expanded', 'true');
   });
 
+  // ---------- "Como se faz": nada é cobrado sem antes ser ensinado ----------
+  const HOW = C.HOW || {};
+  const howBox = (h, open, label) => `<details class="callout how" ${open ? 'open' : ''}><summary><b>${label || 'Como se faz'}: ${esc(h.t)}</b></summary><ol>${h.steps.map((x) => `<li>${colorize(esc(x))}</li>`).join('')}</ol><p class="small" style="margin:6px 0 0"><b>Exemplo resolvido:</b> ${colorize(esc(h.ex))}</p></details>`;
+  function howRunnerHTML(it, before) {
+    const h = HOW[it.gk]; if (!h) return '';
+    const assess = ['diag', 'exam', 'final', 'review'].includes(R.kind);
+    if (before) {
+      if (R.answered || assess) return '';
+      return (S.genSeen || {})[it.gk] >= 2 ? howBox(h, false) : `<div class="howfirst"><div class="eyebrow">Antes de responder, veja como se faz</div>${howBox(h, true)}</div>`;
+    }
+    return howBox(h, false);
+  }
+  // As contas de cada conceito aparecem dentro da lição que ensina o conceito.
+  function lessonHowHTML(l) {
+    const keys = [];
+    Pr.CONCEPTS.filter((c) => c.lessons[0] === l.id).forEach((c) => c.gens.concat(Pr.APPLY_SRC[c.id] || []).forEach((g) => { const k = g.startsWith('drill:') ? g.slice(6) : g; if (HOW[k] && k !== l.drill && !keys.includes(k)) keys.push(k); }));
+    if (!keys.length) return '';
+    return `<div class="panel stack"><h3>Como calcular e decidir</h3><p class="small muted" style="margin:0">Os exercícios deste assunto cobram ${keys.length === 1 ? 'esta conta' : 'estas contas'}. Leia o passo a passo e refaça o exemplo de cabeça antes de seguir.</p>${keys.map((k, i) => howBox(HOW[k], i === 0, 'Como')).join('')}</div>`;
+  }
+
   // ---------- mentor socrático ----------
   function itemHints(it) {
+    if (HOW[it.gk] && HOW[it.gk].hints) return HOW[it.gk].hints.concat(['Abra o "Como se faz" e siga os passos com os números desta questão.']);
     if (it.hints && it.hints.length) return it.hints;
     const cid = (it.lid && (Pr.byLesson[it.lid] || [])[0]) || (R.kind === 'lesson' && (Pr.byLesson[R.id] || [])[0]) || (R.kind === 'drill' && (Pr.byDrill[R.drill] || [])[0]);
     const c = cid && Pr.byId[cid];
@@ -1467,7 +1489,7 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
   function diagItem(L) {
     const d = R.diag, bank = C.PLACEMENT[L], free = bank.map((x, i) => i).filter((i) => !d.used[L + ':' + i]);
     const i = free.length ? pick(free) : Math.floor(Math.random() * bank.length); d.used[L + ':' + i] = 1;
-    const src = bank[i], it = src.gen ? Pr.GEN[src.gen](GH) : src.drill ? DRILLS[src.drill].gen() : toItem(src);
+    const src = bank[i], it = Object.assign({}, src.gen ? Pr.GEN[src.gen](GH) : src.drill ? DRILLS[src.drill].gen() : toItem(src), { gk: src.gen || src.drill || null });
     return Object.assign({}, it, { cid: src.cid, lvl: L });
   }
   function diagRecord(ok) {
@@ -1501,6 +1523,7 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
   function prepItem() {
     let it = R.items[R.i];
     if (typeof it === 'function') it = R.items[R.i] = it();
+    if (!it.gk && R.kind === 'drill') it.gk = R.mixed ? R.mixed[R.i] : R.drill;
     R.cur = it; R.order = it.keep ? it.options.map((_, i) => i) : shuffle(it.options.map((_, i) => i));
     R.answered = false; R.picked = null; R.retry = null; R.t0 = performance.now(); DOUBT = null;
   }
@@ -1521,11 +1544,12 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
       <div class="bar"><i style="width:${isDiag ? (R.cur.lvl / 6) * 100 + 8 : (R.i / n) * 100}%"></i></div>
       ${R.kind === 'drill' && S.settings.drillTime && !R.answered ? '<div class="bar clock"><i id="run-clock" style="width:100%"></i></div>' : ''}
       <div class="panel prompt">${it.html || `<p class="lead">${colorize(esc(it.text))}</p>`}</div>
+      ${howRunnerHTML(it, true)}
       <div class="opts ${it.two ? 'two' : ''}">${optsHTML}</div>
       ${idk && !R.answered ? `<div class="row"><button class="btn ghost" data-act="answer" data-o="-2">Não sei</button><span class="small muted">${isDiag ? 'Não sabe? Marque "Não sei". Chutar deixa o diagnóstico impreciso.' : 'Não lembra? Marque "Não sei": o cartão volta amanhã. Chutar só engana a sua agenda.'}</span></div>` : ''}
       ${R.kind === 'review' && R.answered && R.cur.cardF ? `<div class="panel small"><div class="eyebrow">Cartão · ${esc(R.cur.topic)}</div><b>${colorize(esc(R.cur.cardF))}</b><div>${colorize(esc(R.cur.cardB))}</div></div>` : ''}
       ${R.retry && !R.answered ? socraticHTML(it) : ''}
-      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div>${R.kind === 'diag' ? '' : doubtHTML('run')}<div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
+      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div>${howRunnerHTML(it, false)}${R.kind === 'diag' ? '' : doubtHTML('run')}<div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
     </div>`;
   };
   MOUNTS.runner = () => {
@@ -1551,6 +1575,7 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
   function record(o, ok) {
     if (ok) R.correct++;
     R.results.push(ok); R.picks[R.i] = o;
+    if (R.cur.gk && HOW[R.cur.gk]) { S.genSeen = S.genSeen || {}; S.genSeen[R.cur.gk] = (S.genSeen[R.cur.gk] || 0) + 1; }
     const ms = performance.now() - R.t0, cur = R.cur;
     if (R.kind === 'drill') {
       if (R.mixed) R.drill = R.mixed[R.i];
@@ -2061,7 +2086,7 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
     const k = id.lastIndexOf(':'), lid = id.slice(0, k), i = +id.slice(k + 1), x = findLesson(lid), c = cardOf(id) || { reps: 0 }, card = ALLCARDS[id];
     const gens = (Pr.byLesson[lid] || []).map((cid) => Pr.byId[cid]).filter((cc) => cc && cc.gens.length);
     let it;
-    if (gens.length && (c.reps % 2 === 1 || !x.l.quiz.length)) { const cc = pick(gens), g = pick(cc.gens); it = Object.assign({}, g.startsWith('drill:') ? DRILLS[g.slice(6)].gen() : Pr.GEN[g](GH), { cid: cc.id }); }
+    if (gens.length && (c.reps % 2 === 1 || !x.l.quiz.length)) { const cc = pick(gens), g = pick(cc.gens); it = Object.assign({}, g.startsWith('drill:') ? DRILLS[g.slice(6)].gen() : Pr.GEN[g](GH), { cid: cc.id, gk: (g.startsWith('drill:') ? g.slice(6) : g) }); }
     else { const q = x.l.quiz; let j = (i + (c.reps || 0)) % q.length; for (let t = 0; t < q.length && used.has(lid + ':' + j); t++) j = (j + 1) % q.length; used.add(lid + ':' + j); it = Object.assign(toItem(q[j]), { lid }); }
     return Object.assign(it, { card: id, topic: x.l.title, cardF: card.f, cardB: card.b, lid: it.lid || lid });
   }

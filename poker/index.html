@@ -308,6 +308,9 @@ svg text { font-family: var(--font-mono); }
 .bar.clock i { background: var(--red); }
 @keyframes clk { from { width: 100%; } to { width: 0; } }
 #secs:empty { display: none; }
+.callout.how summary { cursor: pointer; }
+.callout.how ol { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.howfirst { border: 1px dashed var(--brass); border-radius: var(--r); padding: 10px 12px; display: grid; gap: 8px; }
 .modesw { margin-left: auto; }
 .modebtn { display: inline-flex; align-items: center; gap: 8px; background: var(--felt-3); border: 1px solid var(--line); border-radius: 99px; padding: 5px 6px 5px 12px; color: var(--ivory); font: 700 0.8rem/1 var(--font-body, inherit); cursor: pointer; }
 .modebtn:hover { border-color: var(--brass); }
@@ -407,6 +410,7 @@ table.dash td { vertical-align: middle; }
 <script src="content-n5.js"></script>
 <script src="content-diag.js"></script>
 <script src="content-apply.js"></script>
+<script src="content-how.js"></script>
 <script src="practice.js"></script>
 <script src="tracker.js"></script>
 <script src="lab-core.js"></script>
