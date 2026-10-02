@@ -146,7 +146,7 @@
     stackbb(h) {
       const bb = h.pick([100, 200, 400, 600, 800, 1000, 2000]), n = h.pick([8, 10, 12, 15, 20, 25, 30, 40]);
       const chips = bb * n, o = opts(n, (v) => v + ' bb', [n / 2, n * 2, n + 5, n - 3, Math.round(chips / (bb * 1.5))]);
-      return { html: `<p class="lead">Você tem ${h.num(chips, 0)} fichas. Os blinds são ${h.num(bb / 2, 0)}/${h.num(bb, 0)}. Quantos big blinds você tem?</p>`, options: o.options, a: o.a, exp: `${h.num(chips, 0)} ÷ ${h.num(bb, 0)} = <b>${n} bb</b>.${n <= 12 ? ' Faixa de all-in ou desistir.' : n <= 25 ? ' Faixa de aberturas pequenas e all-in por cima (reshove).' : ''}` };
+      return { html: `<p class="lead">Você tem ${h.num(chips, 0)} fichas. Os blinds são ${h.num(bb / 2, 0)}/${h.num(bb, 0)}. Quantos big blinds você tem?</p>`, options: o.options, a: o.a, exp: `Big blinds = fichas ÷ valor do big blind: ${h.num(chips, 0)} ÷ ${h.num(bb, 0)} = <b>${n} bb</b>. Contar em big blinds deixa qualquer stack comparável, em qualquer nível de blinds.${n <= 12 ? ' Faixa de all-in ou desistir.' : n <= 25 ? ' Faixa de aberturas pequenas e all-in por cima (reshove).' : ''}` };
     },
     winrate(h) {
       const hands = h.pick([5000, 10000, 20000, 25000, 40000, 50000]), wr = h.pick([-3, -1, 1, 2, 3, 4, 5, 6, 8]);
@@ -197,7 +197,7 @@
       const pot = h.pick([40, 60, 100]), bet = h.pick([0.5, 0.75, 1]) * pot, e = h.pick([0.17, 0.2, 0.25]);
       const x = Math.max(0, Math.round(((1 - e) * bet) / e - (pot + bet))), o = opts(x, String, [x + 20, Math.max(0, x - 20), x * 2, Math.round(x / 2), bet, pot]);
       return { html: `<p class="lead">Turn. Pote de ${pot}, aposta de ${h.num(bet, 0)}. Você completa ${Math.round(e * 100)}% das vezes. Quanto precisa ganhar <b>a mais</b> no river, quando completar, para pagar sem prejuízo?</p>`, options: o.options, a: o.a,
-        exp: `Empate quando ${h.num(e, 2)} × (${h.num(pot + bet, 0)} + X) = ${h.num(1 - e, 2)} × ${h.num(bet, 0)}. X ≈ <b>${x}</b>.` };
+        exp: `Pagar ${h.num(bet, 0)} perde quando você não completa (${Math.round((1 - e) * 100)}% das vezes). Quando completa (${Math.round(e * 100)}%), você ganha o pote mais a aposta (${h.num(pot + bet, 0)}) e mais X no river. Empate: ${h.num(e, 2)} × (${h.num(pot + bet, 0)} + X) = ${h.num(1 - e, 2)} × ${h.num(bet, 0)} → X ≈ <b>${x}</b>. Se ele costuma pagar mais que isso quando você completa, pagar dá lucro.` };
     },
     blefratio(h) {
       const fr = h.pick([[1, 3], [1, 2], [2, 3], [3, 4], [1, 1], [3, 2], [2, 1]]), x = fr[0] / fr[1];
@@ -207,7 +207,7 @@
       }
       const V = h.pick([6, 8, 9, 12, 15, 18, 24]), b = Math.round((V * x) / (1 + x)), o = opts(b, String, [V, Math.round(V / 2), Math.round(V / 3), b + 2, Math.max(1, b - 2), Math.round(V * x)]);
       return { html: `<p class="lead">Você chega ao river com ${V} combinações de valor e vai apostar ${sizeTxt(fr)}. Quantas combinações de blefe, aproximadamente, levar?</p>`, options: o.options, a: o.a,
-        exp: `Proporção blefes : valor = ${h.num(x, 2)} : ${h.num(1 + x, 2)}. ${V} × ${h.num(x, 2)} ÷ ${h.num(1 + x, 2)} ≈ <b>${b}</b>.` };
+        exp: `Pense em quem paga: para pagar a sua aposta (${h.num(x, 2)} pote), ele arrisca ${h.num(x, 2)} para ganhar ${h.num(1 + x, 2)} (o pote mais a sua aposta). Para pagar e desistir renderem o mesmo para ele, o seu range precisa de ${h.num(x, 2)} blefe para cada ${h.num(1 + x, 2)} de valor. Com ${V} de valor: ${V} × ${h.num(x, 2)} ÷ ${h.num(1 + x, 2)} ≈ <b>${b}</b> blefes. Apostas maiores permitem mais blefes.` };
     },
     semiblefe(h) {
       const pot = 100, bet = 100, e = h.pick([0.15, 0.2, 0.25, 0.33]), c = e * (pot + bet) - (1 - e) * bet;
@@ -232,7 +232,9 @@
       const o = opts(n, String, [6, 3, 1, 9, 12, 16, 4]);
       const cards = board.map(P.parseCard), hc = P.parseCard(heroCard);
       return { html: `<p class="lead">Mesa:</p><div class="board">${h.cards(cards)}</div><p>Você segura ${h.cards([hc], true)} (e outra carta sem relação). Quantas combinações de <b>${askPair ? hi + hi : hi + lo}</b> o adversário pode ter?</p>`, options: o.options, a: o.a,
-        exp: askPair ? `Sobram ${leftHi} carta(s) de ${rname(hi)}: formando pares com elas, <b>${n}</b>.` : `Sobram ${leftHi} carta(s) de ${rname(hi)} e ${leftLo} de ${rname(lo)}: ${leftHi} × ${leftLo} = <b>${n}</b>.` };
+        exp: (askPair ? `Existem 4 cartas de ${rname(hi)}. Uma está na mesa${heroHasHi ? ' e outra está na sua mão' : ''}, então o adversário só pode ter as ${leftHi} que sobraram. Com ${leftHi} cartas, os pares possíveis são ${leftHi} × ${leftHi - 1} ÷ 2 = <b>${n}</b> (sem nenhuma carta visível seriam 6).`
+          : `Das 4 cartas de ${rname(hi)}, sobram ${leftHi} (tire a da mesa${heroHasHi ? ' e a sua' : ''}). Das 4 de ${rname(lo)}, sobram ${leftLo} (tire a da mesa). Cada uma das ${leftHi} combina com cada uma das ${leftLo}: ${leftHi} × ${leftLo} = <b>${n}</b> (sem cartas visíveis seriam 16).`)
+          + (heroHasHi ? ' É isso que significa bloquear: a carta na sua mão tira combinações do adversário.' : ' A sua carta, de outro valor, não bloqueia nada aqui: só cartas do mesmo valor tiram combinações.') };
     },
     bf(h) {
       const f = h.pick([1.2, 1.3, 1.5, 1.8, 2, 2.5, 3]), val = Math.round((f / (1 + f)) * 100);
@@ -260,12 +262,12 @@
     ic(h) {
       const hands = h.pick([2500, 10000, 40000, 90000]), sd = h.pick([80, 90, 100]);
       const m = Math.round((1.96 * sd) / Math.sqrt(hands / 100)), o = opts(m, (v) => '± ' + v + ' bb/100', [Math.round(sd / Math.sqrt(hands / 100)), m * 2, Math.max(1, Math.round(m / 2)), m + 10]);
-      return { html: `<p class="lead">Com ${h.num(hands, 0)} mãos e desvio padrão de ${sd} bb/100, qual a margem aproximada do intervalo de confiança de 95% da sua taxa?</p>`, options: o.options, a: o.a, exp: `1,96 × ${sd} ÷ √${h.num(hands / 100, 0)} ≈ <b>± ${m} bb/100</b>.` };
+      return { html: `<p class="lead">Com ${h.num(hands, 0)} mãos e desvio padrão de ${sd} bb/100, qual a margem aproximada do intervalo de confiança de 95% da sua taxa?</p>`, options: o.options, a: o.a, exp: `A taxa é medida em blocos de 100 mãos: ${h.num(hands, 0)} mãos são ${h.num(hands / 100, 0)} blocos. A incerteza diminui com a raiz do número de blocos (√${h.num(hands / 100, 0)} = ${h.num(Math.sqrt(hands / 100), 1)}), e o intervalo de 95% vai a 1,96 desvios para cada lado: 1,96 × ${sd} ÷ ${h.num(Math.sqrt(hands / 100), 1)} ≈ <b>± ${m} bb/100</b>. Para cortar a margem pela metade, são precisas 4 vezes mais mãos.` };
     },
     roi(h) {
       const inv = h.pick([2000, 5000, 6000, 10000]), roi = h.pick([-10, 5, 10, 15, 20, 30]), prof = (inv * roi) / 100;
       const o = opts(roi, (v) => v + '%', [roi * 2, roi + 10, roi - 5, Math.round(roi / 2)]);
-      return { html: `<p class="lead">Você investiu $${h.num(inv, 0)} em torneios e ${prof >= 0 ? 'lucrou' : 'perdeu'} $${h.num(Math.abs(prof), 0)}. Qual o seu ROI?</p>`, options: o.options, a: o.a, exp: `${h.num(prof, 0)} ÷ ${h.num(inv, 0)} = <b>${roi}%</b>.` };
+      return { html: `<p class="lead">Você investiu $${h.num(inv, 0)} em torneios e ${prof >= 0 ? 'lucrou' : 'perdeu'} $${h.num(Math.abs(prof), 0)}. Qual o seu ROI?</p>`, options: o.options, a: o.a, exp: `ROI = lucro ÷ investimento: ${h.num(prof, 0)} ÷ ${h.num(inv, 0)} = <b>${roi}%</b>. Ou seja, para cada $100 investidos, você ${roi >= 0 ? 'ganhou' : 'perdeu'} $${Math.abs(roi)} em média.` };
     },
     overlay(h) {
       const buy = h.pick([11, 22, 55]), fee = 0.1, gtd = h.pick([5000, 10000, 20000]);

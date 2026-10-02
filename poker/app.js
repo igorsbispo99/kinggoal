@@ -52,7 +52,7 @@
   let S;
   try { S = JSON.parse(localStorage.getItem(KEY)); } catch (e) { S = null; }
   S = S && S.v === 1 ? Object.assign(fresh(), S) : fresh();
-  S.settings = Object.assign({ drillTime: 0, socratic: true, tableClock: 0, breath: true, mentor: true }, S.settings);
+  S.settings = Object.assign({ drillTime: 0, socratic: true, tableClock: 0, breath: true, mentor: true, guide: 'auto' }, S.settings);
   let cloudTimer = null;
   function save() {
     if (S.profile) S.hist[todayStr()] = Math.round(ipp().total);
@@ -188,6 +188,44 @@
     for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) if (Math.abs(r[i] - r[j]) <= 3 || Math.abs(lowA[i] - lowA[j]) <= 3) near = true;
     return conn3 || (twoTone && near) ? 1 : 0;
   }
+  // Explicações concretas: por que este flop é seco ou molhado, e de onde vem a equity de uma mão antes do flop.
+  const SUIT_PL = ['espadas', 'copas', 'ouros', 'paus'];
+  function textureWhy(b, cl) {
+    const r = b.map(P.rankOf), s = b.map(P.suitOf), rt = (x) => (x === 12 || x === -1 ? 'A' : rankTxt(x)), list = b.slice().sort((x, y) => y - x).map((c) => rankTxt(P.rankOf(c)) + P.SUIT_SYM[P.suitOf(c)]).join(', ');
+    if (cl === 3) return `As três cartas são de ${SUIT_PL[s[0]]}. Quem tem duas cartas de ${SUIT_PL[s[0]]} já fez flush, e quem tem uma tem projeto: qualquer ${SUIT_PL[s[0]].slice(0, -1)} que cair no turn muda muito a mão.`;
+    if (cl === 2) { const pr = r.find((x, i) => r.indexOf(x) !== i); return `Há duas cartas de valor ${rt(pr)}: a mesa é pareada. Menos mãos acertam uma mesa assim, e trincas ficam mais raras (só sobram duas cartas de ${rt(pr)} no baralho).`; }
+    const lowA = r.map((x) => (x === 12 ? -1 : x)), span = (a) => Math.max(...a) - Math.min(...a), conn = span(r) <= 4 || span(lowA) <= 4;
+    const suitCnt = [0, 0, 0, 0]; s.forEach((x) => suitCnt[x]++); const tt = suitCnt.findIndex((n) => n === 2);
+    let near = null; for (let i = 0; i < 3; i++) for (let j = i + 1; j < 3; j++) if (!near && (Math.abs(r[i] - r[j]) <= 3 || Math.abs(lowA[i] - lowA[j]) <= 3)) near = [r[i], r[j]];
+    if (cl === 1) {
+      const parts = [];
+      if (conn) { const lo = span(r) <= 4 ? Math.min(...r) : Math.min(...lowA), hi = Math.min(lo + 4, 12); parts.push(`as três cartas (${list}) cabem numa sequência de cinco, de ${rt(lo)} a ${rt(hi)}: muitas mãos têm projeto de sequência`); }
+      if (tt >= 0) parts.push(`há duas cartas de ${SUIT_PL[tt]}, então quem tem duas de ${SUIT_PL[tt]} tem projeto de flush${!conn && near ? `, e ${rt(near[0])} e ${rt(near[1])} estão próximas` : ''}`);
+      return `Molhada: ${parts.join('; além disso, ')}. Numa mesa assim, as mãos mudam muito no turn e no river.`;
+    }
+    return `Seca: ${list} ${tt >= 0 ? `tem duas de ${SUIT_PL[tt]} (um projeto de flush é possível), mas as cartas são distantes entre si` : 'são de naipes diferentes e distantes entre si'}. Quase ninguém tem projeto, e quem acertou a mesa no flop costuma continuar na frente.`;
+  }
+  function eqWhy(hero, vs, pc) {
+    const r = hero.map(P.rankOf).sort((a, b) => b - a), pair = r[0] === r[1], suited = P.suitOf(hero[0]) === P.suitOf(hero[1]), rt = (x) => rankTxt(x);
+    const ref = ' Referências para estimar: par contra par menor, cerca de 80%; par contra duas cartas maiores, cerca de 55%; duas cartas maiores contra duas menores, cerca de 65%; mão dominada (mesma carta, kicker pior), cerca de 30%.';
+    if (vs) {
+      const v = vs.map(P.rankOf).sort((a, b) => b - a), vp = v[0] === v[1];
+      let t;
+      if (pair && vp) t = r[0] > v[0] ? 'Par contra par menor: o par maior ganha cerca de 80% das vezes; o menor quase só vence fazendo trinca.' : 'Par contra par maior: o seu par ganha só cerca de 20%, quase sempre fazendo trinca.';
+      else if (pair) { const o = v.filter((x) => x > r[0]).length; t = o === 2 ? 'O seu par contra duas cartas maiores: é a clássica "moeda", perto de 55% para o par.' : o === 1 ? 'O seu par contra uma carta maior e uma menor: o par fica perto de 70%.' : 'O seu par contra duas cartas menores: o par fica perto de 85%.'; }
+      else if (vp) { const o = r.filter((x) => x > v[0]).length; t = o === 2 ? 'Suas duas cartas maiores contra um par menor: perto de 45% para você; o par leva vantagem até você acertar.' : o === 1 ? 'Uma carta sua é maior que o par dele e a outra é menor: perto de 30% para você.' : 'Suas duas cartas são menores que o par dele: perto de 15% para você.'; }
+      else if (r.some((x) => v.includes(x))) { const sh = r.find((x) => v.includes(x)), mine = r.find((x) => x !== sh) ?? sh, his = v.find((x) => x !== sh) ?? sh; t = `As duas mãos têm ${rt(sh)}: quem tem o kicker maior domina. ${mine > his ? `O seu kicker (${rt(mine)}) é maior: você fica perto de 70%.` : `O kicker dele (${rt(his)}) é maior: você fica perto de 30%, porque precisa acertar justamente o seu kicker.`}`; }
+      else if (r[1] > v[0]) t = 'Suas duas cartas são maiores que as dele: perto de 65% para você.';
+      else if (v[1] > r[0]) t = 'Suas duas cartas são menores que as dele: perto de 35% para você.';
+      else t = 'Cartas intercaladas (cada um tem uma carta maior que uma do outro): perto de 55% para quem tem a carta mais alta.';
+      return t + (suited ? ' Ser do mesmo naipe acrescenta 2 a 3 pontos.' : '');
+    }
+    const w = pc <= 0.1 ? `Quem joga só as ${pct(pc)} melhores mãos tem quase só pares altos e Ás com carta alta (AK, AQ).` : `Um range de ${pct(pc)} já inclui pares médios, Ás com kickers variados e cartas altas.`;
+    const t = pair ? (r[0] >= 9 ? 'Pares altos ficam na frente da maior parte desse range.' : 'Pares baixos e médios ficam perto de 50% contra ranges largos e abaixo disso contra ranges apertados, que têm pares maiores.')
+      : r[0] === 12 ? (r[1] >= 10 ? 'Ás com kicker alto disputa bem contra esse range.' : `Ás com kicker ${rt(r[1])} sofre contra Ases com kicker melhor, que são comuns nesse range.`)
+      : 'Sem Ás nem par, a mão costuma ficar atrás de ranges apertados: o valor dela está em acertar o flop.';
+    return `${w} ${t}${suited ? ' Ser do mesmo naipe acrescenta 2 a 3 pontos.' : ''}`;
+  }
   const outsOf = (hero, board, rest) => rest.filter((c) => P.category(P.evaluate(hero.concat(board, [c]))) >= 4);
   function numOptions(correct, fmt, candidates) {
     const seen = new Set([fmt(correct)]); const opts = [correct];
@@ -276,7 +314,7 @@
         const type = pick(['need', 'need', 'mdf', 'alpha']); const val = { need, mdf, alpha }[type]; const f = (x) => pct(x, 1);
         const o = numOptions(val, f, [need, mdf, alpha, 1 - need, Math.min(0.95, bet / pot), val + 0.08, val - 0.07]);
         const txt = { need: `Pote de ${num(pot)}bb. O adversário aposta ${num(bet)}bb. Quanta equity você precisa para pagar?`, mdf: `Pote de ${num(pot)}bb e aposta de ${num(bet)}bb. Qual a frequência mínima de defesa (MDF)?`, alpha: `Você quer blefar ${num(bet)}bb num pote de ${num(pot)}bb. Com que frequência o adversário precisa desistir para o blefe lucrar?` }[type];
-        const exp = { need: `call ÷ (pote + aposta + call) = ${num(bet)} ÷ ${num(pot + 2 * bet)} = <b>${f(need)}</b>.`, mdf: `pote ÷ (pote + aposta) = ${num(pot)} ÷ ${num(pot + bet)} = <b>${f(mdf)}</b>.`, alpha: `aposta ÷ (pote + aposta) = ${num(bet)} ÷ ${num(pot + bet)} = <b>${f(alpha)}</b>.` }[type];
+        const exp = { need: `Você paga ${num(bet)} para disputar um pote final de ${num(pot)} + ${num(bet)} + ${num(bet)} = ${num(pot + 2 * bet)}. Para não perder dinheiro, precisa ganhar ${num(bet)} ÷ ${num(pot + 2 * bet)} = <b>${f(need)}</b> das vezes.`, mdf: `Se você desistir demais, qualquer blefe dele dá lucro. Para impedir isso, continue com pelo menos pote ÷ (pote + aposta) = ${num(pot)} ÷ ${num(pot + bet)} = <b>${f(mdf)}</b> do seu range.`, alpha: `O blefe arrisca ${num(bet)} para ganhar o pote de ${num(pot)}. Empata quando ele desiste aposta ÷ (pote + aposta) = ${num(bet)} ÷ ${num(pot + bet)} = <b>${f(alpha)}</b> das vezes; acima disso, lucra.` }[type];
         return { keep: true, html: `<p class="lead">${txt}</p>`, options: o.options, a: o.a, exp };
       } },
     callfold: { name: 'Pagar ou desistir', domain: 'math', lesson: 'l3_4', desc: 'Equity contra o preço, no turn.',
@@ -284,14 +322,14 @@
         for (let t = 0; t < 1500; t++) {
           const d = P.deck(); const hero = d.splice(0, 2), board = d.splice(0, 4);
           if (P.category(P.evaluate(hero.concat(board))) > 1) continue;
-          const n = outsOf(hero, board, d).length; if (n < 4) continue;
+          const outsC = outsOf(hero, board, d), n = outsC.length; if (n < 4) continue;
           const eq = n / 46, pot = pick([10, 20, 40, 60, 100]), fr = pick([0.25, 0.33, 0.5, 0.66, 0.75, 1]);
           const bet = Math.round(pot * fr), need = bet / (pot + 2 * bet);
           if (Math.abs(need - eq) < 0.02) continue;
           const evCall = eq * (pot + bet) - (1 - eq) * bet;
           return { keep: true, two: true, html: `<p class="lead">Turn. O adversário aposta ${bet}bb num pote de ${pot}bb.</p><div class="lbl">Sua mão</div><div class="board">${cardsHTML(hero)}</div><div class="lbl">Mesa</div><div class="board">${cardsHTML(board)}</div><p class="muted small">Considere que ele tem uma mão feita, que as suas outs para sequência ou flush estão limpas e que não haverá mais apostas no river.</p>`,
             options: ['Pagar', 'Desistir'], a: eq > need ? 0 : 1, errOf: (o) => (o === 0 ? 'overcall' : 'overfold'), evLoss: Math.abs(evCall), pot: pot + bet,
-            exp: `${n} outs → ${n}/46 = <b>${pct(eq, 1)}</b> de equity. Preço: ${bet} ÷ ${pot + 2 * bet} = <b>${pct(need, 1)}</b>. ${eq > need ? 'Equity maior que o preço: pagar.' : 'Equity menor que o preço: desistir.'} EV do call: ${num(evCall, 2)} bb.` };
+            exp: `<p style="margin:0 0 6px"><b>1. Suas outs:</b> ${n} cartas completam a sua sequência ou flush:</p><div class="board">${cardsHTML(outsC.slice().sort((x, y) => y - x), true)}</div><p style="margin:6px 0">Faltam 46 cartas desconhecidas, então a sua chance no river é ${n} ÷ 46 = <b>${pct(eq, 1)}</b>.</p><p style="margin:0 0 6px"><b>2. O preço:</b> você paga ${bet} para disputar um pote final de ${pot} + ${bet} + ${bet} = ${pot + 2 * bet}. Precisa ganhar ${bet} ÷ ${pot + 2 * bet} = <b>${pct(need, 1)}</b> das vezes.</p><p style="margin:0"><b>3. Compare:</b> ${eq > need ? `${pct(eq, 1)} é mais que ${pct(need, 1)}: pagar dá lucro.` : `${pct(eq, 1)} é menos que ${pct(need, 1)}: pagar dá prejuízo, desista.`} Em média, pagar ${evCall >= 0 ? 'ganha' : 'perde'} ${num(Math.abs(evCall), 2)} bb.</p>` };
         }
         return DRILLS.potodds.gen();
       } },
@@ -306,23 +344,22 @@
           }
         }
         const b = P.deck().slice(0, 3), cl = flopClass(b);
-        const why = ['Nenhum flush draw e cartas distantes: poucos projetos.', 'As cartas estão próximas o suficiente para sequências, ou há flush draw com cartas próximas.', 'Uma carta repetida: menos mãos acertam essa mesa.', 'Três cartas do mesmo naipe: qualquer carta desse naipe muda muito a mão.'][cl];
-        return { keep: true, html: `<p class="lead">Como você classifica este flop?</p><div class="board">${cardsHTML(b)}</div>`, options: ['Seca', 'Molhada', 'Pareada', 'Monotone'], a: cl, exp: why + ' <span class="muted">Critério do treino: molhada = as três cartas cabem numa sequência (distância até 4) ou há duas do mesmo naipe com duas cartas a até 3 de distância.</span>' };
+        return { keep: true, html: `<p class="lead">Como você classifica este flop?</p><div class="board">${cardsHTML(b)}</div>`, options: ['Seca', 'Molhada', 'Pareada', 'Monotone'], a: cl, exp: textureWhy(b, cl) + ' <span class="muted small">Critério do treino: molhada = as três cartas cabem numa sequência de cinco, ou há duas do mesmo naipe e duas cartas a até 3 valores de distância.</span>' };
       } },
     equity: { name: 'Estime a equity', domain: 'read', lesson: 'l5_1', desc: 'Mão contra mão e mão contra range.', err: 'read',
       gen() {
         const bins = [[0, 0.3, 'Menos de 30%'], [0.3, 0.45, '30% a 45%'], [0.45, 0.55, '45% a 55%'], [0.55, 0.7, '55% a 70%'], [0.7, 1.01, 'Mais de 70%']];
         for (let t = 0; t < 12; t++) {
           const hl = pick(P.RANKED.slice(0, 70)); const hero = pick(P.COMBOS[hl]);
-          let eq, vsTxt;
+          let eq, vsTxt, vsC = null, pcV = null;
           if (Math.random() < 0.5) {
             const vl = pick(P.RANKED.slice(0, 70)); const opts = P.COMBOS[vl].filter((c) => hero.indexOf(c[0]) < 0 && hero.indexOf(c[1]) < 0);
             if (!opts.length || vl === hl) continue;
-            const vs = pick(opts); eq = P.equity(hero, [vs], [], 2500); vsTxt = `<div class="lbl">Adversário</div><div class="board">${cardsHTML(vs)}</div>`;
-          } else { const pc = pick([0.05, 0.1, 0.2, 0.35]); eq = P.equity(hero, [P.topRange(pc)], [], 2500); vsTxt = `<p>contra um adversário que joga as <b>${pct(pc)} melhores mãos</b>.</p>`; }
+            const vs = pick(opts); vsC = vs; eq = P.equity(hero, [vs], [], 2500); vsTxt = `<div class="lbl">Adversário</div><div class="board">${cardsHTML(vs)}</div>`;
+          } else { const pc = pick([0.05, 0.1, 0.2, 0.35]); pcV = pc; eq = P.equity(hero, [P.topRange(pc)], [], 2500); vsTxt = `<p>contra um adversário que joga as <b>${pct(pc)} melhores mãos</b>.</p>`; }
           const bi = bins.findIndex((b) => eq >= b[0] && eq < b[1]), b = bins[bi];
           if (eq - b[0] < 0.02 || b[1] - eq < 0.02) continue;
-          return { keep: true, html: `<p class="lead">Qual a equity da sua mão antes do flop?</p><div class="lbl">Você</div><div class="board">${cardsHTML(hero)}</div>${vsTxt}`, options: bins.map((x) => x[2]), a: bi, exp: `Equity simulada: <b>${pct(eq, 1)}</b> (${hl}).` };
+          return { keep: true, html: `<p class="lead">Qual a equity da sua mão antes do flop?</p><div class="lbl">Você</div><div class="board">${cardsHTML(hero)}</div>${vsTxt}`, options: bins.map((x) => x[2]), a: bi, exp: `<p style="margin:0 0 6px">Equity simulada: <b>${pct(eq, 1)}</b> (${hl}).</p><p style="margin:0">${eqWhy(hero, vsC, pcV)}</p>` };
         }
         return DRILLS.ranking.gen();
       } },
@@ -616,6 +653,7 @@ ${defense}`;
   const sectionOf = (v) => (v.startsWith('lab-') ? 'lab' : v.startsWith('elite-') ? 'elite' : 'form');
   let VIEW = 'home', PARAMS = {}, R = null, tableTimer = null, SECTION = 'form';
   function go(view, params) {
+    DOUBT = null;
     clearTimeout(tableTimer); tableTimer = null;
     VIEW = view; PARAMS = params || {}; SECTION = view === 'runner' || view === 'lesson' || view === 'dbexam' ? SECTION : sectionOf(view);
     render();
@@ -966,7 +1004,8 @@ ${defense}`;
       case 'table': {
         const recent = Object.keys(S.lessons).sort((a, b) => (S.lessons[a].date < S.lessons[b].date ? 1 : -1)).slice(0, 6).flatMap((l) => Pr.byLesson[l] || []);
         const qs = [...new Set(recent.filter((c) => THINK[c]).concat(['abertura', 'potodds', 'posflop']))].slice(0, 3);
-        return { intro: `<p>Agora vamos jogar: ${t.n} mãos na <b>${esc(MODES[t.mode][0])}</b>. ${esc(MODES[t.mode][1])}</p><p>${WHY.table}</p>`, focus: qs.map((c) => esc(THINK[c])), how: 'Antes de cada decisão, faça a pergunta certa (acima). Depois de agir, leia o meu comentário no painel do mentor. Não olhe se ganhou ou perdeu a mão: olhe se a decisão foi boa.', crit: `${t.n} mãos. Ao terminar, vamos rever juntos as decisões com erro.`, cta: 'Sentar à mesa' };
+        const gl = guideLevel();
+        return { intro: `<p>Agora vamos jogar: ${t.n} mãos na <b>${esc(MODES[t.mode][0])}</b>. ${esc(MODES[t.mode][1])}</p><p>${WHY.table}</p>${gl ? `<p>${gl === 2 ? 'Como você está começando, a mesa é <b>guiada</b>: antes de cada decisão eu faço algumas perguntas (sua posição, o que aconteceu antes, o que você tem, quanto custa). Elas vão diminuindo conforme você acerta.' : 'A mesa ainda é guiada, mas só com a pergunta principal de cada decisão: você já acerta a maior parte sozinho.'}</p>` : ''}`, focus: qs.map((c) => esc(THINK[c])), how: 'Antes de cada decisão, faça a pergunta certa (acima). Depois de agir, leia o meu comentário no painel do mentor. Não olhe se ganhou ou perdeu a mão: olhe se a decisão foi boa.', crit: `${t.n} mãos. Ao terminar, vamos rever juntos as decisões com erro.`, cta: 'Sentar à mesa' };
       }
       case 'replay': return { intro: `<p>${WHY.replay}</p>`, how: 'Abra cada mão com erro. Para cada decisão: cubra o meu comentário, responda a pergunta-chave e só então compare. Se o erro for de conceito, use os botões de lição ou prática ali mesmo.', crit: 'Revise pelo menos as mãos marcadas com erro.', cta: 'Abrir o replay' };
       case 'weekly': return { intro: `<p>${WHY.weekly}</p>`, focus: ['O que funcionou nesta semana?', 'O que não funcionou?', 'Qual foi o seu erro mais caro e o que aprendeu sobre ele?', 'Qual é a meta de processo para a próxima semana (algo que você controla, não um resultado)?'], how: 'Escreva com honestidade; ninguém além de você vê.', cta: 'Fazer a revisão da semana' };
@@ -1275,6 +1314,7 @@ ${defense}`;
       <div class="callout example"><span class="eyebrow">Na prática</span>${colorize(l.example)}</div>
       <div class="callout"><span class="eyebrow">Dica do mentor</span>${colorize(l.tip)}</div>
       ${l.lab ? `<div class="callout lab"><span class="eyebrow">No Laboratório</span>${colorize(esc(l.lab[1]))}<div style="margin-top:8px"><button class="btn" data-act="nav" data-v="${l.lab[0]}">Abrir ${esc((Lab.tools.find((t) => t[0] === l.lab[0]) || E.drills.find((t) => t[0] === l.lab[0]) || [0, l.lab[0] === 'elite-leaks' ? 'Mapa de leaks' : 'ferramenta'])[1])}</button></div></div>` : ''}
+      ${doubtHTML('les:' + l.id, 'Tenho uma dúvida sobre esta lição')}
       <div class="panel stack"><h3>Verifique o que aprendeu</h3><p class="muted small">Perguntas sem consultar o texto. Buscar a resposta na memória é o que fixa o conteúdo.</p>
       <div class="row"><button class="btn primary" data-act="lessonquiz" data-id="${l.id}">Começar o quiz</button>${l.drill ? `<button class="btn" data-act="drill" data-id="${l.drill}">Treino: ${DRILLS[l.drill].name}</button>` : ''}${(Pr.byLesson[l.id] || []).map((cid) => Pr.byId[cid]).filter((c) => c.gens.length).map((c) => `<button class="btn" data-act="practice" data-c="${c.id}">Praticar: ${esc(c.name)}</button>`).join('')}${S.lessons[l.id] && nxt ? `<button class="btn ghost" data-act="lesson" data-id="${nxt.id}">Próxima lição ›</button>` : ''}</div></div>
       </div>
@@ -1351,11 +1391,11 @@ ${defense}`;
     const it = R.cur;
     const prompt = `Você é o Mentor Ás, professor de poker que usa o método socrático. Um aluno (nível ${S.placement || 0} de 5 do curso) errou uma questão. NÃO revele a resposta correta e não diga qual alternativa é a certa. Faça UMA pergunta curta (no máximo duas frases) que leve o aluno a perceber sozinho o erro, partindo da alternativa que ele escolheu. Use linguagem simples, em português do Brasil. Se o aluno responder, avalie o raciocínio dele com uma frase e faça a próxima pergunta.
 
-QUESTÃO: ${stripTags(it.text || it.html)}
+QUESTÃO: ${ctxText(it.html || it.text)}
 ALTERNATIVAS: ${it.options.join(' | ')}
 O ALUNO ESCOLHEU: ${it.options[r.first]}
 RESPOSTA CORRETA (só para você; não revele): ${it.options[it.a]}
-EXPLICAÇÃO (só para você): ${stripTags(it.exp)}
+EXPLICAÇÃO (só para você): ${ctxText(it.exp)}
 ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n') : ''}`;
     r.aiOpen = false; render();
     const box = document.getElementById('socr'), el = document.createElement('div'); el.className = 'small'; el.textContent = 'O mentor está pensando…'; if (box) box.appendChild(el);
@@ -1363,6 +1403,63 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     try { await sample(prompt, { modelTier: 'default', cache: false, onText: ({ text }) => { out = text; el.innerHTML = `<b>Mentor Ás:</b> ${esc(text)}`; } }); r.ai.push(['mentor', out.trim() || '…']); r.aiOpen = true; dayLog('ai'); }
     catch (e) { r.ai.push(['mentor', sampleErr(e)]); }
     if (R && R.retry === r && !R.answered) render();
+  }
+
+  // ---------- dúvida com contexto e relatos de problema ----------
+  // Texto para a IA: as cartas viram "A♥" em vez de sumirem junto com o HTML.
+  function ctxText(h) {
+    const SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
+    return String(h || '').replace(/<span class="card[^"]*"[^>]*aria-label="([^"]*)"[^>]*>[\s\S]*?<\/span>(<\/i><\/span>)?/g, (m, l) => ' ' + (l.length === 2 ? (l[0] === 'T' ? '10' : l[0]) + (SYM[l[1]] || l[1]) : '[' + l + ']') + ' ')
+      .replace(/<(p|div|br|li)[^>]*>/g, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/[ \t]+/g, ' ').replace(/\n\s*/g, '\n').trim();
+  }
+  const itemCtx = (it, o) => `QUESTÃO:\n${ctxText(it.html || it.text)}\nALTERNATIVAS: ${it.options.map((x, i) => `(${i + 1}) ${x}`).join(' | ')}\nO ALUNO RESPONDEU: ${o === -2 ? 'Não sei' : o === -1 ? 'sem resposta (tempo)' : o == null ? '(ainda não respondeu)' : it.options[o]}\nRESPOSTA CORRETA: ${it.options[it.a]}\nEXPLICAÇÃO DADA PELO APP:\n${ctxText(it.exp)}`;
+  function doubtCtx(key) {
+    const [k, a, b] = key.split(':');
+    if (k === 'run' && R && R.cur) return { what: 'uma questão que acabou de responder', ctx: itemCtx(R.cur, R.picked) };
+    if (k === 'rv' && R && R.items[+a]) return { what: 'uma questão da prova de revisão', ctx: itemCtx(R.items[+a], R.picks[+a]) };
+    if (k === 'rp') {
+      const r = (S.replays || []).find((x) => String(x.id) === a), d = r && r.dec[+b]; if (!d) return null;
+      const cs = (arr) => arr.map((c) => ctxText(cardsHTML([c]))).join(' ');
+      return { what: 'uma decisão de uma mão que jogou na mesa de treino', ctx: `MÃO: ${MODES[r.mode] ? MODES[r.mode][0] : r.mode}. Cartas do aluno: ${cs(r.hero)}. Posição: ${d.pos}.\nRUA: ${d.street}. Mesa nesse momento: ${d.board.length ? cs(d.board) : '(pré-flop)'}.\nPote: ${num(d.pot, 1)} bb. Para pagar: ${num(d.toCall || 0, 1)} bb${d.need ? ` (precisa de ${pct(d.need)})` : ''}.${d.eq != null ? ` Equity estimada: ${pct(d.eq)}.` : ''}${d.made ? ` Mão feita: ${d.made}.` : ''}\nO ALUNO ESCOLHEU: ${ACT_TXT[d.a] || d.a}${d.amt ? ' ' + num(d.amt, 1) + ' bb' : ''}. Avaliação do app: ${(G_TXT[d.g] || G_TXT.ok)[1]}.\nCOMENTÁRIO DO APP: ${d.txt}\nHISTÓRICO DA MÃO:\n${r.events.join('\n')}` };
+    }
+    if (k === 'les') { const x = findLesson(a); if (!x) return null; const l = x.l; return { what: `a lição "${l.title}"`, ctx: `LIÇÃO: ${l.title}\n${ctxText(l.why)}\n${ctxText(l.body).slice(0, 5000)}\nNA PRÁTICA: ${ctxText(l.example)}\nDICA: ${ctxText(l.tip)}` }; }
+    return null;
+  }
+  let DOUBT = null;
+  function doubtHTML(key, label) {
+    if (!DOUBT || DOUBT.key !== key) return `<div class="row doubt-row"><button class="btn ghost small" data-act="doubt" data-k="${key}">${label || 'Tenho uma dúvida'}</button><button class="btn ghost small" data-act="report" data-k="${key}">Reportar problema</button></div>`;
+    const rep = DOUBT.mode === 'report';
+    return `<div class="panel stack doubt" id="doubt-box"><div class="eyebrow">${rep ? 'Reportar um problema' : 'Sua dúvida'}</div>
+      ${rep ? '<p class="small muted" style="margin:0">Achou um erro, uma explicação confusa ou uma resposta duvidosa? Conte o que viu. O relato fica salvo junto com a questão inteira; em Evolução você copia todos os relatos para enviar.</p>' : DOUBT.msgs.length ? '' : '<p class="small muted" style="margin:0">Escreva com as suas palavras o que não ficou claro. O mentor vê a questão inteira, a sua resposta e a explicação.</p>'}
+      ${DOUBT.msgs.map(([w, t]) => `<div class="small ${w === 'mentor' ? 'bubble' : ''}"><b class="${w === 'mentor' ? 'who' : ''}">${w === 'mentor' ? 'Mentor Ás' : 'Você'}</b>${w === 'mentor' ? '' : ': '}${esc(t).replace(/\n/g, '<br>')}</div>`).join('')}
+      <div id="doubt-live" class="small"></div>
+      ${DOUBT.busy ? '' : `<textarea id="doubt-in" rows="2" placeholder="${rep ? 'O que está errado ou confuso?' : DOUBT.msgs.length ? 'Responda ao mentor ou pergunte mais' : 'Ex.: por que 10, J, Q e K não formam uma sequência?'}"></textarea>
+      <div class="row"><button class="btn small primary" data-act="${rep ? 'report-send' : 'doubt-send'}">${rep ? 'Salvar relato' : 'Enviar'}</button><button class="btn ghost small" data-act="doubt-close">Fechar</button></div>`}</div>`;
+  }
+  async function doubtSend(text) {
+    const D = DOUBT; if (!D || D.busy) return;
+    const c = doubtCtx(D.key); if (!c) { toast('Não encontrei o contexto desta questão.'); return; }
+    D.msgs.push(['aluno', text]);
+    if (D.msgs.filter((m) => m[0] === 'aluno').length > 6) { D.msgs.push(['mentor', 'Vamos parar esta conversa por aqui. Se ainda ficou confuso, use "Reportar problema": eu reviso esta questão.']); render(); return; }
+    const sample = await getSample();
+    if (!sample) { D.msgs.push(['mentor', 'A conversa com o mentor por IA funciona quando o app está aberto dentro do Claude. Se achar que a explicação está errada, use "Reportar problema": o relato fica salvo com a questão inteira.']); render(); return; }
+    D.busy = true; render();
+    const lvl = levelCap();
+    const prompt = `Você é o Mentor Ás, professor de poker No-Limit Hold'em, paciente e didático. O seu aluno está na fase ${lvl} de 5 do curso${lvl <= 1 ? ' (ainda iniciante: evite jargão e explique cada termo)' : ''}. Ele tem uma dúvida sobre ${c.what}.
+Regras: responda em português do Brasil, em linguagem simples, com frases curtas e no máximo 180 palavras. Primeiro entenda exatamente o que o confundiu e corrija com clareza, usando as cartas e os números do contexto num exemplo concreto. Se a dúvida revelar um engano comum (por exemplo, achar que quatro cartas formam sequência), nomeie o engano. Se, analisando, você concluir que a resposta ou a explicação do app estão erradas, diga isso com franqueza e explique o certo. Termine com UMA pergunta curta para o aluno verificar se entendeu. Cartas: A, K, Q, J, 10 a 2; naipes ♠ ♥ ♦ ♣.
+
+CONTEXTO:
+${c.ctx}
+
+CONVERSA:
+${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n')}`;
+    let out = '';
+    try { await sample(prompt, { modelTier: 'default', cache: false, onText: ({ text: t }) => { out = t; const el = document.getElementById('doubt-live'); if (el) el.innerHTML = `<div class="bubble"><b class="who">Mentor Ás</b>${esc(t).replace(/\n/g, '<br>')}</div>`; } }); D.msgs.push(['mentor', out.trim() || '…']); dayLog('ai'); }
+    catch (e) { D.msgs.push(['mentor', sampleErr(e)]); }
+    D.busy = false; if (DOUBT === D) render();
+  }
+  function reportText() {
+    return (S.reports || []).map((r, i) => `#${i + 1} · ${new Date(r.t).toLocaleString('pt-BR')} · ${r.where}\nRELATO: ${r.note}\n${r.ctx}`).join('\n\n----------\n\n');
   }
 
   // ---------- diagnóstico adaptativo ----------
@@ -1405,7 +1502,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     let it = R.items[R.i];
     if (typeof it === 'function') it = R.items[R.i] = it();
     R.cur = it; R.order = it.keep ? it.options.map((_, i) => i) : shuffle(it.options.map((_, i) => i));
-    R.answered = false; R.picked = null; R.retry = null; R.t0 = performance.now();
+    R.answered = false; R.picked = null; R.retry = null; R.t0 = performance.now(); DOUBT = null;
   }
   VIEWS.runner = () => {
     if (!R) return VIEWS.home();
@@ -1428,7 +1525,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       ${idk && !R.answered ? `<div class="row"><button class="btn ghost" data-act="answer" data-o="-2">Não sei</button><span class="small muted">${isDiag ? 'Não sabe? Marque "Não sei". Chutar deixa o diagnóstico impreciso.' : 'Não lembra? Marque "Não sei": o cartão volta amanhã. Chutar só engana a sua agenda.'}</span></div>` : ''}
       ${R.kind === 'review' && R.answered && R.cur.cardF ? `<div class="panel small"><div class="eyebrow">Cartão · ${esc(R.cur.topic)}</div><b>${colorize(esc(R.cur.cardF))}</b><div>${colorize(esc(R.cur.cardB))}</div></div>` : ''}
       ${R.retry && !R.answered ? socraticHTML(it) : ''}
-      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div><div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
+      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div>${R.kind === 'diag' ? '' : doubtHTML('run')}<div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
     </div>`;
   };
   MOUNTS.runner = () => {
@@ -1700,6 +1797,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   function startHeroClock() {
     clearTimeout(heroTimer); heroTimer = null;
     const lim = (S.settings.tableClock || 0) * 1000;
+    if (T && T.guide && !T.guide.done) { T.clk = null; return; }
     if (!T || !lim) { if (T) T.clk = null; return; }
     const key = T.handNo + '-' + T.events.length;
     if (!T.clk || T.clk.key !== key) T.clk = { t0: Date.now(), lim, key };
@@ -1727,11 +1825,58 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     }
     T.act(0, a, amt); coachInfo = null; tableStep();
   }
+  // ---------- mesa guiada ----------
+  // Para quem está começando: antes de cada decisão, o mentor conduz o raciocínio com perguntas curtas (posição, o que
+  // aconteceu antes, o que você tem, quanto custa). As perguntas diminuem conforme o aluno acerta, até sumirem.
+  const POS_TXT = { UTG: 'O UTG é o primeiro a falar antes do flop: a pior posição, por isso abre poucas mãos.', HJ: 'O HJ (hijack) fica no meio da mesa: abre um pouco mais que o UTG.', CO: 'O CO (cutoff) fica logo antes do botão: uma boa posição.', BTN: 'O BTN (botão) fala por último depois do flop: a melhor posição da mesa.', SB: 'O SB (small blind) já colocou meio big blind, mas fala primeiro depois do flop.', BB: 'O BB (big blind) já colocou 1 big blind e é o último a falar antes do flop.' };
+  function guideLevel() {
+    const g = S.settings.guide || 'auto'; if (g === 'off') return 0; if (g === 'on') return 2;
+    if (levelCap() >= 2 || (S.placement || 0) >= 2 || TMODE === 'hu') return 0;
+    const h = (S.guideHist || []).slice(-40), acc = h.length ? h.reduce((a, b) => a + b, 0) / h.length : 0;
+    return h.length < 15 || acc < 0.8 ? 2 : h.length < 40 || acc < 0.92 ? 1 : 0;
+  }
+  function buildGuide() {
+    const lvl = guideLevel(); if (!lvl) return null;
+    const c = coachInfo, L = T.legal(0), pos = c.pos, qs = [], need = c.need;
+    const pctOpts = (v) => { const o = shuffle([...new Set([v, v + 0.1, Math.max(0.05, v - 0.08), 0.5].map((x) => Math.round(x * 100)))]).slice(0, 4); if (!o.includes(Math.round(v * 100))) o[0] = Math.round(v * 100); return { options: o.map((x) => x + '%'), a: o.indexOf(Math.round(v * 100)) }; };
+    const potQ = () => { const o = pctOpts(need); return { key: 1, cid: 'potodds', q: `Para pagar você coloca ${num(L.toCall, 1)} bb, e o pote final fica com ${num(c.pot + L.toCall, 1)} bb. Quanto você precisa ganhar, no mínimo, para pagar?`, options: o.options, a: o.a, exp: `${num(L.toCall, 1)} ÷ ${num(c.pot + L.toCall, 1)} = ${pct(need)}. Se a sua chance de ganhar for maior que isso, pagar dá lucro.` }; };
+    if (T.street === 'preflop') {
+      if (T.n > 2) { const others = shuffle(['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'].filter((x) => x !== pos)).slice(0, 3), o = shuffle([pos].concat(others)); qs.push({ cid: 'posicao', q: 'Antes de tudo: qual é a sua posição nesta mão?', options: o, a: o.indexOf(pos), exp: POS_TXT[pos] }); }
+      if (T.raises === 0) {
+        const limp = T.p.filter((p, i) => i !== 0 && p.vpip).length;
+        if (pos === 'BB') qs.push({ key: 1, cid: 'estilo', q: 'Ninguém aumentou e você está no big blind. Quanto custa ver o flop?', options: ['Nada: posso passar', '1 bb', '2,5 bb'], a: 0, exp: 'Você já colocou o big blind e ninguém aumentou: passar é de graça. Só aumente com mãos fortes.' });
+        else {
+          qs.push({ cid: 'abertura', q: 'Alguém aumentou antes de você?', options: ['Não', 'Sim'], a: 0, exp: limp ? `Ninguém aumentou: ${limp === 1 ? 'um jogador só pagou' : limp + ' jogadores só pagaram'} o big blind (limp). A regra continua: aumentar ou desistir.` : 'Ninguém aumentou: todos antes de você desistiram. Você pode abrir o pote.' });
+          const inR = P.RFI[pos] && P.RFI[pos].has(c.label);
+          qs.push({ key: 1, cid: 'abertura', q: `Sua mão é ${c.label}. Ela está na tabela de abertura do ${pos}?`, options: ['Sim', 'Não'], a: inR ? 0 : 1, exp: `${c.label} ${inR ? 'está' : 'não está'} na tabela do ${pos}. Pela regra: ${inR ? 'aumente' : 'desista'}. Com a prática, você vai saber a tabela de cor.` });
+        }
+      } else {
+        const op = T.pos(T.preAggr);
+        if (T.n > 2) { const o = shuffle([op].concat(shuffle(['UTG', 'HJ', 'CO', 'BTN', 'SB'].filter((x) => x !== op && x !== pos)).slice(0, 2))); qs.push({ cid: 'vs3bet', q: 'Alguém aumentou. De que posição veio o aumento?', options: o, a: o.indexOf(op), exp: `O aumento veio do ${op}. ${['UTG', 'HJ'].includes(op) ? 'Posição cedo: o range dele é forte, então você precisa de uma mão melhor para continuar.' : 'Posição tardia: o range dele é mais largo, então você pode continuar com mais mãos.'}` }); }
+        qs.push(potQ());
+      }
+    } else {
+      const sc = P.evaluate(T.p[0].cards.concat(T.board)), cat = P.category(sc), others = shuffle([0, 1, 2, 3, 4, 5, 6].filter((x) => x !== cat && Math.abs(x - cat) <= 3)).slice(0, 3), o = shuffle([cat].concat(others));
+      qs.push({ cid: 'combinacoes', q: 'O que você tem agora, com as suas cartas e as da mesa?', options: o.map((x) => P.CAT_NAMES[x]), a: o.indexOf(cat), html: true, exp: handLine('Seu melhor jogo', T.p[0].cards.concat(T.board), sc) });
+      if (L.toCall > 0) qs.push(potQ());
+      else { const eq = c.eq, a = eq > 0.6 ? 0 : eq < 0.3 ? 2 : 1; qs.push({ key: 1, cid: 'posflop', q: 'Ninguém apostou nesta rua. Qual é o seu objetivo agora?', options: ['Apostar por valor: mãos piores pagam', 'Passar para controlar o pote', 'Passar ou blefar: a mão quase não ganha no showdown'], a, exp: `Sua equity estimada é ${pct(eq)}. ${a === 0 ? 'Acima de 60%, você está quase sempre na frente: aposte para ganhar das mãos piores.' : a === 1 ? 'Entre 30% e 60%, a mão vale algo no showdown, mas apostar faz as melhores pagarem e as piores desistirem: passar costuma ser melhor.' : 'Abaixo de 30%, a mão quase nunca ganha no showdown: passe, ou blefe se o adversário desiste muito.'}` }); }
+    }
+    const list = lvl === 1 ? qs.filter((x) => x.key) : qs;
+    return list.length ? { qs: list, i: 0, ans: null, done: false, key: T.handNo + '-' + T.events.length } : null;
+  }
+  function guideHTML() {
+    const g = T.guide; if (!g || g.done) return '';
+    const q = g.qs[g.i], answered = g.ans != null, ok = g.ans === q.a;
+    return `<div class="panel stack guide"><div class="row" style="justify-content:space-between"><span class="eyebrow">Mesa guiada · pergunta ${g.i + 1} de ${g.qs.length}</span><button class="btn ghost small" data-act="guide-skip">Decidir sem as perguntas</button></div>
+      <p style="margin:0"><b>${esc(q.q)}</b></p>
+      <div class="opts ${q.options.every((o) => o.length < 22) ? 'two' : ''}">${q.options.map((o, i) => `<button class="opt ${answered ? (i === q.a ? 'right' : i === g.ans ? 'wrong' : '') : ''}" data-act="guide-ans" data-o="${i}" ${answered ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>
+      ${answered ? `<div class="feedback ${ok ? 'ok' : 'no'} small"><b>${ok ? 'Isso.' : 'Não exatamente.'}</b> ${q.html ? q.exp : esc(q.exp)}</div><div><button class="btn primary small" data-act="guide-next" id="guideNext">${g.i + 1 < g.qs.length ? 'Próxima pergunta' : 'Agora, decida'}</button></div>` : ''}</div>`;
+  }
   function tableStep() {
     clearTimeout(tableTimer);
     if (!T) return;
     if (T.over) { if (!T.counted) { T.counted = true; handDone(); } render(); const b = document.getElementById('dealBtn'); if (b) b.focus(); return; }
-    if (T.turn === 0) { computeCoach(); startHeroClock(); render(); return; }
+    if (T.turn === 0) { computeCoach(); const gk = T.handNo + '-' + T.events.length; if (!T.guide || T.guide.key !== gk) T.guide = buildGuide(); startHeroClock(); render(); return; }
     render();
     tableTimer = setTimeout(() => { if (VIEW !== 'table' || !T || T.over) return; const d = T.botDecide(T.turn); T.act(T.turn, d.a, d.amt); tableStep(); }, T.p[0].folded ? 200 : 520);
   }
@@ -1786,6 +1931,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     const base = q('calm'), drop = ['loss', 'late', 'clock'].map((k) => [k, q(k)]).filter(([, v]) => v != null && base != null && base - v >= 0.08);
     return `<div class="panel stack"><div class="eyebrow">Modo pressão</div>
       <p class="small muted" style="margin:0">Treine a decisão com o relógio correndo: quando o tempo acaba, a mesa passa ou desiste por você, e isso conta como erro. As cartas são sempre sorteadas de forma justa; a pressão vem só do relógio, do cansaço e das perdas, como numa mesa real.</p>
+      <div class="row"><span class="small">Mesa guiada (perguntas do mentor antes de cada decisão):</span>${[['auto', 'Automática'], ['on', 'Sempre'], ['off', 'Desligada']].map(([v, t]) => `<button class="btn small ${(S.settings.guide || 'auto') === v ? 'primary' : ''}" data-act="tguide" data-s="${v}">${t}</button>`).join('')}</div>
       <div class="row"><span class="small">Relógio por decisão:</span>${CLOCKS.map(([v, t]) => `<button class="btn small ${S.settings.tableClock === v ? 'primary' : ''}" data-act="tclock" data-s="${v}">${t}</button>`).join('')}</div>
       <div class="row"><span class="small">Pausa de 8 s para respirar depois de uma perda grande:</span><button class="btn small ${S.settings.breath !== false ? 'primary' : ''}" data-act="breath">${S.settings.breath !== false ? 'Ligada' : 'Desligada'}</button></div>
       <div class="scroll-x"><table class="t"><tr><th>Situação</th><th>Decisões</th><th>Qualidade</th></tr>${rows.map(([k, t]) => `<tr><td>${t}</td><td class="num">${pr[k] ? pr[k].n : 0}</td><td class="num">${q(k) == null ? '<span class="muted">mín. 10</span>' : pct(q(k))}</td></tr>`).join('')}</table></div>
@@ -1844,7 +1990,8 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
         else { const oop = ['SB', 'BB'].includes(T.pos(0)); sizes.push([T.curBet * (oop ? 4 : 3), T.raises >= 2 ? '4-bet' : '3-bet']); }
       } else if (T.curBet === 0) { sizes.push([pot / 3, '1/3 pote'], [(pot * 2) / 3, '2/3 pote'], [pot, 'Pote']); }
       else sizes.push([T.curBet * 3, 'Aumentar 3x']);
-      actions = `<button class="btn danger" data-act="hero" data-a="fold" ${L.canCheck ? 'disabled title="Passar é grátis"' : ''}>Desistir</button>
+      const gOn = T.guide && !T.guide.done;
+      actions = gOn ? '<span class="small muted">Responda as perguntas do mentor; depois, a decisão é sua.</span>' : `<button class="btn danger" data-act="hero" data-a="fold" ${L.canCheck ? 'disabled title="Passar é grátis"' : ''}>Desistir</button>
         <button class="btn" data-act="hero" data-a="${L.canCheck ? 'check' : 'call'}">${L.canCheck ? 'Passar' : `Pagar ${num(L.toCall, 1)}`}</button>
         ${L.canRaise ? sizes.filter((s) => s[0] < L.maxTo).map((s) => `<button class="btn primary" data-act="hero" data-a="raise" data-amt="${Math.max(L.minTo, Math.round(s[0] * 10) / 10)}">${s[1]} ${num(Math.max(L.minTo, Math.round(s[0] * 10) / 10), 1)}</button>`).join('') + `<button class="btn" data-act="hero" data-a="raise" data-amt="${L.maxTo}">All-in ${num(L.maxTo, 1)}</button>` : ''}`;
     } else actions = '<span class="muted small">Os adversários estão pensando…</span>';
@@ -1858,6 +2005,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
       ${tableGoalHTML()}
       <div class="table-wrap ${T.n === 2 ? 'hu' : ''}"><div class="oval"></div><div class="center"><div class="board">${T.board.length ? cardsHTML(T.board) : ''}</div><span class="pot">Pote ${num(T.pot(), 1)} bb</span></div>${seats}</div>
       ${L && T.clk ? `<div class="bar clock" title="Relógio de decisão"><i style="width:100%;animation:clk ${T.clk.lim}ms linear ${-(Date.now() - T.clk.t0)}ms forwards"></i></div>` : ''}
+      ${L ? guideHTML() : ''}
       <div class="actions">${actions}</div>
       <div class="grid2"><div class="panel stack"><div class="eyebrow">Painel do mentor</div>${panel}<div class="coach-feed">${feed.map((f) => `<div class="coach-item ${f.g}"><span class="lbl">${f.street}</span> ${f.txt}</div>`).join('') || '<span class="small muted">Os comentários sobre as suas decisões aparecem aqui.</span>'}</div></div>
       <div class="panel stack"><div class="eyebrow">Histórico da mão</div><div class="log" id="handlog">${T.events.map((e) => colorize(esc(e.replace(/\b([2-9TJQKA])([shdc])\b/g, (m, r, s) => r + '♠♥♦♣'['shdc'.indexOf(s)])))).join('<br>')}</div></div></div>
@@ -1880,14 +2028,14 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     semiblefe: 'Aumentar sem a melhor mão: ele desiste com frequência, e se pagar ainda tenho outs?',
     posflop: 'O que eu tenho contra o range dele? Aposto por valor, como blefe ou passo para controlar o pote?',
   };
-  function replayDecHTML(d, i) {
+  function replayDecHTML(d, i, rid) {
     const c = Pr.byId[d.cid], [cls, lbl] = G_TXT[d.g] || G_TXT.ok;
     return `<div class="panel stack"><div class="row" style="justify-content:space-between"><div class="eyebrow">Decisão ${i + 1} · ${STREET_TXT[d.street] || d.street}</div><span class="pill ${cls}">${lbl}${d.timed ? ' · tempo' : ''}</span></div>
       ${d.board.length ? `<div class="row">${cardsHTML(d.board, true)}</div>` : ''}
       <div class="row small"><span class="pill gold">${esc(d.pos)}</span><span class="pill">${esc(d.label)}</span>${d.made ? `<span class="pill">${esc(d.made)}</span>` : ''}<span class="pill num">Pote ${num(d.pot, 1)}bb</span>${d.toCall && d.street !== 'preflop' ? `<span class="pill num">Pagar ${num(d.toCall, 1)} · precisa ${pct(d.need)}</span>` : ''}${d.eq != null ? `<span class="pill num">Equity ${pct(d.eq)}</span>` : ''}</div>
       ${THINK[d.cid] ? `<div class="small"><b>Pergunta-chave:</b> ${THINK[d.cid]}</div>` : ''}
       <div class="small">Você <b>${ACT_TXT[d.a] || d.a}${d.amt ? ' ' + num(d.amt, 1) + 'bb' : ''}</b>. ${esc(d.txt)}</div>
-      ${c ? `<div class="row"><span class="small muted">Conceito: <b>${esc(c.name)}</b></span><button class="btn small" data-act="lesson" data-id="${c.lessons[0]}">Lição</button><button class="btn small" data-act="applyc" data-c="${c.id}">Aplicar</button>${c.gens.length ? `<button class="btn small" data-act="practice" data-c="${c.id}">Praticar</button>` : ''}</div>` : ''}</div>`;
+      ${c ? `<div class="row"><span class="small muted">Conceito: <b>${esc(c.name)}</b></span><button class="btn small" data-act="lesson" data-id="${c.lessons[0]}">Lição</button><button class="btn small" data-act="applyc" data-c="${c.id}">Aplicar</button>${c.gens.length ? `<button class="btn small" data-act="practice" data-c="${c.id}">Praticar</button>` : ''}</div>` : ''}${rid ? doubtHTML('rp:' + rid + ':' + i, 'Tenho uma dúvida sobre esta decisão') : ''}</div>`;
   }
   VIEWS.replays = () => {
     const all = S.replays || [], bad = !!PARAMS.bad, list = bad ? all.filter((r) => r.bad) : all;
@@ -1901,7 +2049,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     const cids = [...new Set(r.dec.filter((d) => d.g === 'bad').map((d) => d.cid))].filter((c) => Pr.byId[c]);
     return `<div class="wrap narrow"><div class="runner-top"><div><div class="eyebrow">${esc(MODES[r.mode] ? MODES[r.mode][0] : r.mode)} · mão #${r.handNo}</div><h1>Replay da mão</h1></div><button class="btn ghost" data-act="replays">Todas as mãos</button></div>
       <div class="panel row" style="justify-content:space-between"><div class="row">${cardsHTML(r.hero)}${r.board.length ? `<span class="small muted">mesa</span>${cardsHTML(r.board, true)}` : ''}</div><b class="num" style="font-size:1.4rem;color:${r.net > 0 ? 'var(--good)' : r.net < 0 ? 'var(--red)' : 'inherit'}">${r.net > 0 ? '+' : ''}${num(r.net, 1)}bb</b></div>
-      ${r.dec.length ? `<p class="small muted">Antes de ler o comentário de cada decisão, cubra-o e responda à pergunta-chave. Depois compare.</p>${r.dec.map(replayDecHTML).join('')}` : '<p class="muted">Você não tomou decisões nesta mão (desistiu antes ou a mão acabou antes da sua vez).</p>'}
+      ${r.dec.length ? `<p class="small muted">Antes de ler o comentário de cada decisão, cubra-o e responda à pergunta-chave. Depois compare.</p>${r.dec.map((d, i) => replayDecHTML(d, i, r.id)).join('')}` : '<p class="muted">Você não tomou decisões nesta mão (desistiu antes ou a mão acabou antes da sua vez).</p>'}
       ${cids.length ? `<div class="panel stack"><div class="eyebrow">O que treinar a partir desta mão</div><div class="row">${cids.map((c) => `<button class="btn small primary" data-act="applyc" data-c="${c}">Aplicar: ${esc(Pr.byId[c].name)}</button>`).join('')}</div></div>` : ''}
       <details class="panel"><summary><b>Histórico completo da mão</b></summary><div class="log">${r.events.map((e) => colorize(esc(e.replace(/\b([2-9TJQKA])([shdc])\b/g, (m, a, b) => a + '♠♥♦♣'['shdc'.indexOf(b)])))).join('<br>')}</div></details></div>`;
   };
@@ -1933,17 +2081,17 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   }
   const stripHTML = (h) => String(h || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
   function reviewReportHTML() {
-    const rows = R.items.map((it, i) => ({ it, ok: R.results[i], o: R.picks[i] })).filter((r) => r.it && typeof r.it === 'object');
+    const rows = R.items.map((it, i) => ({ it, ok: R.results[i], o: R.picks[i], i })).filter((r) => r.it && typeof r.it === 'object');
     rows.sort((a, b) => a.ok - b.ok);
-    return `<div class="stack"><h3>Questão por questão</h3>${rows.map(({ it, ok, o }) => {
+    return `<div class="stack"><h3>Questão por questão</h3>${rows.map(({ it, ok, o, i }) => {
       const q = it.text || stripHTML(it.html), mine = o === -2 ? 'Não sei' : o === -1 ? 'Sem resposta' : it.options[o], c = S.cards[it.card];
       const exp = it.html ? it.exp : colorize(esc(it.exp)), cp = it.cid && Pr.byId[it.cid] ? Pr.byId[it.cid] : (Pr.byLesson[it.lid] || []).map((x) => Pr.byId[x]).find((x) => x && practicable(x));
       return `<div class="panel stack rv-item ${ok ? 'ok' : 'no'}"><div class="row" style="justify-content:space-between"><span class="eyebrow">${esc(it.topic)}</span><span class="pill ${ok ? 'good' : 'bad'}">${ok ? 'Acertou' : 'Errou'}</span></div>
-        <div class="small">${colorize(esc(q.length > 220 ? q.slice(0, 220) + '…' : q))}</div>
+        ${it.html ? `<div class="small rv-q">${it.html}</div>` : `<div class="small">${colorize(esc(q.length > 220 ? q.slice(0, 220) + '…' : q))}</div>`}
         <div class="small">Sua resposta: <b>${colorize(esc(mine || '—'))}</b>${ok ? '' : ` · Correta: <b>${colorize(esc(it.options[it.a]))}</b>`}</div>
         ${ok ? (R.free || !c ? '' : `<div class="small muted">Este cartão volta em ${Math.max(1, Math.round((new Date(c.due) - new Date(todayStr())) / DAY))} dia(s).</div>`)
           : `<div class="feedback no small">${exp}</div><div class="callout"><span class="eyebrow">Para revisar</span><p style="margin:4px 0 0"><b>${colorize(esc(it.cardF))}</b></p><p style="margin:4px 0 0">${colorize(esc(it.cardB))}</p></div>
-          <div class="row"><button class="btn small" data-act="lesson" data-id="${it.lid}">Reler a lição</button>${cp ? `<button class="btn small" data-act="practice" data-c="${cp.id}">Praticar: ${esc(cp.name)}</button>` : ''}</div>`}</div>`;
+          <div class="row"><button class="btn small" data-act="lesson" data-id="${it.lid}">Reler a lição</button>${cp ? `<button class="btn small" data-act="practice" data-c="${cp.id}">Praticar: ${esc(cp.name)}</button>` : ''}</div>`}${doubtHTML('rv:' + i)}</div>`;
     }).join('')}</div>`;
   }
   VIEWS.review = () => {
@@ -1980,6 +2128,7 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
           <div class="small muted">Decisões: ${sm.good} boas · ${sm.ok} aceitáveis · ${sm.bad} erros.</div>
           ${lineChart(sm.curve.map((y, i) => ({ x: 'mão ' + i, y })), { h: 160, zero: true, dec: 0, label: 'Resultado acumulado em bb', fmt: (y) => num(y, 1) + ' bb', empty: 'Jogue algumas mãos para ver o gráfico.' })}</div></div>
       <div class="panel"><div class="eyebrow">Precisão por treino</div><div class="scroll-x"><table class="t"><tr><th>Treino</th><th>Área</th><th>Respostas</th><th>Últimas 30</th><th>Meta</th></tr>${Object.entries(DRILLS).map(([id, d]) => { const a = drillAcc(id); return `<tr><td>${d.name}</td><td>${C.DOMAINS[d.domain]}</td><td class="num">${a ? a.n : 0}</td><td class="num">${a ? pct(a.acc) : '—'}</td><td>${a && a.n >= 30 && a.acc >= 0.85 ? '<span class="pill good">✓ atingida</span>' : '<span class="pill">em curso</span>'}</td></tr>`; }).join('')}</table></div></div>
+      ${(S.reports || []).length ? `<div class="panel stack"><div class="eyebrow">Relatos de problema · ${S.reports.length}</div><p class="small muted" style="margin:0">Questões que você marcou como erradas ou confusas, cada uma com o contexto completo. Copie e envie para quem mantém o app.</p><textarea id="rep-text" rows="6" readonly>${esc(reportText())}</textarea><div class="row"><button class="btn small" data-act="reports-copy">Copiar todos</button><button class="btn ghost small" data-act="reports-clear">Apagar relatos</button></div></div>` : ''}
       <div class="panel"><div class="eyebrow">Conquistas · ${Object.keys(S.badges).length}/${Object.keys(BADGES).length}</div><div class="badges" style="margin-top:12px">${Object.entries(BADGES).map(([id, [ico, t, d]]) => `<div class="bdg ${S.badges[id] ? '' : 'off'}"><span class="ico">${ico}</span><b class="small">${t}</b><span class="small muted">${d}</span></div>`).join('')}</div></div>
     </div>`;
   };
@@ -2155,6 +2304,18 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     'hint-more': () => { if (R && R.retry) { R.retry.h++; render(); } },
     reveal: () => { if (R && R.retry) { R.retry.revealed = true; R.picked = R.retry.first; R.answered = true; render(); focusNext(); } },
     'hint-ai': () => socraticAI(),
+    doubt: (d) => { DOUBT = { key: d.k, msgs: [], mode: 'ask' }; render(); const t = document.getElementById('doubt-in'); if (t) t.focus(); },
+    report: (d) => { DOUBT = { key: d.k, msgs: [], mode: 'report' }; render(); const t = document.getElementById('doubt-in'); if (t) t.focus(); },
+    'doubt-close': () => { DOUBT = null; render(); },
+    'doubt-send': () => { const v = document.getElementById('doubt-in'); if (v && v.value.trim()) doubtSend(v.value.trim()); },
+    'report-send': () => {
+      const v = document.getElementById('doubt-in'), note = v && v.value.trim(); if (!note) { toast('Escreva o que está errado ou confuso.'); return; }
+      const c = doubtCtx(DOUBT.key) || { what: DOUBT.key, ctx: '' };
+      S.reports = (S.reports || []).concat({ t: Date.now(), where: c.what, note, ctx: c.ctx.slice(0, 6000) }).slice(-50); save();
+      DOUBT = null; toast('Relato salvo. Em Evolução você copia todos para enviar.'); render();
+    },
+    'reports-copy': () => { const t = document.getElementById('rep-text'); try { navigator.clipboard.writeText(t.value).then(() => toast('Relatos copiados'), () => t.select()); } catch (e) { t.select(); } },
+    'reports-clear': () => { S.reports = []; save(); render(); },
     'hint-send': () => { const v = document.getElementById('socr-in'); if (v && v.value.trim()) socraticAI(v.value.trim()); },
     'socratic-toggle': () => { S.settings.socratic = S.settings.socratic === false; save(); render(); },
     drill: (d) => startDrill(d.id),
@@ -2175,6 +2336,15 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
     },
     replays: (d) => go('replays', d.bad ? { bad: 1 } : {}),
     replay: (d) => go('replay', { id: d.id }),
+    'guide-ans': (d) => {
+      const g = T && T.guide; if (!g || g.done || g.ans != null) return;
+      const q = g.qs[g.i], o = +d.o, ok = o === q.a; g.ans = o;
+      S.guideHist = (S.guideHist || []).concat(ok ? 1 : 0).slice(-60); observe(q.cid, 'p', ok, 0.5); save(); render();
+      const nb = document.getElementById('guideNext'); if (nb) nb.focus();
+    },
+    'guide-next': () => { const g = T && T.guide; if (!g) return; if (g.i + 1 < g.qs.length) { g.i++; g.ans = null; } else { g.done = true; startHeroClock(); } render(); },
+    'guide-skip': () => { const g = T && T.guide; if (g) { g.done = true; startHeroClock(); render(); } },
+    tguide: (d) => { S.settings.guide = d.s; save(); render(); },
     hero: (d) => heroAct(d.a, d.amt ? +d.amt : undefined),
     'rv-start': () => startReviewExam(dueCards(), false),
     'rv-free': () => startReviewExam(Object.keys(S.cards).filter((id) => ALLCARDS[id]), true),
@@ -2235,6 +2405,8 @@ ${r.ai.length ? 'CONVERSA ATÉ AQUI:\n' + r.ai.map(([w, t]) => (w === 'mentor' ?
   // ---------- API usada pelo Laboratório e pelo Alto rendimento ----------
   window.App = { S: () => S, save, render, go, toast, addXP, logDecision, logTool, lessonTitle, cardsHTML, cardHTML, mentorHTML, radar, today: todayStr, daysAgo: (n) => addDays(todayStr(), -n), recordSession, addPlanItem, askMentor, juryCall, conceptState,
     // Leitura do estado da questão atual (usada pelos testes automáticos).
+    // Gera uma questão de um treino ou gerador (usado pela auditoria automática).
+    genSample: (k) => (DRILLS[k] ? DRILLS[k].gen() : (Pr.APP_GEN[k] || Pr.GEN[k])(GH)), genKeys: () => Object.keys(DRILLS).concat(Object.keys(Pr.GEN), Object.keys(Pr.APP_GEN)),
     runnerState: () => (R ? { kind: R.kind, i: R.i, done: !!R.done, answered: !!R.answered, retry: !!R.retry, a: R.cur && R.cur.a, n: R.cur && R.cur.options.length, lvl: R.cur && R.cur.lvl, cid: R.cur && R.cur.cid } : null) };
 
   let startView = 'home';
