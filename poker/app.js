@@ -227,11 +227,14 @@
     return `${w} ${t}${suited ? ' Ser do mesmo naipe acrescenta 2 a 3 pontos.' : ''}`;
   }
   const outsOf = (hero, board, rest) => rest.filter((c) => P.category(P.evaluate(hero.concat(board, [c]))) >= 4);
+  // Alternativas numéricas dos treinos. Um candidato pode vir como [valor, motivo do erro]; os com motivo têm prioridade.
   function numOptions(correct, fmt, candidates) {
-    const seen = new Set([fmt(correct)]); const opts = [correct];
-    for (const c of shuffle(candidates)) { if (opts.length >= 4) break; const f = fmt(c); if (c >= 0 && !seen.has(f)) { seen.add(f); opts.push(c); } }
-    const sorted = opts.slice().sort((a, b) => a - b);
-    return { options: sorted.map(fmt), a: sorted.indexOf(correct) };
+    const seen = new Set([fmt(correct)]); const opts = [correct], reason = {};
+    const list = shuffle(candidates.map((c) => (Array.isArray(c) ? c : [c, null]))).sort((x, y) => (y[1] ? 1 : 0) - (x[1] ? 1 : 0));
+    for (const [c, r] of list) { if (opts.length >= 4) break; const f = fmt(c); if (c >= 0 && !seen.has(f)) { seen.add(f); opts.push(c); if (r) reason[f] = r; } }
+    const sorted = opts.slice().sort((a, b) => a - b), why = {};
+    sorted.forEach((v, i) => { if (reason[fmt(v)]) why[i] = reason[fmt(v)]; });
+    return { options: sorted.map(fmt), a: sorted.indexOf(correct), why };
   }
   const eqCache = {};
   const rangeOf = (profile) => (eqCache[profile] = eqCache[profile] || P.topRange((P.PROFILES[profile] || P.PROFILES.tag).range));
@@ -312,10 +315,15 @@
         const bet = Math.round(((pot * fr[0]) / fr[1]) * 10) / 10;
         const need = bet / (pot + 2 * bet), mdf = pot / (pot + bet), alpha = bet / (pot + bet);
         const type = pick(['need', 'need', 'mdf', 'alpha']); const val = { need, mdf, alpha }[type]; const f = (x) => pct(x, 1);
-        const o = numOptions(val, f, [need, mdf, alpha, 1 - need, Math.min(0.95, bet / pot), val + 0.08, val - 0.07]);
+        const W = {
+          need: [[mdf, 'Essa é a defesa mínima (MDF): quanto do seu range continuar, não o preço de pagar com uma mão.'], [alpha, 'Faltou o seu pagamento no pote final: divida por pote + aposta + o que você paga.'], [1 - need, 'Essa é a chance de perder que você pode aceitar. A pergunta é a chance mínima de ganhar.'], [Math.min(0.95, bet / pot), 'Você dividiu a aposta pelo pote. Divida o que você paga pelo pote final (pote + aposta + pagamento).']],
+          mdf: [[need, 'Esse é o preço para pagar com uma mão (pot odds), não quanto do range defender.'], [alpha, 'Essa é a frequência de desistências que o blefe dele precisa. A defesa mínima é o complemento: pote ÷ (pote + aposta).'], [Math.min(0.95, bet / pot), 'Você dividiu a aposta pelo pote. A defesa mínima é pote ÷ (pote + aposta).']],
+          alpha: [[mdf, 'Essa é a defesa mínima de quem recebe a aposta. O blefe precisa de aposta ÷ (pote + aposta) de desistências.'], [need, 'Esse é o preço de quem paga. Para o blefe, divida a aposta por pote + aposta.'], [Math.min(0.95, bet / pot), 'Você dividiu a aposta só pelo pote. Divida por pote + aposta.']],
+        }[type];
+        const o = numOptions(val, f, W.concat([val + 0.08, val - 0.07]));
         const txt = { need: `Pote de ${num(pot)}bb. O adversário aposta ${num(bet)}bb. Quanta equity você precisa para pagar?`, mdf: `Pote de ${num(pot)}bb e aposta de ${num(bet)}bb. Qual a frequência mínima de defesa (MDF)?`, alpha: `Você quer blefar ${num(bet)}bb num pote de ${num(pot)}bb. Com que frequência o adversário precisa desistir para o blefe lucrar?` }[type];
         const exp = { need: `Você paga ${num(bet)} para disputar um pote final de ${num(pot)} + ${num(bet)} + ${num(bet)} = ${num(pot + 2 * bet)}. Para não perder dinheiro, precisa ganhar ${num(bet)} ÷ ${num(pot + 2 * bet)} = <b>${f(need)}</b> das vezes.`, mdf: `Se você desistir demais, qualquer blefe dele dá lucro. Para impedir isso, continue com pelo menos pote ÷ (pote + aposta) = ${num(pot)} ÷ ${num(pot + bet)} = <b>${f(mdf)}</b> do seu range.`, alpha: `O blefe arrisca ${num(bet)} para ganhar o pote de ${num(pot)}. Empata quando ele desiste aposta ÷ (pote + aposta) = ${num(bet)} ÷ ${num(pot + bet)} = <b>${f(alpha)}</b> das vezes; acima disso, lucra.` }[type];
-        return { keep: true, html: `<p class="lead">${txt}</p>`, options: o.options, a: o.a, exp };
+        return { keep: true, html: `<p class="lead">${txt}</p>`, options: o.options, a: o.a, why: o.why, exp };
       } },
     callfold: { name: 'Pagar ou desistir', domain: 'math', lesson: 'l3_4', desc: 'Equity contra o preço, no turn.',
       gen() {
@@ -328,7 +336,7 @@
           if (Math.abs(need - eq) < 0.02) continue;
           const evCall = eq * (pot + bet) - (1 - eq) * bet;
           return { keep: true, two: true, html: `<p class="lead">Turn. O adversário aposta ${bet}bb num pote de ${pot}bb.</p><div class="lbl">Sua mão</div><div class="board">${cardsHTML(hero)}</div><div class="lbl">Mesa</div><div class="board">${cardsHTML(board)}</div><p class="muted small">Considere que ele tem uma mão feita, que as suas outs para sequência ou flush estão limpas e que não haverá mais apostas no river.</p>`,
-            options: ['Pagar', 'Desistir'], a: eq > need ? 0 : 1, errOf: (o) => (o === 0 ? 'overcall' : 'overfold'), evLoss: Math.abs(evCall), pot: pot + bet,
+            options: ['Pagar', 'Desistir'], a: eq > need ? 0 : 1, why: eq > need ? { 1: `Desistir joga fora lucro: a sua chance (${pct(eq, 1)}) é maior que o preço (${pct(need, 1)}).` } : { 0: `Pagar sai caro: a sua chance (${pct(eq, 1)}) é menor que o preço (${pct(need, 1)}). Conte as outs e compare com o preço antes de decidir.` }, errOf: (o) => (o === 0 ? 'overcall' : 'overfold'), evLoss: Math.abs(evCall), pot: pot + bet,
             exp: `<p style="margin:0 0 6px"><b>1. Suas outs:</b> ${n} cartas completam a sua sequência ou flush:</p><div class="board">${cardsHTML(outsC.slice().sort((x, y) => y - x), true)}</div><p style="margin:6px 0">Faltam 46 cartas desconhecidas, então a sua chance no river é ${n} ÷ 46 = <b>${pct(eq, 1)}</b>.</p><p style="margin:0 0 6px"><b>2. O preço:</b> você paga ${bet} para disputar um pote final de ${pot} + ${bet} + ${bet} = ${pot + 2 * bet}. Precisa ganhar ${bet} ÷ ${pot + 2 * bet} = <b>${pct(need, 1)}</b> das vezes.</p><p style="margin:0"><b>3. Compare:</b> ${eq > need ? `${pct(eq, 1)} é mais que ${pct(need, 1)}: pagar dá lucro.` : `${pct(eq, 1)} é menos que ${pct(need, 1)}: pagar dá prejuízo, desista.`} Em média, pagar ${evCall >= 0 ? 'ganha' : 'perde'} ${num(Math.abs(evCall), 2)} bb.</p>` };
         }
         return DRILLS.potodds.gen();
@@ -344,7 +352,7 @@
           }
         }
         const b = P.deck().slice(0, 3), cl = flopClass(b);
-        return { keep: true, html: `<p class="lead">Como você classifica este flop?</p><div class="board">${cardsHTML(b)}</div>`, options: ['Seca', 'Molhada', 'Pareada', 'Monotone'], a: cl, exp: textureWhy(b, cl) + ' <span class="muted small">Critério do treino: molhada = as três cartas cabem numa sequência de cinco, ou há duas do mesmo naipe e duas cartas a até 3 valores de distância.</span>' };
+        return { keep: true, html: `<p class="lead">Como você classifica este flop?</p><div class="board">${cardsHTML(b)}</div>`, options: ['Seca', 'Molhada', 'Pareada', 'Monotone'], a: cl, why: cl >= 2 ? { 0: `Antes de olhar projetos, confira as regras de cima: ${cl === 3 ? 'três cartas do mesmo naipe fazem a mesa monotone' : 'duas cartas do mesmo valor fazem a mesa pareada'}.`, 1: `Antes de olhar projetos, confira as regras de cima: ${cl === 3 ? 'três cartas do mesmo naipe fazem a mesa monotone' : 'duas cartas do mesmo valor fazem a mesa pareada'}.`, 2: 'Pareada pede duas cartas do mesmo valor na mesa. Aqui os três valores são diferentes.', 3: 'Monotone pede as três cartas do mesmo naipe. Aqui não são.' } : { 0: 'Seca é quando quase ninguém tem projeto. Aqui há projetos de sequência ou de flush.', 1: 'Molhada pede cartas próximas para sequências, ou duas do mesmo naipe com cartas próximas. Aqui as cartas estão distantes.', 2: 'Pareada pede duas cartas do mesmo valor na mesa. Aqui os três valores são diferentes.', 3: 'Monotone pede as três cartas do mesmo naipe. Aqui não são.' }, exp: textureWhy(b, cl) + ' <span class="muted small">Critério do treino: molhada = as três cartas cabem numa sequência de cinco, ou há duas do mesmo naipe e duas cartas a até 3 valores de distância.</span>' };
       } },
     equity: { name: 'Estime a equity', domain: 'read', lesson: 'l5_1', desc: 'Mão contra mão e mão contra range.', err: 'read',
       gen() {
@@ -430,7 +438,19 @@
   }
   const ST = { novo: ['Ainda sem dados', ''], construcao: ['Em construção', 'gold'], fraco: ['Precisa de reforço', 'bad'], dominado: ['Dominado', 'good'], revisar: ['Dominado, hora de revisar', 'gold'] };
   const conceptOpen = (c) => c.level <= (S.placement || 0) || c.lessons.some((l) => S.lessons[l]);
-  const GH = { cards: (a, sm) => cardsHTML(a, sm), pick, shuffle, pct, num };
+  // Mini-mesa: desenha quem está em cada lugar, o botão, o que cada um fez e as fichas na frente de cada jogador.
+  // seats: [{ pos, name, label, act: 'raise'|'call'|'fold'|'post'|'allin'|'check'|'live', put, dealer, hero }], na ordem da mesa (sentido horário).
+  function miniTableHTML(o) {
+    const n = o.seats.length, XY = n === 2 ? [[50, 84], [50, 16]] : n === 3 ? [[50, 84], [15, 26], [85, 26]] : [[50, 86], [12, 64], [17, 16], [50, 8], [83, 16], [88, 64]];
+    const seats = o.seats.map((st, i) => {
+      const [x, y] = XY[i], cx = 50 + (x - 50) * 0.52, cy = 48 + (y - 50) * 0.5, dx = 50 + (x - 50) * 0.66 + (x >= 50 ? -7 : 7), dy = 48 + (y - 50) * 0.66;
+      return `<div class="mt-seat ${st.act || ''} ${st.hero ? 'hero' : ''}" style="left:${x}%;top:${y}%"><b>${esc(st.name || st.pos)}</b>${st.name && st.pos ? `<span class="mt-pos">${esc(st.pos)}</span>` : ''}${st.label ? `<span class="mt-act">${esc(st.label)}</span>` : ''}</div>`
+        + (st.put != null && st.put > 0 ? `<span class="mt-chip" style="left:${cx}%;top:${cy}%">${esc(String(st.put).replace('.', ','))}</span>` : '')
+        + (st.dealer ? `<span class="mt-dealer" style="left:${dx}%;top:${dy}%" title="Botão (dealer)">D</span>` : '');
+    }).join('');
+    return `<div class="mt" role="img" aria-label="${esc(o.aria || 'Mesa com os jogadores e as ações')}"><div class="mt-felt"></div>${o.center ? `<div class="mt-center">${o.center}</div>` : ''}${seats}</div>`;
+  }
+  const GH = { cards: (a, sm) => cardsHTML(a, sm), pick, shuffle, pct, num, mini: miniTableHTML };
   const quizPoolOf = (c) => c.lessons.filter((l) => S.lessons[l] || (findLesson(l) && findLesson(l).m.level < (S.placement || 0))).flatMap((l) => (findLesson(l) ? findLesson(l).l.quiz.map((q) => [q, l]) : []));
   const practicable = (c) => c.gens.length > 0 || quizPoolOf(c).length > 0;
   // Um exercício novo do conceito: gerado pelo motor quando há gerador; senão, uma pergunta das lições já feitas.
@@ -1697,7 +1717,9 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
     if (mentorOn() && S.profile) { actions = mentorNextBtn() + actions.replace(/btn primary/g, 'btn'); if (R.kind !== 'diag' || !R.diagFirst) body = debriefHTML() + body; }
     return `<div class="wrap narrow runner"><div class="eyebrow">${esc(R.title)}</div><h1 class="num">${R.kind === 'diag' ? `Nível ${R.diagRes.level}` : pct(sc)}</h1><h2>${head}</h2>${mentorHTML(body)}<div class="row">${actions}</div>${extra}</div>`;
   }
-  const toItem = (q) => ({ text: q.text, options: q.options, a: q.a, exp: q.exp });
+  // Perguntas escritas das lições e provas: a explicação completa e o motivo de cada alternativa errada vêm de C.QX.
+  const QKEY = new Map(); MODS.forEach((m) => { m.lessons.forEach((l) => l.quiz.forEach((q, i) => QKEY.set(q, l.id + '#' + i))); m.exam.forEach((q, i) => QKEY.set(q, m.id + '!ex#' + i)); });
+  const toItem = (q) => { const x = (C.QX || {})[QKEY.get(q)]; return x ? { text: q.text, options: q.options, a: q.a, exp: x[0], why: Object.assign({}, x[1]) } : { text: q.text, options: q.options, a: q.a, exp: q.exp }; };
   const examItems = (m) => shuffle(m.exam.map((q) => [q, null]).concat(...m.lessons.map((l) => l.quiz.map((q) => [q, l.id])))).slice(0, 10).map(([q, lid]) => Object.assign(toItem(q), { lid }));
   function finalItems() {
     const mods = MODS.filter((m) => m.level >= 1 && m.level <= 4), per = Math.max(1, Math.ceil(30 / mods.length)), out = [];
@@ -2004,6 +2026,46 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
     }
     return `<div class="mbanner"><span class="small"><b>Meta do mentor:</b> ${Math.min(got, t.n)}/${t.n} mãos${t.mode !== TMODE ? ` (a meta é em ${esc(MODES[t.mode][0])})` : ''}.${ok ? fb : ' Antes de cada decisão, pense no conceito; depois, leia o meu comentário no painel.'}</span>${ok && T.over ? mentorNextBtn('small primary') : ''}</div>`;
   }
+  // ---------- mesa: o que cada jogador fez, a situação em palavras e a linha do tempo ----------
+  function lastActs() {
+    const si = ['preflop', 'flop', 'turn', 'river'].indexOf(T.street), out = {};
+    (T.actions || []).filter((a) => a.st === si).forEach((a) => (out[a.i] = a));
+    return out;
+  }
+  function actOf(a, i) {
+    if (!a) { if (T.street === 'preflop' && !T.over) { const pos = T.pos(i); if (pos === 'SB' && T.n > 2) return ['post', 'SB 0,5']; if (pos === 'BB') return ['post', 'BB 1']; if (T.n === 2 && pos === 'BTN') return ['post', 'SB 0,5']; } return null; }
+    if (a.allin && a.a !== 'f') return ['allin', 'All-in ' + num(a.amt, 1)];
+    return { f: ['fold', 'Desistiu'], x: ['check', 'Passou'], c: ['call', 'Pagou ' + num(a.amt, 1)], b: ['raise', 'Apostou ' + num(a.amt, 1)], r: ['raise', (a.st === 0 ? 'Aumentou p/ ' : 'Aumentou p/ ') + num(a.amt, 1)] }[a.a] || null;
+  }
+  const VERB = { f: 'desistiu', x: 'passou', c: 'pagou', b: 'apostou', r: 'aumentou para' };
+  function situationHTML(L, c) {
+    if (T.over) { const w = T.events.filter((e) => / ganha /.test(e)); return `<b>Fim da mão.</b> ${esc(w.length ? w[w.length - 1] : 'O pote foi decidido.')} ${T.p[0].net ? `Você ${T.p[0].net > 0 ? 'ganhou' : 'perdeu'} <b class="num">${num(Math.abs(T.p[0].net), 1)} bb</b>.` : ''}`; }
+    const si = ['preflop', 'flop', 'turn', 'river'].indexOf(T.street), st = ['Pré-flop', 'Flop', 'Turn', 'River'][si];
+    const acts = (T.actions || []).filter((a) => a.st === si && a.i !== 0), folds = acts.filter((a) => a.a === 'f').length, moves = acts.filter((a) => a.a !== 'f');
+    const who = (i) => (T.n > 2 ? 'o ' + T.pos(i) : T.p[i].name);
+    let s = `<b>${st}.</b> `;
+    s += moves.length ? moves.slice(-3).map((a) => `${who(a.i)} ${VERB[a.a]}${a.amt ? ' ' + num(a.amt, 1) + ' bb' : ''}`).join(', ').replace(/^o /, 'O ') + (folds ? `; ${folds === 1 ? 'um jogador desistiu' : folds + ' desistiram'}` : '') + '. ' : folds ? `${folds === 1 ? 'Um jogador desistiu' : folds + ' jogadores desistiram'}. ` : si === 0 ? 'Ninguém agiu antes de você. ' : 'Ninguém apostou ainda. ';
+    if (!L) return s + `<span class="muted">${T.p[T.turn] ? esc(T.p[T.turn].name) + ' está decidindo…' : ''}</span>`;
+    const hl = T.board.length ? describe(P.evaluate(T.p[0].cards.concat(T.board))) : P.labelOf(T.p[0].cards[0], T.p[0].cards[1]);
+    s += `Você está no <b>${T.pos(0)}</b> com <b>${esc(hl)}</b>. `;
+    if (L.toCall > 0) s += `Para continuar, pague <b class="num">${num(L.toCall, 1)} bb</b>: o pote fica com ${num(T.pot() + L.toCall, 1)} bb e você precisa ganhar <b class="num">${pct(L.toCall / (T.pot() + L.toCall))}</b> das vezes.`;
+    else if (si === 0 && T.raises === 0 && T.pos(0) !== 'BB' && T.n > 2) s += 'Ninguém aumentou: pela tabela, aumente ou desista.';
+    else s += 'Ninguém apostou: você pode passar de graça ou apostar.';
+    return s;
+  }
+  // Barra de equity com a marca do preço: dá para ver na hora se a equity cobre o preço.
+  function eqMeter(eq, need) {
+    return `<div class="eqm" title="Equity ${pct(eq)}${need != null ? ' · precisa ' + pct(need) : ''}"><i style="width:${Math.round(eq * 100)}%" class="${need != null ? (eq >= need ? 'ok' : 'no') : ''}"></i>${need != null ? `<b style="left:${Math.round(need * 100)}%"></b>` : ''}</div>`;
+  }
+  function timelineHTML() {
+    const sym = (str) => str.replace(/\b([2-9TJQKA])([shdc])\b/g, (m, r, s) => (r === 'T' ? '10' : r) + '♠♥♦♣'['shdc'.indexOf(s)]);
+    return T.events.map((e) => {
+      const st = e.match(/^(FLOP|TURN|RIVER): (.*?) — pote (.*)$/);
+      if (st) return `<div class="tl-street"><b>${{ FLOP: 'Flop', TURN: 'Turn', RIVER: 'River' }[st[1]]}</b> ${colorize(esc(sym(st[2])))} <span class="muted small">· pote ${esc(st[3])}</span></div>`;
+      const k = / desiste/.test(e) ? 'fold' : / passa/.test(e) ? 'check' : / paga/.test(e) ? 'call' : / aumenta| aposta/.test(e) ? 'raise' : / ganha/.test(e) ? 'win' : / mostra/.test(e) ? 'show' : 'info';
+      return `<div class="tl ${k}"><i></i><span>${colorize(esc(sym(e)))}</span></div>`;
+    }).join('');
+  }
   VIEWS.table = () => {
     const sm = S.sim, dec = sm.good + sm.ok + sm.bad;
     const stats = `<div class="grid3"><div class="stat"><span class="eyebrow">Mãos</span><span class="v num">${num(sm.hands, 0)}</span></div><div class="stat"><span class="eyebrow">Resultado</span><span class="v num">${sm.hands ? num((sm.net / sm.hands) * 100, 1) : 0}<span class="small muted"> bb/100</span></span><span class="small muted num">${num(sm.net, 1)} bb no total</span></div><div class="stat"><span class="eyebrow">Qualidade das decisões</span><span class="v num">${dec ? pct((sm.good + 0.5 * sm.ok) / dec) : '—'}</span><span class="small muted num">VPIP ${sm.hands ? pct(sm.vpip / sm.hands) : '—'} · PFR ${sm.hands ? pct(sm.pfr / sm.hands) : '—'}</span></div></div>`;
@@ -2017,45 +2079,57 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
     }
     const hero = T.p[0], L = !T.over && T.turn === 0 ? T.legal(0) : null;
     if (L && !coachInfo) computeCoach();
-    const c = coachInfo, XY = SEATXY[T.n] || SEATXY[6];
+    const c = coachInfo, XY = SEATXY[T.n] || SEATXY[6], la = lastActs();
     const seats = T.p.map((p, i) => {
       const [x, y] = XY[i]; const show = i === 0 || (T.over && T.results && T.results.showdown && !p.folded);
       const win = T.over && T.results && T.results.winners.includes(i);
       const lab = p.adv ? MODES.adversarial[2].find((b) => b[2] === p.adv)[0] : p.profile ? P.PROFILES[p.profile].label : '';
-      return `<div class="seat ${T.turn === i ? 'turn' : ''} ${p.folded ? 'folded' : ''} ${win ? 'win' : ''}" style="left:${x}%;top:${y}%">
-        ${i === 0 ? '' : `<div class="cards">${p.folded ? '' : show ? cardsHTML(p.cards, true) : backHTML(true) + backHTML(true)}</div>`}
-        <div class="plate"><span class="pos">${T.pos(i)}${i === T.button ? ' · D' : ''}</span><b>${esc(p.name)}${!p.hero && !p.adv && !isPop(TMODE) ? ` <span class="muted small">${esc(lab)}</span>` : ''}</b>${p.obs && p.obs.h ? `<span class="small muted num" title="VPIP / PFR em ${p.obs.h} mãos">${Math.round((p.obs.v / p.obs.h) * 100)}/${Math.round((p.obs.pf / p.obs.h) * 100)} · ${p.obs.h}m</span>` : ''}<span class="mono">${num(p.stack, 1)} bb</span></div>
-        ${p.bet > 0 ? `<span class="betchip">${num(p.bet, 1)}</span>` : T.over && p.net ? `<span class="small num" style="color:${p.net > 0 ? 'var(--good)' : 'var(--red)'}">${p.net > 0 ? '+' : ''}${num(p.net, 1)}</span>` : ''}
-        ${i === 0 ? `<div class="cards">${cardsHTML(p.cards)}</div>` : ''}</div>`;
+      const a = actOf(la[i], i), pos = T.pos(i);
+      const bx = 50 + (x - 50) * 0.56, by = 47 + (y - 47) * 0.52;
+      const tone = isPop(TMODE) || p.hero ? (p.hero ? 'hero' : 'n' + (i % 5)) : p.profile || 'tag';
+      return `<div class="seat ${T.turn === i && !T.over ? 'turn' : ''} ${p.folded ? 'folded' : ''} ${win ? 'win' : ''} ${p.hero ? 'me' : ''}" style="left:${x}%;top:${y}%">
+          ${a ? `<span class="act-bubble ${a[0]}">${esc(a[1])}</span>` : T.turn === i && !T.over && !p.hero ? '<span class="act-bubble thinking">pensando…</span>' : ''}
+          <div class="seat-body"><div class="avatar t-${tone}">${esc((p.name || '?').trim()[0].toUpperCase())}<span class="pos-chip ${['SB', 'BB'].includes(pos) ? 'blind' : pos === 'BTN' ? 'btn' : ''}">${pos}</span>${p.allin && !T.over ? '<span class="allin-tag">ALL-IN</span>' : ''}</div>
+          <div class="plate"><b>${esc(p.name)}${!p.hero && !p.adv && !isPop(TMODE) ? ` <span class="muted small">${esc(lab)}</span>` : ''}</b>${p.obs && p.obs.h ? `<span class="small muted num" title="VPIP / PFR em ${p.obs.h} mãos">${Math.round((p.obs.v / p.obs.h) * 100)}/${Math.round((p.obs.pf / p.obs.h) * 100)} · ${p.obs.h}m</span>` : ''}<span class="mono stack">${num(p.stack, 1)} bb</span></div></div>
+          ${i === 0 ? '' : `<div class="cards">${p.folded ? '' : show ? cardsHTML(p.cards, true) : backHTML(true) + backHTML(true)}</div>`}
+          ${T.over && p.net ? `<span class="net num ${p.net > 0 ? 'up' : 'down'}">${p.net > 0 ? '+' : ''}${num(p.net, 1)}</span>` : ''}
+        </div>${p.bet > 0 ? `<div class="bet" style="left:${bx}%;top:${by}%"><i class="chipico"></i><span class="num">${num(p.bet, 1)}</span></div>` : ''}${i === T.button ? `<div class="dealer-btn" style="left:${50 + (x - 50) * 0.74 + (x >= 50 ? -6 : 6)}%;top:${47 + (y - 47) * 0.72}%" title="Botão (dealer)">D</div>` : ''}`;
     }).join('');
+    const sc = T.board.length ? P.evaluate(hero.cards.concat(T.board)) : null;
+    const heroInfo = `<div class="hero-hand"><div class="cards big">${cardsHTML(hero.cards)}</div><div class="small"><b>${sc ? describe(sc) : esc(P.labelOf(hero.cards[0], hero.cards[1]))}</b><div class="muted">${T.pos(0)} · ${num(hero.stack, 1)} bb${hero.folded ? ' · fora da mão' : ''}</div></div></div>`;
     let actions = '';
-    if (T.over) { const wait = T.pauseUntil > Date.now(); actions = `<button class="btn primary" data-act="deal" id="dealBtn" ${wait ? 'disabled' : ''}>${wait ? `Respire… ${Math.ceil((T.pauseUntil - Date.now()) / 1000)}s` : 'Próxima mão'}</button>${T.replayId ? `<button class="btn" data-act="replay" data-id="${T.replayId}">Rever esta mão</button>` : ''}<button class="btn ghost" data-act="leave">Levantar da mesa</button>`; }
+    if (T.over) { const wait = T.pauseUntil > Date.now(); actions = `<button class="btn primary big" data-act="deal" id="dealBtn" ${wait ? 'disabled' : ''}>${wait ? `Respire… ${Math.ceil((T.pauseUntil - Date.now()) / 1000)}s` : 'Próxima mão'}</button>${T.replayId ? `<button class="btn" data-act="replay" data-id="${T.replayId}">Rever esta mão</button>` : ''}<button class="btn ghost" data-act="leave">Levantar da mesa</button>`; }
     else if (L) {
       const pot = T.pot(), sizes = [];
       if (T.street === 'preflop') {
         if (T.raises === 0) { const lim = T.p.filter((p, i) => i !== 0 && p.vpip).length; sizes.push([(T.pos(0) === 'SB' ? 3 : 2.5) + lim, 'Aumentar']); }
         else { const oop = ['SB', 'BB'].includes(T.pos(0)); sizes.push([T.curBet * (oop ? 4 : 3), T.raises >= 2 ? '4-bet' : '3-bet']); }
-      } else if (T.curBet === 0) { sizes.push([pot / 3, '1/3 pote'], [(pot * 2) / 3, '2/3 pote'], [pot, 'Pote']); }
+      } else if (T.curBet === 0) { sizes.push([pot / 3, 'Apostar 1/3'], [(pot * 2) / 3, 'Apostar 2/3'], [pot, 'Apostar o pote']); }
       else sizes.push([T.curBet * 3, 'Aumentar 3x']);
-      const gOn = T.guide && !T.guide.done;
-      actions = gOn ? '<span class="small muted">Responda as perguntas do mentor; depois, a decisão é sua.</span>' : `<button class="btn danger" data-act="hero" data-a="fold" ${L.canCheck ? 'disabled title="Passar é grátis"' : ''}>Desistir</button>
-        <button class="btn" data-act="hero" data-a="${L.canCheck ? 'check' : 'call'}">${L.canCheck ? 'Passar' : `Pagar ${num(L.toCall, 1)}`}</button>
-        ${L.canRaise ? sizes.filter((s) => s[0] < L.maxTo).map((s) => `<button class="btn primary" data-act="hero" data-a="raise" data-amt="${Math.max(L.minTo, Math.round(s[0] * 10) / 10)}">${s[1]} ${num(Math.max(L.minTo, Math.round(s[0] * 10) / 10), 1)}</button>`).join('') + `<button class="btn" data-act="hero" data-a="raise" data-amt="${L.maxTo}">All-in ${num(L.maxTo, 1)}</button>` : ''}`;
-    } else actions = '<span class="muted small">Os adversários estão pensando…</span>';
+      const gOn = T.guide && !T.guide.done, need = L.toCall > 0 ? L.toCall / (pot + L.toCall) : 0;
+      actions = gOn ? '<span class="small muted">Responda as perguntas do mentor; depois, a decisão é sua.</span>' : `<button class="act-btn fold" data-act="hero" data-a="fold" ${L.canCheck ? 'disabled title="Passar é grátis"' : ''}><b>Desistir</b><span>${L.canCheck ? 'passar é grátis' : 'sai da mão'}</span></button>
+        <button class="act-btn call" data-act="hero" data-a="${L.canCheck ? 'check' : 'call'}"><b>${L.canCheck ? 'Passar' : `Pagar ${num(L.toCall, 1)}`}</b><span>${L.canCheck ? 'sem custo' : `precisa de ${pct(need)}`}</span></button>
+        ${L.canRaise ? sizes.filter((s) => s[0] < L.maxTo).map((s) => { const v = Math.max(L.minTo, Math.round(s[0] * 10) / 10); return `<button class="act-btn raise" data-act="hero" data-a="raise" data-amt="${v}"><b>${s[1]}</b><span>para ${num(v, 1)} bb</span></button>`; }).join('') + `<button class="act-btn allin" data-act="hero" data-a="raise" data-amt="${L.maxTo}"><b>All-in</b><span>${num(L.maxTo, 1)} bb</span></button>` : ''}`;
+    } else actions = `<span class="muted small">${T.turn != null ? esc(T.p[T.turn].name) + ' está pensando…' : 'Aguarde…'}</span>`;
     const panel = c && L ? `<div class="stack small">
         <div class="row"><span class="pill gold">${c.pos}</span><span class="pill">${c.label}</span>${c.made ? `<span class="pill">${c.made}</span>` : ''}</div>
         ${c.pre && T.raises === 0 && c.pos !== 'BB' && T.n > 2 ? '<div>Ninguém aumentou antes de você. Regra da tabela: ou você aumenta, ou desiste. Nada de limp.</div>' : c.toCall > 0 ? `<div>Para pagar <b class="num">${num(c.toCall, 1)}bb</b> num pote de <b class="num">${num(c.pot, 1)}bb</b>: você precisa de <b class="num">${pct(c.need, 1)}</b> de equity.</div>` : '<div>Ninguém apostou: você pode passar de graça.</div>'}
-        ${c.eq !== undefined ? `<div>Equity estimada contra os ranges prováveis: <b class="num">${pct(c.eq)}</b>.</div>` : '<div>Pré-flop: pense na tabela da sua posição. O mentor comenta depois da sua escolha.</div>'}</div>`
+        ${c.eq !== undefined ? `<div>Equity estimada contra os ranges prováveis: <b class="num">${pct(c.eq)}</b>.${eqMeter(c.eq, c.toCall > 0 ? c.need : null)}</div>` : '<div>Pré-flop: pense na tabela da sua posição. O mentor comenta depois da sua escolha.</div>'}</div>`
       : T.over ? `<div class="small">${T.results && T.results.showdown ? 'Showdown.' : 'Mão encerrada sem showdown.'} Seu resultado: <b class="num">${hero.net > 0 ? '+' : ''}${num(hero.net, 1)}bb</b>.</div>${T.lossAt === T.handNo ? `<div class="hint small"><b>Perda grande.</b> O próximo baralho não sabe que você perdeu: as cartas são sorteadas de forma justa, sem compensação. Solte os ombros, respire fundo duas vezes e pergunte: a decisão foi boa com o que eu sabia? ${T.rv && T.rv.some((d) => d.g === 'bad') ? 'O replay mostra onde houve erro.' : 'O mentor não marcou erro seu nesta mão: pode ter sido só variância.'}</div>` : ''}${readQHTML()}` : '<div class="small muted">Aguardando a sua vez.</div>';
-    return `<div class="wrap">
-      <div class="row" style="justify-content:space-between"><div><div class="eyebrow">${esc(MODES[TMODE][0])} · mão #${T.handNo}</div><h2>${T.street === 'preflop' ? 'Pré-flop' : T.street[0].toUpperCase() + T.street.slice(1)}</h2></div><span class="pill num">${simMode(TMODE).hands} mãos neste modo</span></div>
+    const si = ['preflop', 'flop', 'turn', 'river'].indexOf(T.street);
+    return `<div class="wrap table-view">
+      <div class="table-head"><div><div class="eyebrow">${esc(MODES[TMODE][0])} · mão #${T.handNo}</div>
+        <ol class="streets">${['Pré-flop', 'Flop', 'Turn', 'River'].map((s, k) => `<li class="${k < si || T.over && k <= si ? 'done' : ''} ${k === si && !T.over ? 'cur' : ''}">${s}</li>`).join('')}</ol></div>
+        <span class="pill num">${simMode(TMODE).hands} mãos neste modo</span></div>
       ${tableGoalHTML()}
-      <div class="table-wrap ${T.n === 2 ? 'hu' : ''}"><div class="oval"></div><div class="center"><div class="board">${T.board.length ? cardsHTML(T.board) : ''}</div><span class="pot">Pote ${num(T.pot(), 1)} bb</span></div>${seats}</div>
+      <div class="table-wrap ${T.n === 2 ? 'hu' : ''}"><div class="oval"><span class="felt-logo">Escola do Ás</span></div>
+        <div class="center"><div class="board">${T.board.length ? cardsHTML(T.board) : ''}${'<span class="card slot"></span>'.repeat(5 - T.board.length)}</div><span class="pot">Pote <b class="num">${num(T.pot(), 1)} bb</b></span></div>${seats}</div>
+      <div class="situation"><span class="eyebrow">Situação</span><p>${situationHTML(L, c)}</p></div>
       ${L && T.clk ? `<div class="bar clock" title="Relógio de decisão"><i style="width:100%;animation:clk ${T.clk.lim}ms linear ${-(Date.now() - T.clk.t0)}ms forwards"></i></div>` : ''}
       ${L ? guideHTML() : ''}
-      <div class="actions">${actions}</div>
+      <div class="actionbar">${hero.folded && !T.over ? '' : heroInfo}<div class="actions">${actions}</div></div>
       <div class="grid2"><div class="panel stack"><div class="eyebrow">Painel do mentor</div>${panel}<div class="coach-feed">${feed.map((f) => `<div class="coach-item ${f.g}"><span class="lbl">${f.street}</span> ${f.txt}</div>`).join('') || '<span class="small muted">Os comentários sobre as suas decisões aparecem aqui.</span>'}</div></div>
-      <div class="panel stack"><div class="eyebrow">Histórico da mão</div><div class="log" id="handlog">${T.events.map((e) => colorize(esc(e.replace(/\b([2-9TJQKA])([shdc])\b/g, (m, r, s) => r + '♠♥♦♣'['shdc'.indexOf(s)])))).join('<br>')}</div></div></div>
+      <div class="panel stack"><div class="eyebrow">Histórico da mão</div><div class="timeline" id="handlog">${timelineHTML()}</div></div></div>
       ${stats}</div>`;
   };
 
