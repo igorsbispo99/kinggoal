@@ -81,12 +81,16 @@
   const PLURAL = { 'ás': 'ases', rei: 'reis', dama: 'damas', valete: 'valetes' };
   const rplural = (r) => PLURAL[rname(r)] || rname(r);
   // Alternativas numéricas (aceita negativos): a correta + distratores distintos, completando até 4.
+  // Alternativas numéricas. Um candidato pode vir como [valor, motivo]: o motivo descreve o erro de raciocínio que leva
+  // àquele número, e o app mostra ao aluno quando ele marca essa alternativa ("why").
   function opts(correct, fmt, cands) {
-    const seen = new Set([fmt(correct)]), out = [correct];
-    for (const c of cands.slice().sort(() => Math.random() - 0.5)) { if (out.length >= 4) break; const f = fmt(c); if (!seen.has(f) && Number.isFinite(c)) { seen.add(f); out.push(c); } }
+    const seen = new Set([fmt(correct)]), out = [correct], reason = {};
+    const list = cands.map((c) => (Array.isArray(c) ? c : [c, null])).sort(() => Math.random() - 0.5).sort((x, y) => (y[1] ? 1 : 0) - (x[1] ? 1 : 0));
+    for (const [c, r] of list) { if (out.length >= 4) break; const f = fmt(c); if (!seen.has(f) && Number.isFinite(c)) { seen.add(f); out.push(c); if (r) reason[f] = r; } }
     for (let k = 1; out.length < 4 && k < 50; k++) { const c = correct + k * (Math.abs(correct) > 20 ? 5 : 1) * (k % 2 ? 1 : -1); const f = fmt(c); if (!seen.has(f)) { seen.add(f); out.push(c); } }
-    const sorted = out.slice().sort((x, y) => x - y);
-    return { options: sorted.map(fmt), a: sorted.indexOf(correct) };
+    const sorted = out.slice().sort((x, y) => x - y), why = {};
+    sorted.forEach((v, i) => { if (reason[fmt(v)]) why[i] = reason[fmt(v)]; });
+    return { options: sorted.map(fmt), a: sorted.indexOf(correct), why };
   }
 
   // ---------------------------------------------------------------- geradores
@@ -120,10 +124,17 @@
     },
     pote(h) {
       const r = h.pick([4, 5, 6, 7]), callers = between(1, 2), bbCalls = Math.random() < 0.5;
+      const seats = ['UTG', 'HJ', 'CO', 'BTN'], who = seats.slice(0, 1 + callers), rest = seats.slice(1 + callers);
       const pot = r * (1 + callers) + 1 + (bbCalls ? r : 2);
-      const o = opts(pot, String, [pot - 1, pot - 2, pot + 1, pot + 2, pot - r, pot + r]);
-      return { html: `<p class="lead">Blinds de 1/2. Um jogador aumenta para ${r}. ${callers === 1 ? 'Outro jogador paga' : 'Dois jogadores pagam'}. O small blind desiste. O big blind ${bbCalls ? 'paga' : 'desiste'}. Quantas fichas há no pote?</p>`,
-        options: o.options, a: o.a, exp: `Quem aumentou e quem pagou: ${1 + callers} × ${r} = ${r * (1 + callers)}. Small blind (desistiu, mas deixou): 1. Big blind: ${bbCalls ? r + ' (pagou)' : '2 (desistiu, mas deixou)'}. Total: <b>${pot}</b>.`, hints: ['Quem desiste deixa no pote o que já tinha colocado.'] };
+      const o = opts(pot, String, [[pot - 1, 'Faltou o small blind: ele desistiu, mas a ficha que colocou antes das cartas fica no pote.'],
+        bbCalls ? [pot - r + 2, `Você contou o big blind como 2, mas ele pagou o aumento: completou até ${r}, então tem ${r} no pote.`] : [pot - 2, 'Faltou o big blind: ele desistiu, mas os 2 que colocou antes das cartas ficam no pote.'],
+        bbCalls ? [pot + 2, `Você somou os 2 do big blind ao pagamento dele. Pagar o aumento é completar até ${r}: o total dele é ${r}, não ${r + 2}.`] : [pot + r - 2, `O big blind desistiu: ele deixou só os 2 que já tinha, não pagou ${r}.`],
+        [pot - r, `Faltou um dos jogadores que pagaram ${r}.`], [pot + r, `Você contou um jogador a mais pagando ${r}.`]]);
+      const acts = [`${who[0]} aumenta para ${r}.`].concat(who.slice(1).map((p) => `${p} paga ${r}.`), rest.map((p) => `${p} desiste.`), ['SB desiste.', `BB ${bbCalls ? `paga (completa até ${r})` : 'desiste'}.`]);
+      const rows = who.map((p) => [p, r, p === who[0] ? 'aumentou' : 'pagou']).concat([['SB', 1, 'desistiu, mas deixou o small blind'], ['BB', bbCalls ? r : 2, bbCalls ? `pagou: completou até ${r}` : 'desistiu, mas deixou o big blind']]);
+      return { html: `<p class="lead">Blinds de 1/2: antes das cartas, o SB colocou 1 e o BB colocou 2. Depois, a ação foi esta, em ordem:</p><ol class="acts">${acts.map((a) => `<li>${a}</li>`).join('')}</ol><p class="lead">Quantas fichas há no pote agora?</p>`,
+        options: o.options, a: o.a, why: o.why,
+        exp: `Some o que cada jogador deixou no pote:<table class="t small">${rows.map(([p, v, t]) => `<tr><td>${p}</td><td class="num">${v}</td><td>${t}</td></tr>`).join('')}<tr><td><b>Total</b></td><td class="num"><b>${pot}</b></td><td></td></tr></table>Quem só desistiu sem ter colocado nada (${rest.length ? rest.join(', ') : 'ninguém'}) não entra na conta.`, hints: ['Quanto cada jogador colocou, no total?', 'Quem desiste leva de volta o que já tinha colocado?'] };
     },
     posicao(h) {
       const order = ['SB', 'BB', 'UTG', 'HJ', 'CO', 'BTN'];
@@ -133,8 +144,8 @@
     },
     stackef(h) {
       const a = h.pick([40, 60, 80, 100, 120, 150, 200, 250]), b = h.pick([35, 45, 70, 90, 110, 180, 300]);
-      const e = Math.min(a, b), o = opts(e, (x) => x + ' bb', [a, b, a + b, Math.abs(a - b), Math.round((a + b) / 2)]);
-      return { html: `<p class="lead">Você tem ${a} bb e o único adversário na partida tem ${b} bb. Qual é o stack efetivo?</p>`, options: o.options, a: o.a, exp: `O menor dos dois: <b>${e} bb</b>. É o máximo que pode trocar de mãos entre vocês.` };
+      const e = Math.min(a, b), o = opts(e, (x) => x + ' bb', [[Math.max(a, b), 'Esse é o maior stack. O efetivo é o menor: ninguém ganha de um jogador mais do que ele tem.'], [a + b, 'Você somou os dois stacks. O efetivo é só o menor deles.'], [Math.abs(a - b), 'Essa é a diferença entre os stacks, não o stack efetivo.'], [Math.round((a + b) / 2), 'Essa é a média dos stacks. O efetivo é o menor.']]);
+      return { html: `<p class="lead">Você tem ${a} bb e o único adversário na partida tem ${b} bb. Qual é o stack efetivo?</p>`, options: o.options, a: o.a, why: o.why, exp: `O menor dos dois: <b>${e} bb</b>. É o máximo que pode trocar de mãos entre vocês.` };
     },
     sidepot(h) {
       const s = h.pick([20, 30, 40, 50]), x = h.pick([30, 40, 60, 80]);
@@ -145,13 +156,13 @@
     },
     stackbb(h) {
       const bb = h.pick([100, 200, 400, 600, 800, 1000, 2000]), n = h.pick([8, 10, 12, 15, 20, 25, 30, 40]);
-      const chips = bb * n, o = opts(n, (v) => v + ' bb', [n / 2, n * 2, n + 5, n - 3, Math.round(chips / (bb * 1.5))]);
-      return { html: `<p class="lead">Você tem ${h.num(chips, 0)} fichas. Os blinds são ${h.num(bb / 2, 0)}/${h.num(bb, 0)}. Quantos big blinds você tem?</p>`, options: o.options, a: o.a, exp: `Big blinds = fichas ÷ valor do big blind: ${h.num(chips, 0)} ÷ ${h.num(bb, 0)} = <b>${n} bb</b>. Contar em big blinds deixa qualquer stack comparável, em qualquer nível de blinds.${n <= 12 ? ' Faixa de all-in ou desistir.' : n <= 25 ? ' Faixa de aberturas pequenas e all-in por cima (reshove).' : ''}` };
+      const chips = bb * n, o = opts(n, (v) => v + ' bb', [[n * 2, `Você dividiu pelo small blind (${bb / 2}). O big blind é o número maior: ${bb}.`], [n / 2, `Você dividiu por ${bb * 2}, o dobro do big blind. Divida pelo big blind: ${bb}.`], [Math.round(chips / (bb * 1.5)), 'Você dividiu pela soma dos blinds. Divida só pelo big blind.'], n + 5, n - 3]);
+      return { html: `<p class="lead">Você tem ${h.num(chips, 0)} fichas. Os blinds são ${h.num(bb / 2, 0)}/${h.num(bb, 0)}. Quantos big blinds você tem?</p>`, options: o.options, a: o.a, why: o.why, exp: `Big blinds = fichas ÷ valor do big blind: ${h.num(chips, 0)} ÷ ${h.num(bb, 0)} = <b>${n} bb</b>. Contar em big blinds deixa qualquer stack comparável, em qualquer nível de blinds.${n <= 12 ? ' Faixa de all-in ou desistir.' : n <= 25 ? ' Faixa de aberturas pequenas e all-in por cima (reshove).' : ''}` };
     },
     winrate(h) {
       const hands = h.pick([5000, 10000, 20000, 25000, 40000, 50000]), wr = h.pick([-3, -1, 1, 2, 3, 4, 5, 6, 8]);
-      const bb = (wr * hands) / 100, o = opts(wr, (v) => h.num(v, 1) + ' bb/100', [wr * 10, wr / 10, wr + 2, wr - 2, wr * 2]);
-      return { html: `<p class="lead">Você ${bb >= 0 ? 'ganhou' : 'perdeu'} ${h.num(Math.abs(bb), 0)} bb em ${h.num(hands, 0)} mãos. Qual a sua taxa?</p>`, options: o.options, a: o.a, exp: `${h.num(bb, 0)} ÷ ${h.num(hands / 100, 0)} blocos de 100 mãos = <b>${h.num(wr, 1)} bb/100</b>.` };
+      const bb = (wr * hands) / 100, o = opts(wr, (v) => h.num(v, 1) + ' bb/100', [[wr / 10, `Você dividiu por ${h.num(hands / 10, 0)} (blocos de 10 mãos). São blocos de 100: ${h.num(hands, 0)} ÷ 100 = ${h.num(hands / 100, 0)}.`], [wr * 10, `Você dividiu por ${h.num(hands / 1000, 0)} (blocos de 1.000 mãos). São blocos de 100: ${h.num(hands, 0)} ÷ 100 = ${h.num(hands / 100, 0)}.`], [wr * 2, 'Confira a divisão: ganhos ÷ número de blocos de 100 mãos.'], wr + 2, wr - 2]);
+      return { html: `<p class="lead">Você ${bb >= 0 ? 'ganhou' : 'perdeu'} ${h.num(Math.abs(bb), 0)} bb em ${h.num(hands, 0)} mãos. Qual a sua taxa?</p>`, options: o.options, a: o.a, why: o.why, exp: `bb/100 é quanto você ganha a cada 100 mãos. Passo 1: quantos blocos de 100 mãos? ${h.num(hands, 0)} ÷ 100 = ${h.num(hands / 100, 0)}. Passo 2: divida o resultado pelos blocos: ${h.num(bb, 0)} ÷ ${h.num(hands / 100, 0)} = <b>${h.num(wr, 1)} bb/100</b>.` };
     },
     combos(h) {
       const t = between(0, 2), R = P.RANKS;
@@ -173,14 +184,14 @@
       const n = h.pick([4, 6, 8, 9, 12, 15]), two = Math.random() < 0.45;
       const exact = two ? 1 - ((47 - n) * (46 - n)) / (47 * 46) : n / 46;
       const val = Math.round(exact * 100);
-      const o = opts(val, (v) => v + '%', [n, n * 2, n * 4, n * 3, val + 10, val - 8, val + 20]);
-      return { html: `<p class="lead">Você tem ${n} outs. ${two ? 'Você está no flop e vai ver o turn e o river sem novas apostas (alguém está all-in).' : 'Você está no turn e falta só o river.'} Qual a chance aproximada de completar?</p>`, options: o.options, a: o.a,
+      const o = opts(val, (v) => v + '%', two ? [[n * 2, 'Você usou a regra do 2, mas faltam duas cartas (turn e river): é a regra do 4.'], [n, 'O número de outs não é a chance: multiplique por 4 (duas cartas) ou por 2 (uma carta).'], n * 3, val + 10, val - 8] : [[n * 4, 'Você usou a regra do 4, mas falta só uma carta (o river): é a regra do 2.'], [n, 'O número de outs não é a chance: multiplique por 2 quando falta uma carta.'], n * 3, val + 10, val - 8]);
+      return { html: `<p class="lead">Você tem ${n} outs. ${two ? 'Você está no flop e vai ver o turn e o river sem novas apostas (alguém está all-in).' : 'Você está no turn e falta só o river.'} Qual a chance aproximada de completar?</p>`, options: o.options, a: o.a, why: o.why,
         exp: `${two ? `Regra do 4: ${n} × 4 = ${n * 4}%${n > 8 ? ` (corrigindo: − ${n - 8} = ${n * 4 - (n - 8)}%)` : ''}.` : `Regra do 2: ${n} × 2 = ${n * 2}%.`} O número exato é <b>${val}%</b>.` };
     },
     bbpreco(h) {
       const o0 = h.pick([2, 2.2, 2.5, 3, 3.5, 4]), call = o0 - 1, fin = 2 * o0 + 0.5, need = call / fin;
-      const val = Math.round(need * 100), o = opts(val, (v) => v + '%', [val + 6, val - 6, val + 12, Math.round((o0 / fin) * 100), 50, 33]);
-      return { html: `<p class="lead">O botão abre para ${h.num(o0, 1)} bb e o small blind desiste. Você está no big blind. Quanto precisa ganhar, no mínimo, para pagar?</p>`, options: o.options, a: o.a,
+      const val = Math.round(need * 100), o = opts(val, (v) => v + '%', [[Math.round((o0 / fin) * 100), `Você usou o aumento inteiro (${h.num(o0, 1)}), mas já tinha 1 bb no pote: você só coloca ${h.num(call, 1)}.`], [Math.round((call / (o0 + 0.5 + 1)) * 100), 'Você dividiu pelo pote antes do seu pagamento. Divida pelo pote final, já com o que você vai colocar.'], val + 6, val - 6, 50]);
+      return { html: `<p class="lead">O botão abre para ${h.num(o0, 1)} bb e o small blind desiste. Você está no big blind. Quanto precisa ganhar, no mínimo, para pagar?</p>`, options: o.options, a: o.a, why: o.why,
         exp: `Você completa ${h.num(call, 1)} bb (já tinha 1). Pote final: ${h.num(o0, 1)} + 0,5 + ${h.num(o0, 1)} = ${h.num(fin, 1)}. ${h.num(call, 1)} ÷ ${h.num(fin, 1)} ≈ <b>${val}%</b>.` };
     },
     ev(h) {
@@ -250,8 +261,8 @@
     },
     hudeal(h) {
       const second = h.pick([600, 1000, 3000, 6000]), first = second + h.pick([400, 1000, 2000, 4000]), share = h.pick([0.3, 0.4, 0.5, 0.6, 0.7]);
-      const v = Math.round(second + share * (first - second)), o = opts(v, (x) => '$' + h.num(x, 0), [Math.round(share * (first + second)), Math.round(share * first), second, first, v + 200]);
-      return { html: `<p class="lead">Mano a mano final. 1º: $${h.num(first, 0)}; 2º: $${h.num(second, 0)}. Você tem ${Math.round(share * 100)}% das fichas. Qual o valor justo do seu stack?</p>`, options: o.options, a: o.a, exp: `$${h.num(second, 0)} garantidos + ${Math.round(share * 100)}% de $${h.num(first - second, 0)} = <b>$${h.num(v, 0)}</b>.` };
+      const v = Math.round(second + share * (first - second)), o = opts(v, (x) => '$' + h.num(x, 0), [[Math.round(share * (first + second)), 'Você aplicou a sua fatia aos dois prêmios. Mas o 2º prêmio já é garantido: a fatia vale só para a diferença entre o 1º e o 2º.'], [Math.round(share * first), 'Você aplicou a fatia ao 1º prêmio inteiro e esqueceu o 2º prêmio, que já é garantido.'], [second, 'Esse é só o valor garantido. Falta a sua parte da diferença em disputa.'], first, v + 200]);
+      return { html: `<p class="lead">Mano a mano final. 1º: $${h.num(first, 0)}; 2º: $${h.num(second, 0)}. Você tem ${Math.round(share * 100)}% das fichas. Qual o valor justo do seu stack?</p>`, options: o.options, a: o.a, why: o.why, exp: `$${h.num(second, 0)} garantidos + ${Math.round(share * 100)}% de $${h.num(first - second, 0)} = <b>$${h.num(v, 0)}</b>.` };
     },
     impacto(h) {
       const fa = h.pick([2, 5, 10, 16]), la = h.pick([0.05, 0.1, 0.2]), fb = h.pick([0.1, 0.3, 0.5]), lb = h.pick([1, 2, 5]);
@@ -266,8 +277,8 @@
     },
     roi(h) {
       const inv = h.pick([2000, 5000, 6000, 10000]), roi = h.pick([-10, 5, 10, 15, 20, 30]), prof = (inv * roi) / 100;
-      const o = opts(roi, (v) => v + '%', [roi * 2, roi + 10, roi - 5, Math.round(roi / 2)]);
-      return { html: `<p class="lead">Você investiu $${h.num(inv, 0)} em torneios e ${prof >= 0 ? 'lucrou' : 'perdeu'} $${h.num(Math.abs(prof), 0)}. Qual o seu ROI?</p>`, options: o.options, a: o.a, exp: `ROI = lucro ÷ investimento: ${h.num(prof, 0)} ÷ ${h.num(inv, 0)} = <b>${roi}%</b>. Ou seja, para cada $100 investidos, você ${roi >= 0 ? 'ganhou' : 'perdeu'} $${Math.abs(roi)} em média.` };
+      const o = opts(roi, (v) => v + '%', [[roi * 2, 'Confira a divisão: lucro ÷ investimento.'], [Math.round(roi / 2), 'Confira a divisão: lucro ÷ investimento (não divida pelo dobro do investimento).'], roi + 10, roi - 5]);
+      return { html: `<p class="lead">Você investiu $${h.num(inv, 0)} em torneios e ${prof >= 0 ? 'lucrou' : 'perdeu'} $${h.num(Math.abs(prof), 0)}. Qual o seu ROI?</p>`, options: o.options, a: o.a, why: o.why, exp: `ROI = lucro ÷ investimento: ${h.num(prof, 0)} ÷ ${h.num(inv, 0)} = <b>${roi}%</b>. Ou seja, para cada $100 investidos, você ${roi >= 0 ? 'ganhou' : 'perdeu'} $${Math.abs(roi)} em média.` };
     },
     overlay(h) {
       const buy = h.pick([11, 22, 55]), fee = 0.1, gtd = h.pick([5000, 10000, 20000]);
@@ -283,8 +294,8 @@
     },
     makeup(h) {
       const mk = h.pick([0, 500, 1000, 2000]), prof = h.pick([300, 800, 1500, 3000]), split = h.pick([0.5, 0.6]);
-      const v = Math.round(Math.max(0, prof - mk) * split), o = opts(v, (x) => '$' + h.num(x, 0), [Math.round(prof * split), prof - mk, Math.round(mk * split), v + 250, 0]);
-      return { html: `<p class="lead">Você tem makeup de $${h.num(mk, 0)} com o time. Neste mês lucrou $${h.num(prof, 0)}. A sua parte da divisão é ${Math.round(split * 100)}%. Quanto recebe?</p>`, options: o.options, a: o.a,
+      const v = Math.round(Math.max(0, prof - mk) * split), o = opts(v, (x) => '$' + h.num(x, 0), [[Math.round(prof * split), 'Você dividiu o lucro inteiro. Antes de dividir, o lucro precisa zerar o makeup.'], [prof - mk, 'Isso é o que sobra depois de zerar o makeup. Falta aplicar a sua porcentagem da divisão.'], Math.round(mk * split), v + 250, 0]);
+      return { html: `<p class="lead">Você tem makeup de $${h.num(mk, 0)} com o time. Neste mês lucrou $${h.num(prof, 0)}. A sua parte da divisão é ${Math.round(split * 100)}%. Quanto recebe?</p>`, options: o.options, a: o.a, why: o.why,
         exp: prof <= mk ? `O lucro nem zera o makeup (fica $${h.num(mk - prof, 0)} de makeup). Você recebe <b>$0</b>.` : `Primeiro zera o makeup: $${h.num(prof, 0)} − $${h.num(mk, 0)} = $${h.num(prof - mk, 0)}. A sua parte: ${Math.round(split * 100)}% = <b>$${h.num(v, 0)}</b>.` };
     },
   };

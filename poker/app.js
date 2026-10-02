@@ -1037,6 +1037,7 @@ ${defense}`;
     const p = Object.values(by).reduce((a, x) => a + x.p, 0), pc = Object.values(by).reduce((a, x) => a + x.pc, 0), k = Object.values(by).reduce((a, x) => a + x.n - x.p, 0), kc = Object.values(by).reduce((a, x) => a + x.c - x.pc, 0);
     let s = `<p>${sc >= 0.9 ? 'Muito bem.' : sc >= 0.75 ? 'Bom trabalho.' : sc >= 0.5 ? 'Resultado no meio do caminho, e isso é normal nesta etapa.' : 'Foi difícil, e tudo bem: errar no treino é exatamente o que evita errar na mesa.'} Você acertou ${c} de ${n}.`;
     if (R.assisted) s += ` Em ${R.assisted === 1 ? 'uma questão' : R.assisted + ' questões'} você chegou à resposta com a minha pista: no placar conta como erro, mas o raciocínio foi seu.`;
+    const gN = Object.keys(R.guessed || {}).length; if (gN) s += ` Você marcou ${gN === 1 ? 'um acerto' : gN + ' acertos'} como chute: obrigado pela honestidade. Contei como erro, e esse conteúdo volta antes.`;
     s += '</p>';
     if (p && k) s += `<p>Nos exercícios: ${kc} de ${k}. Nas situações de jogo: ${pc} de ${p}.${kc / k >= 0.75 && pc / p < 0.67 ? ' A regra já está na sua cabeça, mas ainda não vira decisão na hora. Por isso vou trazer mais situações de jogo nos próximos dias.' : ''}</p>`;
     if (weak.length && R.kind !== 'diag') s += `<p>Os erros se concentraram em ${weak.slice(0, 2).map(([cid, x]) => `<b>${esc(cName(cid))}</b> (${x.c} de ${x.n})`).join(' e ')}. ${R.kind === 'review' ? '' : 'Isso volta no reforço das próximas sessões; não precisa decorar nada agora.'}</p>`;
@@ -1371,6 +1372,11 @@ ${defense}`;
   // ---------- "Como se faz": nada é cobrado sem antes ser ensinado ----------
   const HOW = C.HOW || {};
   const howBox = (h, open, label) => `<details class="callout how" ${open ? 'open' : ''}><summary><b>${label || 'Como se faz'}: ${esc(h.t)}</b></summary><ol>${h.steps.map((x) => `<li>${colorize(esc(x))}</li>`).join('')}</ol><p class="small" style="margin:6px 0 0"><b>Exemplo resolvido:</b> ${colorize(esc(h.ex))}</p></details>`;
+  // O motivo provável do erro, quando a alternativa marcada corresponde a um engano conhecido.
+  function errWhyHTML(it) {
+    const o = R.retry ? R.retry.first : R.picked;
+    return o != null && o >= 0 && o !== it.a && it.why && it.why[o] ? `<p style="margin:6px 0"><b>Onde está o erro:</b> ${esc(it.why[o])}</p>` : '';
+  }
   function howRunnerHTML(it, before) {
     const h = HOW[it.gk]; if (!h) return '';
     const assess = ['diag', 'exam', 'final', 'review'].includes(R.kind);
@@ -1378,7 +1384,7 @@ ${defense}`;
       if (R.answered || assess) return '';
       return (S.genSeen || {})[it.gk] >= 2 ? howBox(h, false) : `<div class="howfirst"><div class="eyebrow">Antes de responder, veja como se faz</div>${howBox(h, true)}</div>`;
     }
-    return howBox(h, false);
+    return howBox(h, R.picked !== it.a || !!(R.guessed || {})[R.i]);
   }
   // As contas de cada conceito aparecem dentro da lição que ensina o conceito.
   function lessonHowHTML(l) {
@@ -1398,7 +1404,7 @@ ${defense}`;
   }
   function socraticHTML(it) {
     const hs = itemHints(it), r = R.retry;
-    return `<div class="feedback no stack socratic"><div><b>Ainda não.</b> Antes de ver a resposta, pense:</div>${hs.slice(0, r.h + 1).map((x) => `<p class="hint">${colorize(esc(x))}</p>`).join('')}
+    return `<div class="feedback no stack socratic"><div><b>Ainda não.</b> Antes de ver a resposta, pense:</div>${it.why && it.why[r.first] ? `<p class="hint"><b>Sobre a sua resposta:</b> ${esc(it.why[r.first])}</p>` : ''}${hs.slice(0, r.h + 1).map((x) => `<p class="hint">${colorize(esc(x))}</p>`).join('')}
       <div class="row">${r.h + 1 < hs.length ? '<button class="btn small" data-act="hint-more">Outra pista</button>' : ''}<button class="btn small" data-act="hint-ai">Conversar com o mentor (IA)</button><button class="btn ghost small" data-act="reveal">Ver a resposta</button></div>
       <div id="socr" class="stack">${r.ai.map(([w, t]) => `<div class="small"><b>${w === 'mentor' ? 'Mentor Ás' : 'Você'}:</b> ${esc(t)}</div>`).join('')}${r.aiOpen ? '<div class="row"><input type="text" id="socr-in" placeholder="Responda ao mentor" style="flex:1;min-width:0"><button class="btn small" data-act="hint-send">Enviar</button></div>' : ''}</div>
       <p class="small muted" style="margin:0">Escolha outra alternativa quando tiver uma nova ideia.</p></div>`;
@@ -1520,9 +1526,25 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
   // ---------- runner genérico ----------
   let runTimer = null;
   function startRunner(kind, items, meta) { R = Object.assign({ kind, items, i: 0, correct: 0, answered: false, results: [], picks: [] }, meta || {}, { mtask: MTASK }); MTASK = null; prepItem(); go('runner'); }
+  // Uma questão nunca se repete na mesma rodada e evita as que o aluno viu há pouco (até 120 questões atrás).
+  const qKey = (x) => String(x.text || stripTags(x.html || '')).slice(0, 220);
+  function altItem() {
+    if (R.kind === 'practice') { const c = pick(adaptivePick(4)); return c ? practiceItem(c) : null; }
+    if (R.kind === 'apply') { const c = pick(applyPick(4)); return c ? applyItem(c) : null; }
+    return null;
+  }
   function prepItem() {
     let it = R.items[R.i];
-    if (typeof it === 'function') it = R.items[R.i] = it();
+    if (typeof it === 'function') {
+      const fn = it, seen = (R.seenQ = R.seenQ || new Set()), recent = S.recentQ || [];
+      for (let t = 0; t < 12; t++) {
+        const c = t < 8 ? fn() : altItem(); if (!c) continue;
+        it = c; const k = qKey(c);
+        if (!seen.has(k) && (t >= 5 || !recent.includes(k))) break;
+      }
+      R.items[R.i] = it;
+    }
+    const qk = qKey(it); (R.seenQ = R.seenQ || new Set()).add(qk); S.recentQ = (S.recentQ || []).filter((x) => x !== qk).concat(qk).slice(-120);
     if (!it.gk && R.kind === 'drill') it.gk = R.mixed ? R.mixed[R.i] : R.drill;
     R.cur = it; R.order = it.keep ? it.options.map((_, i) => i) : shuffle(it.options.map((_, i) => i));
     R.answered = false; R.picked = null; R.retry = null; R.t0 = performance.now(); DOUBT = null;
@@ -1549,7 +1571,7 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
       ${idk && !R.answered ? `<div class="row"><button class="btn ghost" data-act="answer" data-o="-2">Não sei</button><span class="small muted">${isDiag ? 'Não sabe? Marque "Não sei". Chutar deixa o diagnóstico impreciso.' : 'Não lembra? Marque "Não sei": o cartão volta amanhã. Chutar só engana a sua agenda.'}</span></div>` : ''}
       ${R.kind === 'review' && R.answered && R.cur.cardF ? `<div class="panel small"><div class="eyebrow">Cartão · ${esc(R.cur.topic)}</div><b>${colorize(esc(R.cur.cardF))}</b><div>${colorize(esc(R.cur.cardB))}</div></div>` : ''}
       ${R.retry && !R.answered ? socraticHTML(it) : ''}
-      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${it.html ? it.exp : colorize(esc(it.exp))}</div>${howRunnerHTML(it, false)}${R.kind === 'diag' ? '' : doubtHTML('run')}<div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
+      ${R.answered ? `<div class="feedback ${ok ? 'ok' : 'no'}"><b>${headTxt}</b>${tailTxt}${errWhyHTML(it)}${it.html ? it.exp : colorize(esc(it.exp))}</div>${ok && !R.retry && R.kind !== 'diag' ? ((R.guessed || {})[R.i] ? '<p class="small muted">Marcado como chute: conta como erro no seu mapa, e este assunto volta antes. Veja o método abaixo.</p>' : '<div><button class="btn ghost small" data-act="guessed">Acertei no chute</button></div>') : ''}${howRunnerHTML(it, false)}${R.kind === 'diag' ? '' : doubtHTML('run')}<div><button class="btn primary" data-act="next" id="nextBtn">${R.i + 1 < n ? 'Próxima' : 'Ver resultado'}</button></div>` : ''}
     </div>`;
   };
   MOUNTS.runner = () => {
@@ -2113,7 +2135,7 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
       const exp = it.html ? it.exp : colorize(esc(it.exp)), cp = it.cid && Pr.byId[it.cid] ? Pr.byId[it.cid] : (Pr.byLesson[it.lid] || []).map((x) => Pr.byId[x]).find((x) => x && practicable(x));
       return `<div class="panel stack rv-item ${ok ? 'ok' : 'no'}"><div class="row" style="justify-content:space-between"><span class="eyebrow">${esc(it.topic)}</span><span class="pill ${ok ? 'good' : 'bad'}">${ok ? 'Acertou' : 'Errou'}</span></div>
         ${it.html ? `<div class="small rv-q">${it.html}</div>` : `<div class="small">${colorize(esc(q.length > 220 ? q.slice(0, 220) + '…' : q))}</div>`}
-        <div class="small">Sua resposta: <b>${colorize(esc(mine || '—'))}</b>${ok ? '' : ` · Correta: <b>${colorize(esc(it.options[it.a]))}</b>`}</div>
+        <div class="small">Sua resposta: <b>${colorize(esc(mine || '—'))}</b>${ok ? '' : ` · Correta: <b>${colorize(esc(it.options[it.a]))}</b>`}</div>${!ok && it.why && it.why[o] ? `<div class="small"><b>Onde está o erro:</b> ${esc(it.why[o])}</div>` : ''}
         ${ok ? (R.free || !c ? '' : `<div class="small muted">Este cartão volta em ${Math.max(1, Math.round((new Date(c.due) - new Date(todayStr())) / DAY))} dia(s).</div>`)
           : `<div class="feedback no small">${exp}</div><div class="callout"><span class="eyebrow">Para revisar</span><p style="margin:4px 0 0"><b>${colorize(esc(it.cardF))}</b></p><p style="margin:4px 0 0">${colorize(esc(it.cardB))}</p></div>
           <div class="row"><button class="btn small" data-act="lesson" data-id="${it.lid}">Reler a lição</button>${cp ? `<button class="btn small" data-act="practice" data-c="${cp.id}">Praticar: ${esc(cp.name)}</button>` : ''}</div>`}${doubtHTML('rv:' + i)}</div>`;
@@ -2341,6 +2363,15 @@ ${D.msgs.map(([w, t]) => (w === 'mentor' ? 'Mentor: ' : 'Aluno: ') + t).join('\n
     },
     'reports-copy': () => { const t = document.getElementById('rep-text'); try { navigator.clipboard.writeText(t.value).then(() => toast('Relatos copiados'), () => t.select()); } catch (e) { t.select(); } },
     'reports-clear': () => { S.reports = []; save(); render(); },
+    guessed: () => {
+      if (!R || !R.answered || R.picked !== R.cur.a || R.retry || (R.guessed || {})[R.i]) return;
+      (R.guessed = R.guessed || {})[R.i] = true; R.correct--; R.results[R.results.length - 1] = false;
+      const cur = R.cur;
+      if (R.kind === 'lesson') observeLesson(R.id, false); else if (cur.cid) observe(cur.cid, cur.track || (R.kind === 'apply' ? 'p' : 'k'), false); else if (cur.lid) observeLesson(cur.lid, false);
+      if (R.kind === 'drill') { const st = drillStat(R.mixed ? R.mixed[R.i] : R.drill); st.h[st.h.length - 1] = 0; st.c = Math.max(0, st.c - 1); }
+      if (R.kind === 'review' && !R.free && cur.card && S.cards[cur.card]) { lapseCard(cur.card); S.cards[cur.card].due = addDays(todayStr(), 1); }
+      save(); render(); focusNext();
+    },
     'hint-send': () => { const v = document.getElementById('socr-in'); if (v && v.value.trim()) socraticAI(v.value.trim()); },
     'socratic-toggle': () => { S.settings.socratic = S.settings.socratic === false; save(); render(); },
     drill: (d) => startDrill(d.id),
