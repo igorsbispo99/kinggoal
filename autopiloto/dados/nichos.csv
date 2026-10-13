@@ -1,0 +1,13 @@
+id,nicho,demanda,concorrencia,alcance,producao_ia,frequencia_pautas,monetizacao,custo,risco,audiencia_externa,evidencia_demanda
+1,Antigolpe e seguranca digital do dia a dia,5,3,5,5,5,3,5,3,5,VERIFICADO: FBSP 2.261.055 registros de estelionato em 2025; Febraban 174 mil relatos de falsa venda no 1o sem/2025
+2,Financas para endividados (sair das dividas),5,2,4,4,4,4,5,3,4,VERIFICADO: CNC/Peic 82% das familias endividadas (jul/2026); Serasa 82.8 mi inadimplentes (mar/2026)
+3,Ingles pratico para brasileiros,4,1,4,4,4,4,5,5,4,ESTIMATIVA: demanda nao medida nesta pesquisa
+4,Concursos publicos e estudos,4,2,3,4,3,4,5,4,4,ESTIMATIVA: demanda nao medida nesta pesquisa
+5,IA aplicada ao trabalho e produtividade,4,1,4,3,5,4,4,4,4,ESTIMATIVA: demanda nao medida nesta pesquisa
+6,Direitos do consumidor no dia a dia,4,3,4,4,4,3,5,3,3,PARCIAL: Procon-SP reclamacoes sobre Pix 3.194->6.613 (jan-out 2021->2022)
+7,Saude e emagrecimento,5,1,4,3,4,4,4,1,3,ESTIMATIVA: alta demanda presumida; risco regulatorio elevado
+8,Direitos trabalhistas e INSS,5,2,4,4,4,2,5,2,3,ESTIMATIVA: demanda nao medida nesta pesquisa
+9,Achadinhos TikTok Shop (casa e cozinha),5,1,4,2,4,4,2,3,2,PARCIAL: TikTok Shop opera no Brasil desde 08/05/2025 (sem dado de demanda por categoria)
+10,Receitas baratas,4,2,4,2,4,3,3,4,3,ESTIMATIVA: demanda nao medida nesta pesquisa
+11,Historias de misterio e terror (ficcao),4,1,5,4,5,1,3,3,2,ESTIMATIVA: alcance alto presumido; monetizacao fraca
+12,Curiosidades de historia e ciencia,4,1,5,4,5,1,4,2,2,ESTIMATIVA: alto volume de conteudo de baixa qualidade (estudo Kapwing; amostra de 1 conta)

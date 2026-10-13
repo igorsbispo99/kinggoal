@@ -1,0 +1,55 @@
+{
+  "id": "002",
+  "slug": "falsa-central",
+  "marca": "RADAR ANTIGOLPE",
+  "pilar": "Frase que entrega o golpe",
+  "formato": "Frase-alerta + regra de bolso",
+  "objetivo": "Seguidores: entregar uma regra memorável que justifica seguir o perfil.",
+  "publico": "Clientes de banco de 30 a 65 anos, incluindo quem atende ligações de números desconhecidos.",
+  "gancho": "Seu banco nunca vai te ligar para dizer essa frase.",
+  "hipotese": "Ganchos no formato 'seu banco nunca diz X' retêm mais nos 3 primeiros segundos do que ganchos com estatística.",
+  "criterio_sucesso": "Retenção nos 3 primeiros segundos acima da mediana do lote; seguidores ganhos por mil visualizações acima da mediana.",
+  "cenas": [
+    {
+      "papel": "gancho",
+      "narracao": "Seu banco nunca vai te ligar para pedir que você faça um Pix para proteger o seu dinheiro.",
+      "visual": {"tipo": "titulo", "texto": "“Faça um Pix para proteger sua conta”", "destaque": "alerta"}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "É o golpe da falsa central. A pessoa liga dizendo ser do banco, fala de uma compra suspeita e cria pressa. Às vezes o número na tela até parece o do banco.",
+      "visual": {"tipo": "chat", "contato": "Central de Segurança", "mensagens": [
+        {"de": "eles", "texto": "Identificamos uma compra suspeita de R$ 2.890 no seu cartão."},
+        {"de": "eles", "texto": "Para cancelar, precisamos que transfira o saldo para uma conta segura agora."}
+      ]}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "Pelos dados da Febraban, a falsa central foi o segundo golpe mais relatado aos bancos no primeiro semestre de 2025.",
+      "visual": {"tipo": "titulo", "texto": "2º golpe mais relatado aos bancos (1º sem/2025)"}
+    },
+    {
+      "papel": "solucao",
+      "narracao": "A regra é simples. Desligue. Não passe senha nem código. E ligue você mesmo para o número que está atrás do seu cartão.",
+      "visual": {"tipo": "lista", "titulo": "Regra de bolso:", "itens": [
+        "Desligue a ligação",
+        "Não passe senha nem código",
+        "Ligue você para o número do cartão"
+      ]}
+    },
+    {
+      "papel": "cta",
+      "narracao": "Segue o Radar Antigolpe. Toda semana uma frase que entrega o golpe.",
+      "visual": {"tipo": "alerta", "texto": "Desligue. Ligue você."}
+    }
+  ],
+  "cta": "Seguir para a série semanal.",
+  "legenda_post": "Banco não pede transferência para ‘conta segura’. Desligue e ligue você mesmo para o número do cartão. Fonte do ranking: Febraban (1º semestre/2025).",
+  "hashtags": ["#golpe", "#falsacentral", "#banco", "#antigolpe"],
+  "fontes": [
+    {"afirmacao": "Falsa central foi o 2º golpe mais relatado (139 mil relatos) no 1º semestre de 2025", "descricao": "Febraban (via Istoé Dinheiro, 11/11/2025)", "url": "https://istoedinheiro.com.br/golpe-da-falsa-venda-lidera-ranking", "tipo": "secundaria", "verificada": false},
+    {"afirmacao": "Falsa central descrita como principal modalidade de golpe bancário", "descricao": "ENCCLA 2025, Ação 1, Produto 1 (Ministério da Justiça)", "url": "https://www.gov.br/mj/pt-br/assuntos/sua-protecao/lavagem-de-dinheiro/enccla/acoes-enccla/arquivos-enccla-2025/e2025a01-acao-1-enccla-2025-produto-1.pdf", "tipo": "primaria", "verificada": false}
+  ],
+  "rotulo_ia": true,
+  "revisao_humana": {"aprovado": false, "por": null, "em": null, "observacoes": "Valor de R$ 2.890 é ilustrativo (encenação). Conferir PDF da ENCCLA."}
+}

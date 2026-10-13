@@ -1,0 +1,5 @@
+saida/
+fila/
+__pycache__/
+*.onnx
+.env

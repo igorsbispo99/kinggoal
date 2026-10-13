@@ -1,0 +1,4 @@
+pillow>=10
+# opcional, apenas para testes offline de voz:
+# piper-tts
+# Sistema: ffmpeg/ffprobe e a fonte Inter (licenca OFL)

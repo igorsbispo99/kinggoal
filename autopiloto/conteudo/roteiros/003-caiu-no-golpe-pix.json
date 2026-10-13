@@ -1,0 +1,56 @@
+{
+  "id": "003",
+  "slug": "caiu-no-golpe-do-pix",
+  "marca": "RADAR ANTIGOLPE",
+  "pilar": "Caí no golpe, e agora?",
+  "formato": "Passo a passo",
+  "objetivo": "Salvamentos e lista: conteúdo de referência que leva ao checklist gratuito.",
+  "publico": "Quem acabou de cair em golpe via Pix ou quer saber o que fazer se acontecer.",
+  "gancho": "Caiu num golpe pelo Pix? Você tem até 80 dias para pedir o dinheiro de volta.",
+  "hipotese": "Conteúdo de 'o que fazer depois' gera mais salvamentos que conteúdo de prevenção e é melhor gatilho para o checklist gratuito.",
+  "criterio_sucesso": "Salvamentos/visualizações acima da mediana do lote; cliques no link da bio rastreados por UTM.",
+  "cenas": [
+    {
+      "papel": "gancho",
+      "narracao": "Caiu num golpe pelo Pix? Você tem até oitenta dias para pedir o dinheiro de volta. Mas quanto antes, melhor.",
+      "visual": {"tipo": "titulo", "texto": "Caiu no golpe do Pix? Até 80 dias", "destaque": "alerta"}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "Existe um mecanismo do Banco Central chamado MED, o Mecanismo Especial de Devolução. Ele serve para casos de golpe e fraude. Não serve para arrependimento de compra ou erro de digitação.",
+      "visual": {"tipo": "lista", "titulo": "O MED cobre:", "itens": [
+        "Golpe e fraude: sim",
+        "Arrependimento de compra: não",
+        "Chave ou valor digitado errado: não"
+      ]}
+    },
+    {
+      "papel": "solucao",
+      "narracao": "Primeiro, fale com o seu banco pelo aplicativo ou canal oficial e peça a abertura do MED. Depois, registre um boletim de ocorrência. E guarde comprovantes e conversas.",
+      "visual": {"tipo": "lista", "titulo": "Faça nesta ordem:", "itens": [
+        "Peça o MED ao seu banco",
+        "Registre boletim de ocorrência",
+        "Guarde comprovantes e prints"
+      ]}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "Atenção: a devolução não é garantida. Golpistas costumam movimentar o dinheiro rápido, por isso a velocidade conta.",
+      "visual": {"tipo": "alerta", "texto": "Devolução não é garantida. Seja rápido."}
+    },
+    {
+      "papel": "cta",
+      "narracao": "Salva este vídeo. E pega o checklist gratuito do que fazer depois do golpe no link do perfil.",
+      "visual": {"tipo": "titulo", "texto": "Checklist grátis no perfil"}
+    }
+  ],
+  "cta": "Salvar + checklist gratuito no link da bio (captação de lista).",
+  "legenda_post": "Golpe pelo Pix: peça o MED (Mecanismo Especial de Devolução) ao seu banco o quanto antes. O prazo é de até 80 dias, mas a devolução não é garantida. Checklist completo e gratuito no link do perfil.",
+  "hashtags": ["#pix", "#golpe", "#med", "#antigolpe"],
+  "fontes": [
+    {"afirmacao": "Vítima tem até 80 dias a partir da transferência para pedir o MED; MED não cobre arrependimento ou erro de chave/valor", "descricao": "Convergência Digital, sobre a IN BCB 766 (2026)", "url": "https://convergenciadigital.com.br/mercado/entra-em-vigor-regra-do-pix-amplia-prazo-para-contestar-golpe/", "tipo": "secundaria", "verificada": false},
+    {"afirmacao": "Funcionamento do MED", "descricao": "Banco Central do Brasil, página oficial do Pix (verificar texto vigente)", "url": "https://www.bcb.gov.br/estabilidadefinanceira/pix", "tipo": "primaria", "verificada": false}
+  ],
+  "rotulo_ia": true,
+  "revisao_humana": {"aprovado": false, "por": null, "em": null, "observacoes": "Prazo de 80 dias e escopo do MED precisam ser confirmados na página/regulamento do BCB. Não publicar antes do checklist existir."}
+}
