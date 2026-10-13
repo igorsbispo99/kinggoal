@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agende sua primeira conversa</title>
+<meta name="description" content="Psicoterapia online para adultos — atendimento à noite e aos sábados.">
+<style>
+  /* ===== Ajuste aqui as cores da sua identidade ===== */
+  :root {
+    --fundo: #f6f3ee;
+    --cartao: #ffffff;
+    --texto: #1f2a2e;
+    --suave: #5b676b;
+    --marca: #2f6f68;
+    --marca-escura: #245752;
+    --borda: #dcd6cc;
+    --aviso: #fff4e5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--fundo); color: var(--texto);
+    font: 17px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { text-align: center; margin-bottom: 20px; }
+  header img { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; border: 3px solid var(--cartao); }
+  h1 { font-size: 1.45rem; line-height: 1.25; margin: 12px 0 6px; }
+  .sub { color: var(--suave); margin: 0; }
+  .crp { color: var(--suave); font-size: .85rem; margin-top: 6px; }
+  .provas { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 16px 0 0; padding: 0; list-style: none; }
+  .provas li { background: var(--cartao); border: 1px solid var(--borda); border-radius: 999px; padding: 4px 12px; font-size: .85rem; }
+  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; padding: 20px; }
+  .barra { height: 6px; background: var(--borda); border-radius: 999px; overflow: hidden; margin-bottom: 16px; }
+  .barra span { display: block; height: 100%; width: 0; background: var(--marca); transition: width .25s; }
+  .passo { display: none; }
+  .passo.ativo { display: block; }
+  .pergunta { font-weight: 650; font-size: 1.1rem; margin: 0 0 12px; }
+  .opcoes { display: grid; gap: 8px; }
+  .opcoes button, .opcoes label {
+    display: block; width: 100%; text-align: left; font: inherit; color: inherit;
+    background: var(--fundo); border: 1.5px solid var(--borda); border-radius: 12px;
+    padding: 12px 14px; cursor: pointer;
+  }
+  .opcoes button:hover, .opcoes label:hover { border-color: var(--marca); }
+  .opcoes input { margin-right: 8px; accent-color: var(--marca); }
+  input[type=text], input[type=tel], textarea {
+    width: 100%; font: inherit; padding: 12px 14px; border: 1.5px solid var(--borda);
+    border-radius: 12px; background: var(--fundo); color: inherit;
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  .campo { margin-bottom: 12px; }
+  .campo label { display: block; font-size: .9rem; color: var(--suave); margin-bottom: 4px; }
+  .acoes { display: flex; gap: 8px; margin-top: 16px; }
+  .btn {
+    flex: 1; font: inherit; font-weight: 650; border: 0; border-radius: 12px; padding: 14px;
+    background: var(--marca); color: #fff; cursor: pointer;
+  }
+  .btn:hover { background: var(--marca-escura); }
+  .btn.sec { flex: 0 0 auto; background: transparent; color: var(--suave); border: 1.5px solid var(--borda); }
+  .consent { font-size: .85rem; color: var(--suave); display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; }
+  .consent input { margin-top: 4px; accent-color: var(--marca); }
+  .erro { color: #a33; font-size: .9rem; min-height: 1.2em; margin: 8px 0 0; }
+  .alerta { background: var(--aviso); border-radius: 12px; padding: 12px 14px; font-size: .9rem; margin-top: 20px; }
+  .como { margin-top: 24px; }
+  .como h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  .como ol { margin: 0; padding-left: 20px; color: var(--suave); }
+  footer { text-align: center; font-size: .8rem; color: var(--suave); margin-top: 28px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img id="foto" alt="" hidden>
+    <h1 id="titulo"></h1>
+    <p class="sub" id="subtitulo"></p>
+    <p class="crp" id="assinatura"></p>
+    <ul class="provas" id="provas"></ul>
+  </header>
+
+  <section class="cartao" aria-live="polite">
+    <div class="barra"><span id="progresso"></span></div>
+
+    <div class="passo" data-passo="demanda">
+      <p class="pergunta">O que mais tem te incomodado hoje?</p>
+      <div class="opcoes" data-campo="demanda"></div>
+    </div>
+
+    <div class="passo" data-passo="tempo">
+      <p class="pergunta">Há quanto tempo isso acontece?</p>
+      <div class="opcoes" data-campo="tempo"></div>
+    </div>
+
+    <div class="passo" data-passo="terapia">
+      <p class="pergunta">Você já fez terapia antes?</p>
+      <div class="opcoes" data-campo="terapia"></div>
+    </div>
+
+    <div class="passo" data-passo="horario">
+      <p class="pergunta">Quais horários funcionam melhor para você?</p>
+      <div class="opcoes" data-campo="horario" data-multiplo></div>
+      <div class="acoes"><button class="btn sec" type="button" data-voltar>Voltar</button><button class="btn" type="button" data-avancar>Continuar</button></div>
+      <p class="erro" data-erro></p>
+    </div>
+
+    <div class="passo" data-passo="contato">
+      <p class="pergunta">Quase lá! Como posso te chamar?</p>
+      <div class="campo"><label for="nome">Seu nome</label><input id="nome" type="text" autocomplete="given-name" maxlength="60"></div>
+      <div class="campo"><label for="mensagem">Quer contar mais alguma coisa? (opcional)</label><textarea id="mensagem" maxlength="500"></textarea></div>
+      <label class="consent"><input id="maior" type="checkbox"> Tenho 18 anos ou mais.</label>
+      <label class="consent"><input id="lgpd" type="checkbox"> Concordo em enviar estas informações pelo WhatsApp para agendamento. Nada fica salvo nesta página.</label>
+      <div class="acoes"><button class="btn sec" type="button" data-voltar>Voltar</button><button class="btn" type="button" id="enviar">Falar no WhatsApp</button></div>
+      <p class="erro" data-erro></p>
+    </div>
+
+    <div class="passo" data-passo="fim">
+      <p class="pergunta">Pronto! 🙂</p>
+      <p>Abrimos o WhatsApp com suas respostas. É só tocar em <strong>enviar</strong> por lá.</p>
+      <p class="sub">Não abriu? <a id="linkManual" href="#">Toque aqui</a>.</p>
+      <p id="blocoAgenda" hidden>Se preferir já escolher o horário da primeira sessão: <a id="linkAgenda" href="#" target="_blank" rel="noopener">abrir agenda</a>.</p>
+    </div>
+  </section>
+
+  <div class="alerta">
+    Se você está em sofrimento intenso ou pensando em tirar a própria vida, não espere:
+    ligue <strong>188</strong> (CVV, 24h, gratuito) ou <strong>192</strong> (SAMU).
+  </div>
+
+  <section class="como">
+    <h2>Como funciona</h2>
+    <ol>
+      <li>Você responde 5 perguntas rápidas.</li>
+      <li>Conversamos pelo WhatsApp e eu tiro suas dúvidas.</li>
+      <li>Você escolhe o horário da primeira sessão, online.</li>
+    </ol>
+  </section>
+
+  <footer id="rodape"></footer>
+</main>
+
+<script>
+/* ===== Preencha com os seus dados ===== */
+const CONFIG = {
+  nome: "Seu Nome Completo",
+  crp: "CRP 00/00000",
+  whatsapp: "5500000000000",            // DDI + DDD + número, só dígitos
+  agenda: "",                           // link da página de agendamento (opcional)
+  foto: "",                             // ex.: "foto.jpg" na mesma pasta (opcional)
+  titulo: "Terapia online para quem trabalha e está no limite",
+  subtitulo: "Ansiedade, esgotamento e procrastinação — com atendimento à noite e aos sábados.",
+  provas: ["Online, todo o Brasil", "Análise do Comportamento", "Noites e sábados"],
+  opcoes: {
+    demanda: ["Ansiedade ou preocupação constante", "Cansaço, esgotamento, desânimo", "Procrastinação, dificuldade de dar conta", "Relacionamentos", "Outro assunto"],
+    tempo: ["Começou há pouco (semanas)", "Alguns meses", "Mais de um ano"],
+    terapia: ["Nunca fiz", "Já fiz e foi bom", "Já fiz e não me adaptei"],
+    horario: ["Seg a sex, 19h às 22h", "Sábado de manhã", "Durante o dia (em breve)"]
+  }
+};
+/* ===================================== */
+
+const ordem = ["demanda", "tempo", "terapia", "horario", "contato", "fim"];
+const respostas = { horario: [] };
+const params = new URLSearchParams(location.search);
+const origem = params.get("origem") || params.get("utm_source") || "";
+let atual = 0;
+
+const $ = (sel, raiz = document) => raiz.querySelector(sel);
+const $$ = (sel, raiz = document) => [...raiz.querySelectorAll(sel)];
+
+function montar() {
+  document.title = `${CONFIG.nome} · Psicólogo online`;
+  $("#titulo").textContent = CONFIG.titulo;
+  $("#subtitulo").textContent = CONFIG.subtitulo;
+  $("#assinatura").textContent = `${CONFIG.nome} · Psicólogo · ${CONFIG.crp}`;
+  $("#rodape").textContent = `${CONFIG.nome} · ${CONFIG.crp} · Atendimento online`;
+  if (CONFIG.foto) { const f = $("#foto"); f.src = CONFIG.foto; f.alt = CONFIG.nome; f.hidden = false; }
+  for (const p of CONFIG.provas) { const li = document.createElement("li"); li.textContent = p; $("#provas").append(li); }
+
+  for (const caixa of $$(".opcoes")) {
+    const campo = caixa.dataset.campo;
+    for (const texto of CONFIG.opcoes[campo]) {
+      if (caixa.hasAttribute("data-multiplo")) {
+        const label = document.createElement("label");
+        const box = document.createElement("input");
+        box.type = "checkbox"; box.value = texto;
+        box.addEventListener("change", () => {
+          respostas[campo] = $$("input:checked", caixa).map(i => i.value);
+        });
+        label.append(box, texto);
+        caixa.append(label);
+      } else {
+        const b = document.createElement("button");
+        b.type = "button"; b.textContent = texto;
+        b.addEventListener("click", () => { respostas[campo] = texto; ir(atual + 1); });
+        caixa.append(b);
+      }
+    }
+  }
+  $$("[data-voltar]").forEach(b => b.addEventListener("click", () => ir(atual - 1)));
+  $$("[data-avancar]").forEach(b => b.addEventListener("click", () => {
+    if (!respostas.horario.length) return erro("Marque pelo menos um horário.");
+    ir(atual + 1);
+  }));
+  $("#enviar").addEventListener("click", enviar);
+  ir(0);
+}
+
+function erro(msg) {
+  const el = $(`.passo.ativo [data-erro]`);
+  if (el) el.textContent = msg;
+}
+
+function ir(i) {
+  atual = Math.max(0, Math.min(i, ordem.length - 1));
+  $$(".passo").forEach(p => p.classList.toggle("ativo", p.dataset.passo === ordem[atual]));
+  $$("[data-erro]").forEach(e => e.textContent = "");
+  $("#progresso").style.width = `${Math.round((atual / (ordem.length - 1)) * 100)}%`;
+}
+
+function enviar() {
+  const nome = $("#nome").value.trim();
+  if (!nome) return erro("Escreva como posso te chamar.");
+  if (!$("#maior").checked) return erro("No momento atendo apenas maiores de 18 anos.");
+  if (!$("#lgpd").checked) return erro("Para continuar, marque a concordância.");
+
+  const extra = $("#mensagem").value.trim();
+  const linhas = [
+    `Olá! Meu nome é ${nome} e quero saber sobre a terapia.`,
+    ``,
+    `• O que me incomoda: ${respostas.demanda}`,
+    `• Há quanto tempo: ${respostas.tempo}`,
+    `• Terapia antes: ${respostas.terapia}`,
+    `• Horários: ${respostas.horario.join("; ")}`
+  ];
+  if (extra) linhas.push(`• Mais: ${extra}`);
+  if (origem) linhas.push(``, `(origem: ${origem})`);
+
+  const url = `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(linhas.join("\n"))}`;
+  $("#linkManual").href = url;
+  if (CONFIG.agenda) { $("#linkAgenda").href = CONFIG.agenda; $("#blocoAgenda").hidden = false; }
+  ir(ordem.indexOf("fim"));
+  // Com "noopener" o window.open devolve null sempre; sem ele, null significa bloqueio de pop-up.
+  const janela = window.open(url, "_blank");
+  if (janela) janela.opener = null; else location.href = url;
+}
+
+montar();
+</script>
+</body>
+</html>
