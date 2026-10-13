@@ -1,0 +1,11 @@
+id,nicho,monetizacao,teto_escala,demanda,producao_ia,concorrencia,alcance,risco,audiencia_externa,frequencia_pautas,custo,evidencia_demanda
+1,Dinheiro do dia a dia (dividas + direitos + golpes + impostos + beneficios),5,5,5,4,2,4,3,5,5,5,VERIFICADO: CNC 82% familias endividadas (jul/2026); Serasa 82.8 mi inadimplentes (mar/2026); FBSP 2.26 mi estelionatos (2025); isencao IR ate R$ 5 mil vigente desde jan/2026 (~15 mi beneficiados)
+2,Antigolpe (nicho estreito),3,2,5,5,3,5,3,5,5,5,VERIFICADO: FBSP 2.26 mi estelionatos (2025); Febraban 1o sem/2025
+3,Carreira trabalho e renda extra,4,5,4,3,2,4,3,4,4,4,ESTIMATIVA
+4,Tecnologia e IA no dia a dia,4,4,4,3,1,4,4,4,5,4,ESTIMATIVA
+5,Ingles pratico,4,3,4,4,1,4,5,4,4,5,ESTIMATIVA
+6,Concursos publicos,4,3,4,4,2,3,4,4,3,5,ESTIMATIVA
+7,Saude e bem-estar,4,5,5,3,1,4,1,3,4,4,ESTIMATIVA (risco regulatorio alto)
+8,Direitos do cidadao (consumidor trabalhista INSS),2,4,5,4,2,4,2,3,4,5,PARCIAL: Procon-SP reclamacoes Pix 2021->2022
+9,Casa e consumo (achadinhos receitas economia domestica),4,4,5,2,1,4,3,2,4,2,PARCIAL: TikTok Shop no Brasil desde 05/2025
+10,Curiosidades e entretenimento,1,3,4,4,1,5,2,2,5,4,ESTIMATIVA

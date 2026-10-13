@@ -1,0 +1,57 @@
+{
+  "id": "004",
+  "slug": "isencao-ir-5-mil",
+  "marca": "GRANA CLARA",
+  "serie": "Leão Sem Medo",
+  "pilar": "O que mudou e como afeta você",
+  "formato": "Mito x verdade",
+  "objetivo": "Alcance com pauta de 2026 e captação para a lista do IR 2027 (pico de demanda de mar–mai/2027).",
+  "publico": "Assalariados, aposentados e servidores com renda de até R$ 7.350 por mês.",
+  "gancho": "Você ganha até 5 mil? Desde janeiro não paga imposto de renda. Mas tem uma pegadinha.",
+  "hipotese": "Formato mito x verdade sobre regra nova gera mais comentários (dúvidas) que explicação linear, e os comentários viram pauta.",
+  "criterio_sucesso": "Comentários por mil views acima da mediana do lote; ≥ 20 dúvidas distintas aproveitáveis como pauta.",
+  "cenas": [
+    {
+      "papel": "gancho",
+      "narracao": "Você ganha até cinco mil reais por mês? Desde janeiro de 2026 você não paga imposto de renda. Mas tem uma pegadinha.",
+      "visual": {"tipo": "titulo", "texto": "Até R$ 5 mil: isento desde jan/2026", "destaque": "alerta"}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "A pegadinha é o calendário. A declaração entregue em 2026 era sobre o dinheiro de 2025, quando a regra ainda não existia. A isenção aparece na declaração de 2027.",
+      "visual": {"tipo": "lista", "titulo": "Linha do tempo:", "itens": [
+        "Jan/2026: desconto já sai no salário",
+        "Declaração 2026: regra antiga",
+        "Declaração 2027: regra nova"
+      ]}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "E vale a soma de todas as rendas. Salário de três mil e duzentos mais um bico de dois mil e cem passa de cinco mil. Entre cinco mil e sete mil trezentos e cinquenta, o desconto é parcial.",
+      "visual": {"tipo": "lista", "titulo": "Atenção:", "itens": [
+        "Vale a soma de todas as rendas",
+        "R$ 5 mil a R$ 7.350: desconto parcial",
+        "Acima de R$ 7.350: tabela normal"
+      ]}
+    },
+    {
+      "papel": "solucao",
+      "narracao": "Isento de pagar não quer dizer isento de declarar. Outros critérios, como patrimônio, continuam valendo. As regras da declaração de 2027 ainda vão sair.",
+      "visual": {"tipo": "alerta", "texto": "Isento de pagar ≠ isento de declarar"}
+    },
+    {
+      "papel": "cta",
+      "narracao": "Segue a Grana Clara. Quando as regras de 2027 saírem, você fica sabendo aqui primeiro.",
+      "visual": {"tipo": "titulo", "texto": "Série Leão Sem Medo"}
+    }
+  ],
+  "cta": "Seguir para a série do IR 2027 + comentar a dúvida.",
+  "legenda_post": "Isenção do IR para quem ganha até R$ 5 mil vale desde janeiro de 2026, mas só aparece na declaração de 2027. Vale a soma de todas as rendas. Comenta sua dúvida que ela vira vídeo.",
+  "hashtags": ["#impostoderenda", "#ir2027", "#financaspessoais", "#granaclara"],
+  "fontes": [
+    {"afirmacao": "Isenção total até R$ 5 mil/mês desde 1º/01/2026; desconto parcial de R$ 5 mil a R$ 7.350; efeito na declaração de 2027", "descricao": "Planning (análise), confirmar na lei e na Receita Federal", "url": "https://planning.com.br/reforma-tributaria/blog-imposto-de-renda-2026-isencao-5-mil-declaracao/", "tipo": "secundaria", "verificada": false},
+    {"afirmacao": "Limite considera a soma de todas as fontes de renda (exemplo R$ 3.200 + R$ 2.100)", "descricao": "Times Brasil / CNBC", "url": "https://timesbrasil.com.br/minhas-financas/quem-ganha-ate-r-5-mil-precisa-declarar-ir-2026-regras/", "tipo": "secundaria", "verificada": false}
+  ],
+  "rotulo_ia": true,
+  "revisao_humana": {"aprovado": false, "por": null, "em": null, "observacoes": "Conferir o texto da lei no Planalto e a página da Receita antes de aprovar."}
+}

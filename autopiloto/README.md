@@ -1,8 +1,11 @@
-# Projeto Autopiloto — Radar Antigolpe
+# Projeto Autopiloto — Grana Clara (nome provisório)
 
-Negócio de conteúdo curto sem rosto, com o TikTok como canal de aquisição.
+Marca de mídia sobre dinheiro do dia a dia, sem rosto, com o TikTok como canal de aquisição e 6 séries (Sai das Dívidas, Radar Antigolpe, Seu Direito Seu Dinheiro, Conta da Vida Real, Leão Sem Medo, Notícia no Bolso).
 
-- `docs/01-fase1-inteligencia-de-mercado.md`: 12 nichos, matriz ponderada, top 3 e a recomendação.
+- `docs/03-revisao-estrategica-v2.md`: **decisão vigente**, com a matriz v2, a arquitetura de marca, a escada de receita e a estrutura de operação.
+- `dados/calendario_30_dias.csv`: publicações de 26/10 a 24/11/2026.
+
+- `docs/01-fase1-inteligencia-de-mercado.md`: análise v1 (histórico).
 - `docs/02-primeira-entrega.md`: modelo de negócio, monetização, arquitetura, orçamento, plano de 30 dias, riscos e próximos passos.
 
 ## Como rodar

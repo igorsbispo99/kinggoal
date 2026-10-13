@@ -173,7 +173,9 @@ def desenhar_legenda(d, texto):
 
 
 def quadro(roteiro, cena, legenda, progresso):
-    img, d = base(roteiro.get("marca", "RADAR ANTIGOLPE"))
+    img, d = base(roteiro["marca"])
+    if roteiro.get("serie"):
+        d.text((MARGEM, 215), roteiro["serie"].upper(), font=fonte(32, "SemiBold"), fill=COR["suave"])
     desenhar_visual(d, cena["visual"], progresso)
     desenhar_legenda(d, legenda)
     if roteiro.get("rotulo_ia"):
@@ -227,7 +229,7 @@ def renderizar(caminho_roteiro, pasta_saida, backend_tts=None):
                         "-crf", "20", "-c:a", "aac", "-b:a", "160k", "-shortest",
                         "-movflags", "+faststart", str(mp4)], check=True)
     (saida / "legendas.srt").write_text("\n".join(srt), encoding="utf-8")
-    meta = {k: roteiro[k] for k in ("id", "slug", "legenda_post", "hashtags", "fontes", "cta", "rotulo_ia")}
+    meta = {k: roteiro[k] for k in ("id", "slug", "marca", "serie", "legenda_post", "hashtags", "fontes", "cta", "rotulo_ia")}
     meta["duracao_s"] = round(tts.duracao(mp4), 2)
     meta["arquivo"] = mp4.name
     (saida / "metadados.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")

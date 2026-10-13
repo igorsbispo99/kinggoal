@@ -7,7 +7,7 @@ import json
 import re
 from pathlib import Path
 
-CAMPOS = ["id", "slug", "pilar", "formato", "objetivo", "publico", "gancho", "hipotese",
+CAMPOS = ["id", "slug", "marca", "serie", "pilar", "formato", "objetivo", "publico", "gancho", "hipotese",
           "criterio_sucesso", "cenas", "cta", "legenda_post", "hashtags", "fontes",
           "rotulo_ia", "revisao_humana"]
 
@@ -17,6 +17,9 @@ PROIBIDAS = [r"\bgarantid[oa]s?\b", r"\b100\s?%\s?segur", r"\bnunca mais\b.*\bgo
 # Mencoes que pedem cuidado: acusar empresa real ou parecer canal oficial.
 SENSIVEIS = [r"\bnubank\b", r"\bita[uú]\b", r"\bbradesco\b", r"\bcaixa\b", r"\bbanco do brasil\b",
              r"\bsantander\b", r"\binter\b", r"\bmercado pago\b", r"\bpicpay\b", r"\boficial\b"]
+# Compliance de financas: CVM (Res. 20/2021) e Lei 14.790/2023 (apostas).
+FORA_DE_ESCOPO = [r"\bcompre (a )?a[çc][ãa]o\b", r"\brecomendo (a )?a[çc][ãa]o\b", r"\bbets?\b",
+                  r"\baposta", r"\bcassino\b", r"\bempr[ée]stimo f[áa]cil\b", r"\bcr[ée]dito na hora\b"]
 
 CHARS_POR_SEGUNDO = 15.0
 DURACAO_MIN, DURACAO_MAX = 15, 90
@@ -64,6 +67,9 @@ def validar(roteiro, outros=()):
             # "não é garantida" é justamente o aviso honesto que queremos
             if not re.search(r"\bn[ãa]o\b", tudo[max(0, m.start() - 15):m.start()], re.I):
                 erros.append(f"promessa proibida: /{padrao}/ em '{m.group(0)}'")
+    for padrao in FORA_DE_ESCOPO:
+        if re.search(padrao, tudo, re.I):
+            erros.append(f"fora do escopo editorial (CVM/apostas/crédito): /{padrao}/")
     for padrao in SENSIVEIS:
         if re.search(padrao, tudo, re.I):
             avisos.append(f"menção sensível, revisar tom: /{padrao}/")

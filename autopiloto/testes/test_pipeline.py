@@ -38,6 +38,12 @@ class TestQA(unittest.TestCase):
         r["cenas"][1]["narracao"] = "A devolução não é garantida."
         self.assertFalse(any("proibida" in e for e in qa.validar(r)[0]))
 
+    def test_fora_do_escopo_financeiro_bloqueia(self):
+        r = copy.deepcopy(ROTEIRO)
+        r["cenas"][1]["narracao"] = "Hoje eu recomendo a ação da empresa X e uma bet nova."
+        erros = qa.validar(r)[0]
+        self.assertTrue(sum("fora do escopo" in e for e in erros) >= 2)
+
     def test_plagio_interno_bloqueia(self):
         copia = copy.deepcopy(ROTEIRO)
         copia["id"] = "999"

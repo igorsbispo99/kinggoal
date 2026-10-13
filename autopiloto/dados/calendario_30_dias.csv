@@ -1,0 +1,31 @@
+n,data,dia,horario_hipotese,serie,tema,formato,gancho_tipo,cta_tipo,observacao
+1,2026-10-26,seg,12h,Sai das Dívidas,13º: pague primeiro a dívida mais cara,Regra de prioridade,contraintuitivo,salvar + planilha,roteiro 005
+2,2026-10-27,ter,20h,Radar Antigolpe,Código de 6 dígitos por SMS,Conversa reconstituída,frase proibida,compartilhar,roteiro 001
+3,2026-10-28,qua,12h,Conta da Vida Real,Quanto custa de verdade o 12x 'sem juros',Simulação,número,seguir,
+4,2026-10-29,qui,20h,"Seu Direito, Seu Dinheiro",Tarifas: serviços bancários essenciais que não podem ser cobrados,Lista,pergunta,salvar,
+5,2026-10-30,sex,12h,Leão Sem Medo,Isenção do IR até R$ 5 mil: a pegadinha,Mito x verdade,pergunta,comentar dúvida,roteiro 004
+6,2026-10-31,sáb,20h,Radar Antigolpe,Falsa central: a frase que entrega o golpe,Frase-alerta,frase proibida,seguir,roteiro 002
+7,2026-11-01,dom,12h,Conta da Vida Real,Reserva de emergência: calcule a sua,Simulação,número,salvar + planilha,
+8,2026-11-02,seg,20h,Sai das Dívidas,Nome negativado: por quanto tempo e o que muda,Mito x verdade,pergunta,seguir,
+9,2026-11-03,ter,12h,"Seu Direito, Seu Dinheiro",Cobrança de dívida: o que o cobrador não pode fazer,Lista,frase proibida,compartilhar,
+10,2026-11-04,qua,20h,Radar Antigolpe,Caí no golpe do Pix: MED em 3 passos,Passo a passo,pergunta,salvar + checklist,roteiro 003
+11,2026-11-05,qui,12h,Notícia no Bolso,Copom decidiu: o que muda na sua parcela e no seu rendimento,Notícia explicada,número,seguir,publicar após a decisão de 04/11
+12,2026-11-06,sex,20h,Sai das Dívidas,Rotativo do cartão: por que é a pior dívida,Simulação,contraintuitivo,salvar,
+13,2026-11-07,sáb,12h,Conta da Vida Real,Como dividir o salário (método simples),Simulação,número,salvar + planilha,
+14,2026-11-08,dom,20h,Radar Antigolpe,"Golpe da falsa venda, o mais relatado",Conversa reconstituída,número,compartilhar,
+15,2026-11-09,seg,12h,"Seu Direito, Seu Dinheiro",Direito de arrependimento em compra online,Mito x verdade,pergunta,salvar,
+16,2026-11-10,ter,20h,Sai das Dívidas,Como negociar dívida: o que pedir ao credor,Roteiro de conversa,contraintuitivo,salvar + planilha,
+17,2026-11-11,qua,12h,Leão Sem Medo,Reforma tributária: o que muda no preço em 2026-2027,Notícia explicada,pergunta,seguir,pesquisar fontes oficiais antes
+18,2026-11-12,qui,20h,Conta da Vida Real,Financiar ou alugar: a conta,Simulação,pergunta,comentar,
+19,2026-11-13,sex,12h,Notícia no Bolso,Pix em 2026: regras novas que protegem você,Notícia explicada,número,seguir,
+20,2026-11-14,sáb,20h,Radar Antigolpe,Golpe do 'número novo' do parente,Conversa reconstituída,frase proibida,compartilhar,
+21,2026-11-15,dom,12h,Sai das Dívidas,Mutirões de renegociação: vale a pena?,Mito x verdade,pergunta,seguir,
+22,2026-11-16,seg,20h,"Seu Direito, Seu Dinheiro",Garantia legal x garantia estendida,Mito x verdade,contraintuitivo,salvar,
+23,2026-11-17,ter,12h,Conta da Vida Real,Black Friday: o desconto é real? Como checar,Passo a passo,pergunta,salvar,sazonal BF 27/11
+24,2026-11-18,qua,20h,Radar Antigolpe,Black Friday: lojas falsas e anúncios-armadilha,Lista,frase proibida,compartilhar,sazonal BF 27/11
+25,2026-11-19,qui,12h,Notícia no Bolso,13º: quanto vem líquido,Simulação,número,salvar,sazonal 13º
+26,2026-11-20,sex,20h,Sai das Dívidas,Dívida 'caduca' em 5 anos? Mito e verdade,Mito x verdade,contraintuitivo,comentar,
+27,2026-11-21,sáb,12h,"Seu Direito, Seu Dinheiro",Preço anunciado tem que ser cumprido,Lista,frase proibida,compartilhar,sazonal BF 27/11
+28,2026-11-22,dom,20h,Radar Antigolpe,Boleto falso: como conferir antes de pagar,Passo a passo,pergunta,salvar,
+29,2026-11-23,seg,12h,Sai das Dívidas,Plano de 90 dias para sair do vermelho (ep. 1),Série episódica,contraintuitivo,seguir + lista,abre série
+30,2026-11-24,ter,20h,Leão Sem Medo,13º paga imposto? Como funciona,Mito x verdade,pergunta,seguir,

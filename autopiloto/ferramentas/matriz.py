@@ -13,7 +13,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 
-PESOS = {
+# v1 (descartada): nichos estreitos, sem medir o teto de escala.
+PESOS_V1 = {
     "demanda": 15,
     "concorrencia": 10,
     "alcance": 10,
@@ -24,10 +25,24 @@ PESOS = {
     "risco": 10,
     "audiencia_externa": 10,
 }
-assert sum(PESOS.values()) == 100
+# v2 (vigente): acrescenta "teto_escala" — quantas series, plataformas, produtos
+# e linhas de receita o tema comporta sem perder a identidade da marca.
+PESOS = {
+    "monetizacao": 20,
+    "teto_escala": 15,
+    "demanda": 12,
+    "producao_ia": 12,
+    "risco": 10,
+    "concorrencia": 8,
+    "alcance": 8,
+    "audiencia_externa": 8,
+    "frequencia_pautas": 4,
+    "custo": 3,
+}
+assert sum(PESOS.values()) == 100 and sum(PESOS_V1.values()) == 100
 
 
-def carregar(caminho=RAIZ / "dados" / "nichos.csv"):
+def carregar(caminho=RAIZ / "dados" / "nichos_v2.csv"):
     with open(caminho, encoding="utf-8") as f:
         linhas = list(csv.DictReader(f))
     for l in linhas:

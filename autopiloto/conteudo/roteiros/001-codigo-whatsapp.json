@@ -1,7 +1,8 @@
 {
   "id": "001",
   "slug": "codigo-de-6-digitos",
-  "marca": "RADAR ANTIGOLPE",
+  "marca": "GRANA CLARA",
+  "serie": "Radar Antigolpe",
   "pilar": "Anatomia do golpe",
   "formato": "Conversa reconstituída",
   "objetivo": "Alcance e compartilhamento: vídeo que o público envia para pais e avós.",
@@ -13,46 +14,99 @@
     {
       "papel": "gancho",
       "narracao": "Se alguém te pedir esse código de seis dígitos, a conversa já é um golpe.",
-      "visual": {"tipo": "chat", "contato": "Atendimento Promoções", "mensagens": [
-        {"de": "eles", "texto": "Olá! Você foi sorteado(a)! Para confirmar, me envie o código de 6 dígitos que chegou por SMS."}
-      ]}
+      "visual": {
+        "tipo": "chat",
+        "contato": "Atendimento Promoções",
+        "mensagens": [
+          {
+            "de": "eles",
+            "texto": "Olá! Você foi sorteado(a)! Para confirmar, me envie o código de 6 dígitos que chegou por SMS."
+          }
+        ]
+      }
     },
     {
       "papel": "desenvolvimento",
       "narracao": "Esse código serve para ativar a sua conta de mensagens em outro celular. Quem tem o código, entra na sua conta e pede dinheiro para os seus contatos, em seu nome.",
-      "visual": {"tipo": "chat", "contato": "Atendimento Promoções", "mensagens": [
-        {"de": "eles", "texto": "Me envie o código de 6 dígitos que chegou por SMS."},
-        {"de": "voce", "texto": "123-456"},
-        {"de": "eles", "texto": "Obrigado!"}
-      ]}
+      "visual": {
+        "tipo": "chat",
+        "contato": "Atendimento Promoções",
+        "mensagens": [
+          {
+            "de": "eles",
+            "texto": "Me envie o código de 6 dígitos que chegou por SMS."
+          },
+          {
+            "de": "voce",
+            "texto": "123-456"
+          },
+          {
+            "de": "eles",
+            "texto": "Obrigado!"
+          }
+        ]
+      }
     },
     {
       "papel": "desenvolvimento",
       "narracao": "Segundo a Febraban, o golpe do WhatsApp teve setenta e três mil relatos aos bancos só no primeiro semestre de 2025.",
-      "visual": {"tipo": "titulo", "texto": "73 mil relatos em 6 meses", "destaque": "alerta"}
+      "visual": {
+        "tipo": "titulo",
+        "texto": "73 mil relatos em 6 meses",
+        "destaque": "alerta"
+      }
     },
     {
       "papel": "solucao",
       "narracao": "A proteção leva um minuto. Ative a verificação em duas etapas, crie um PIN que só você sabe e nunca repasse código recebido por SMS.",
-      "visual": {"tipo": "lista", "titulo": "Faça agora:", "itens": [
-        "Ative a verificação em duas etapas",
-        "Crie um PIN que só você sabe",
-        "Nunca repasse código de SMS"
-      ]}
+      "visual": {
+        "tipo": "lista",
+        "titulo": "Faça agora:",
+        "itens": [
+          "Ative a verificação em duas etapas",
+          "Crie um PIN que só você sabe",
+          "Nunca repasse código de SMS"
+        ]
+      }
     },
     {
       "papel": "cta",
-      "narracao": "Manda este vídeo para quem você quer proteger. E segue o Radar para o próximo alerta.",
-      "visual": {"tipo": "alerta", "texto": "Mande para quem você quer proteger"}
+      "narracao": "Manda este vídeo para quem você quer proteger. E segue a Grana Clara para o próximo alerta.",
+      "visual": {
+        "tipo": "alerta",
+        "texto": "Mande para quem você quer proteger"
+      }
     }
   ],
   "cta": "Compartilhar com a família + seguir.",
   "legenda_post": "Código de 6 dígitos por SMS é a chave da sua conta. Ninguém de verdade pede isso. Ative a verificação em duas etapas hoje e mande para quem você quer proteger. Fonte dos números: Febraban (1º semestre/2025).",
-  "hashtags": ["#golpe", "#segurancadigital", "#whatsapp", "#antigolpe"],
+  "hashtags": [
+    "#golpe",
+    "#segurancadigital",
+    "#whatsapp",
+    "#antigolpe"
+  ],
   "fontes": [
-    {"afirmacao": "73 mil relatos de golpe do WhatsApp aos bancos no 1º semestre de 2025", "descricao": "Febraban, ranking de golpes 1º sem/2025 (via Istoé Dinheiro, 11/11/2025)", "url": "https://istoedinheiro.com.br/golpe-da-falsa-venda-lidera-ranking", "tipo": "secundaria", "verificada": false},
-    {"afirmacao": "Golpistas pedem o código de SMS para registrar a conta em outro aparelho; verificação em duas etapas protege", "descricao": "Febraban (via Diário de Pernambuco, 11/2025)", "url": "https://www.diariodepernambuco.com.br/economia/2025/11/11700388-febraban-golpe-da-falsa-venda-lidera-entre-os-golpes-mais-relatados-por-clientes-bancarios-no-primeiro-semestre.html", "tipo": "secundaria", "verificada": false}
+    {
+      "afirmacao": "73 mil relatos de golpe do WhatsApp aos bancos no 1º semestre de 2025",
+      "descricao": "Febraban, ranking de golpes 1º sem/2025 (via Istoé Dinheiro, 11/11/2025)",
+      "url": "https://istoedinheiro.com.br/golpe-da-falsa-venda-lidera-ranking",
+      "tipo": "secundaria",
+      "verificada": false
+    },
+    {
+      "afirmacao": "Golpistas pedem o código de SMS para registrar a conta em outro aparelho; verificação em duas etapas protege",
+      "descricao": "Febraban (via Diário de Pernambuco, 11/2025)",
+      "url": "https://www.diariodepernambuco.com.br/economia/2025/11/11700388-febraban-golpe-da-falsa-venda-lidera-entre-os-golpes-mais-relatados-por-clientes-bancarios-no-primeiro-semestre.html",
+      "tipo": "secundaria",
+      "verificada": false
+    }
   ],
   "rotulo_ia": true,
-  "revisao_humana": {"aprovado": false, "por": null, "em": null, "observacoes": "Confirmar números no release oficial da Febraban antes de aprovar."}
+  "revisao_humana": {
+    "aprovado": false,
+    "por": null,
+    "em": null,
+    "observacoes": "Confirmar números no release oficial da Febraban antes de aprovar."
+  }
 }

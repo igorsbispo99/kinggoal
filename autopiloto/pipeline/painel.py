@@ -33,7 +33,7 @@ def relatorio(linhas, idade=7, custos=0.0, receita=0.0):
         saida.append(f"| {l['id']} | {l['formato']} | {l['gancho_tipo']} | {l['views']} | "
                      f"{taxa(l, 'compart'):.1f} | {taxa(l, 'salvos'):.1f} | {taxa(l, 'seguidores'):.1f} | "
                      f"{l['conclusao_pct']} | {l['cadastros']} |")
-    for dim in ("formato", "gancho_tipo"):
+    for dim in [d for d in ("serie", "formato", "gancho_tipo", "cta_tipo") if d in linhas[0]]:
         grupos = defaultdict(list)
         for l in linhas:
             grupos[l[dim]].append(l)

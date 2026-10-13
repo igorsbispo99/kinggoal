@@ -1,5 +1,7 @@
 # Primeira entrega — Projeto Autopiloto
 
+> **Atualização:** a escolha de nicho deste documento foi substituída pela revisão v2 (`03-revisao-estrategica-v2.md`). O antigolpe virou uma série dentro da marca "Dinheiro do dia a dia". A pipeline, o funil e as regras de operação continuam valendo.
+
 Nicho recomendado: **Antigolpe e segurança digital do dia a dia** (ver `01-fase1-inteligencia-de-mercado.md`).
 Premissas monetárias: **US$ 1 ≈ R$ 5,50** (premissa, não verifiquei o câmbio de hoje). Taxas de plataformas vêm de fontes secundárias e conflitantes; confirmar antes de contratar.
 

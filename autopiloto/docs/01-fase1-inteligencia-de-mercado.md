@@ -1,5 +1,7 @@
 # Fase 1 — Inteligência de mercado
 
+> **Atualização:** a escolha de nicho deste documento foi substituída pela revisão v2 (`03-revisao-estrategica-v2.md`). O antigolpe virou uma série dentro da marca "Dinheiro do dia a dia". A pipeline, o funil e as regras de operação continuam valendo.
+
 Data da pesquisa: 13/10/2026. Reproduza a matriz com `python3 ferramentas/matriz.py`.
 
 ## Legenda de confiança

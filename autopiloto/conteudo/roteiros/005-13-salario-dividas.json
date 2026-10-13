@@ -1,0 +1,56 @@
+{
+  "id": "005",
+  "slug": "13-salario-qual-divida-pagar",
+  "marca": "GRANA CLARA",
+  "serie": "Sai das Dívidas",
+  "pilar": "Método prático",
+  "formato": "Regra de prioridade",
+  "objetivo": "Salvamentos e lista: pauta sazonal (nov–dez) que leva à planilha gratuita de saída das dívidas.",
+  "publico": "Trabalhadores CLT endividados que recebem 13º salário.",
+  "gancho": "Vai receber o 13º e tem dívida? Não pague a menor. Pague a mais cara.",
+  "hipotese": "Ganchos contraintuitivos ('não pague a menor') retêm mais que ganchos de data ('o 13º cai dia 30').",
+  "criterio_sucesso": "Retenção nos 3 s acima da mediana; salvamentos por mil views acima da mediana; cadastros na planilha.",
+  "cenas": [
+    {
+      "papel": "gancho",
+      "narracao": "Vai receber o décimo terceiro e tem dívida? Não pague a menor primeiro. Pague a mais cara.",
+      "visual": {"tipo": "titulo", "texto": "Não pague a menor. Pague a mais cara.", "destaque": "alerta"}
+    },
+    {
+      "papel": "desenvolvimento",
+      "narracao": "A primeira parcela do décimo terceiro deve ser paga até trinta de novembro. A segunda, até vinte de dezembro. Antes dela cair, faça a lista.",
+      "visual": {"tipo": "lista", "titulo": "Calendário do 13º:", "itens": [
+        "1ª parcela: até 30 de novembro",
+        "2ª parcela: até 20 de dezembro"
+      ]}
+    },
+    {
+      "papel": "solucao",
+      "narracao": "Anote cada dívida com a taxa de juros ao mês. Está no contrato, na fatura ou no aplicativo do banco. Rotativo do cartão e cheque especial costumam estar no topo.",
+      "visual": {"tipo": "lista", "titulo": "Faça a lista:", "itens": [
+        "Dívida e valor",
+        "Juros ao mês (fatura ou contrato)",
+        "Ordene do maior juro para o menor"
+      ]}
+    },
+    {
+      "papel": "solucao",
+      "narracao": "Depois, ataque de cima para baixo. E antes de pagar à vista, peça desconto. Em pagamento à vista, credor costuma negociar.",
+      "visual": {"tipo": "alerta", "texto": "Peça desconto antes de pagar"}
+    },
+    {
+      "papel": "cta",
+      "narracao": "Salva para não esquecer. E pega a planilha gratuita que ordena as suas dívidas sozinha, no link do perfil.",
+      "visual": {"tipo": "titulo", "texto": "Planilha grátis no perfil"}
+    }
+  ],
+  "cta": "Salvar + planilha gratuita (captação de lista).",
+  "legenda_post": "13º salário: 1ª parcela até 30/11 e 2ª até 20/12 (Lei 4.749/1965). Se tem dívida, comece pela de juros mais altos e peça desconto à vista. Planilha gratuita no link do perfil.",
+  "hashtags": ["#13salario", "#dividas", "#financaspessoais", "#granaclara"],
+  "fontes": [
+    {"afirmacao": "Prazos do 13º: adiantamento até 30/11 e 2ª parcela até 20/12", "descricao": "Lei 4.749/1965 (Planalto)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l4749.htm", "tipo": "primaria", "verificada": false},
+    {"afirmacao": "Rotativo do cartão e cheque especial estão entre as maiores taxas de juros para pessoa física", "descricao": "Banco Central, estatísticas de taxas de juros", "url": "https://www.bcb.gov.br/estatisticas/txjuros", "tipo": "primaria", "verificada": false}
+  ],
+  "rotulo_ia": true,
+  "revisao_humana": {"aprovado": false, "por": null, "em": null, "observacoes": "Conferir a taxa atual das modalidades no BCB. Não citar número de juros sem fonte do mês. Planilha precisa existir antes da publicação."}
+}
